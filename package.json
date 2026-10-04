@@ -1,0 +1,22 @@
+{
+  "name": "chroniken-von-valenor",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c magenta,cyan \"npm run dev --workspace @valenor/server\" \"npm run dev --workspace @valenor/client\"",
+    "build": "npm run build --workspace @valenor/client && npm run build --workspace @valenor/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "start": "npm run start --workspace @valenor/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

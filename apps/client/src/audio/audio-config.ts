@@ -29,7 +29,9 @@ export type AudioEvent =
   | "UI_CANCEL"
   | "UI_ERROR"
   | "VICTORY"
-  | "DEFEAT";
+  | "DEFEAT"
+  | "MOBILE_TURN" | "MOBILE_TRADE_OFFER" | "MOBILE_TRADE_ACCEPTED" | "MOBILE_TRADE_REJECTED"
+  | "MOBILE_PURCHASE" | "MOBILE_BUILD" | "MOBILE_COIN" | "MOBILE_ADVENTURE" | "MOBILE_FATE" | "MOBILE_DOUBLE";
 
 export interface AudioCueConfig {
   paths: readonly string[];
@@ -38,9 +40,18 @@ export interface AudioCueConfig {
   cooldownMs: number;
   pitchVariation?: number;
   duckMusic?: boolean;
+  controllerOnly?: boolean;
+  maxDurationMs?: number;
+  overridePath?: string;
 }
 
 const sfx = (folder: string, file: string) => `/assets/audio/sfx/${folder}/${file}`;
+
+// Optional mobile recordings take precedence; installed game assets remain the fallback.
+const mobile = (file: string, paths: readonly string[], volume: number, maxDurationMs: number): AudioCueConfig => ({
+  paths, overridePath: sfx("mobile", file), group: "SFX", volume, maxDurationMs,
+  cooldownMs: 0, controllerOnly: true
+});
 
 export const MUSIC_TRACK = {
   path: "/assets/audio/music/valenor-main.mp3",
@@ -49,6 +60,16 @@ export const MUSIC_TRACK = {
 };
 
 export const AUDIO_CUES: Readonly<Record<AudioEvent, AudioCueConfig>> = {
+  MOBILE_TURN: mobile("turn.ogg", [sfx("ui", "confirm.ogg")], 0.3, 700),
+  MOBILE_TRADE_OFFER: mobile("trade-offer.ogg", [sfx("world", "realm-transition-01.ogg")], 0.3, 1000),
+  MOBILE_TRADE_ACCEPTED: mobile("trade-accepted.ogg", [sfx("events", "event-positive-01.ogg")], 0.26, 850),
+  MOBILE_TRADE_REJECTED: mobile("trade-rejected.ogg", [sfx("events", "event-negative-01.ogg")], 0.2, 650),
+  MOBILE_PURCHASE: mobile("purchase.ogg", [sfx("property", "property-buy.ogg")], 0.26, 800),
+  MOBILE_BUILD: mobile("build.ogg", [sfx("ui", "confirm.ogg")], 0.26, 650),
+  MOBILE_COIN: mobile("coin.ogg", [sfx("economy", "coins-gain-01.ogg"), sfx("economy", "coins-gain-02.ogg")], 0.18, 400),
+  MOBILE_ADVENTURE: mobile("adventure.ogg", [sfx("cards", "card-draw-01.ogg")], 0.26, 650),
+  MOBILE_FATE: mobile("fate.ogg", [sfx("cards", "card-draw-02.ogg")], 0.26, 650),
+  MOBILE_DOUBLE: mobile("double.ogg", [sfx("events", "event-positive-02.ogg")], 0.28, 900),
   DICE_ROLL: { paths: [1, 2, 3, 4, 5].map((number) => sfx("dice", `dice-0${number}.ogg`)), group: "SFX", volume: 0.9, cooldownMs: 250, pitchVariation: 0.03 },
   TOKEN_MOVE: { paths: [1, 2, 3].map((number) => sfx("movement", `token-0${number}.ogg`)), group: "SFX", volume: 0.28, cooldownMs: 160, pitchVariation: 0.025 },
   GOLD_GAIN: { paths: [sfx("economy", "coins-gain-01.ogg"), sfx("economy", "coins-gain-02.ogg")], group: "SFX", volume: 0.72, cooldownMs: 350, pitchVariation: 0.02 },
@@ -72,4 +93,3 @@ export const AUDIO_CUES: Readonly<Record<AudioEvent, AudioCueConfig>> = {
   VICTORY: { paths: [sfx("victory", "victory.ogg")], group: "SFX", volume: 0.95, cooldownMs: 5_000, duckMusic: true },
   DEFEAT: { paths: [sfx("victory", "defeat.ogg")], group: "SFX", volume: 0.85, cooldownMs: 5_000, duckMusic: true }
 };
-

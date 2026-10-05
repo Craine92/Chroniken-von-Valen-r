@@ -63,3 +63,29 @@ test("held dungeon cards are visible as selectable and received trade assets", (
   assert.match(markup, /Gunst der Mondseherin/);
   assert.match(markup, /type="checkbox"/);
 });
+
+test("every traded property names its group, owner and status on both offer sides", () => {
+  const game = state();
+  game.trades.push({ ...game.trades[0]!, id: "sent", proposerId: "p1", recipientId: "p2" });
+  const original = JSON.stringify(game);
+  const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
+  assert.match(markup, /Mondhain · 2er-Gruppe/);
+  assert.match(markup, /Silberbach · 3er-Gruppe/);
+  assert.match(markup, /Besitz: Philipp/);
+  assert.match(markup, /Besitz: Justine/);
+  assert.match(markup, /Belehnt/);
+  assert.match(markup, /Du gibst/);
+  assert.match(markup, /Du erhältst/);
+  assert.match(markup, /Dein Angebot im Überblick/);
+  assert.match(markup, /--property-group-accent:#24c4b7/);
+  assert.equal(JSON.stringify(game), original);
+});
+
+test("rejected offers retain grouped property identities in collapsed history", () => {
+  const game = state();
+  game.trades[0]!.status = "rejected";
+  const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
+  assert.match(markup, /Abgelehnt/);
+  assert.match(markup, /<details class="trade-section trade-history">/);
+  assert.match(markup, /Silberbach · 3er-Gruppe/);
+});

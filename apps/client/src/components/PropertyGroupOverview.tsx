@@ -12,6 +12,7 @@ interface PropertyGroupOverviewProps {
   economicallyActive: boolean;
   selected?: boolean;
   onSelect?: (groupId: PropertyGroupId) => void;
+  onSelectTile?: (tileIndex: number) => void;
 }
 
 export function PropertyGroupOverview({
@@ -23,7 +24,8 @@ export function PropertyGroupOverview({
   buildAvailable,
   economicallyActive,
   selected = false,
-  onSelect
+  onSelect,
+  onSelectTile
 }: PropertyGroupOverviewProps) {
   const visual = getPropertyGroupVisual(propertyGroup);
   const groupDefinition = getPropertyGroup(propertyGroup);
@@ -33,6 +35,7 @@ export function PropertyGroupOverview({
   const complete = ownedCount === tiles.length;
   const missingTiles = tiles.filter((tile) => ownershipByTile.get(tile.index)?.ownerId !== viewerId);
   const missingCount = tiles.length - ownedCount;
+  const Member = onSelectTile ? "button" : "div";
   const buildStatus = buildAvailable
     ? "Bauen jetzt möglich"
     : complete && !economicallyActive
@@ -45,13 +48,13 @@ export function PropertyGroupOverview({
     <div
       className={`property-group__overview${complete ? " is-complete" : ""}${buildAvailable ? " can-build" : ""}${selected ? " is-selected" : ""}`}
       style={{ "--property-group-accent": visual.cssAccent } as CSSProperties}
-      role={onSelect ? "button" : undefined}
-      tabIndex={onSelect ? 0 : undefined}
-      aria-pressed={onSelect ? selected : undefined}
-      aria-label={onSelect ? `${propertyGroup} auf dem Spielbrett ${selected ? "nicht mehr hervorheben" : "hervorheben"}` : undefined}
-      onClick={() => groupDefinition && onSelect?.(groupDefinition.id)}
+      role={onSelect && !onSelectTile ? "button" : undefined}
+      tabIndex={onSelect && !onSelectTile ? 0 : undefined}
+      aria-pressed={onSelect && !onSelectTile ? selected : undefined}
+      aria-label={onSelect && !onSelectTile ? `${propertyGroup} auf dem Spielbrett ${selected ? "nicht mehr hervorheben" : "hervorheben"}` : undefined}
+      onClick={onSelectTile ? undefined : () => groupDefinition && onSelect?.(groupDefinition.id)}
       onKeyDown={(event) => {
-        if (groupDefinition && onSelect && (event.key === "Enter" || event.key === " ")) {
+        if (!onSelectTile && groupDefinition && onSelect && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
           onSelect(groupDefinition.id);
         }
@@ -87,14 +90,16 @@ export function PropertyGroupOverview({
                 ? `Besitz: ${owner.name}`
                 : "Noch frei";
           return (
-            <div className={`property-group__member${ownedByViewer ? " is-owned" : ""}${owner && !ownedByViewer ? " is-rival" : ""}`} key={tile.index}>
+            <Member className={`property-group__member${ownedByViewer ? " is-owned" : ""}${owner && !ownedByViewer ? " is-rival" : ""}`} key={tile.index} type={onSelectTile ? "button" : undefined} onClick={onSelectTile ? () => onSelectTile(tile.index) : undefined}>
               <span className={`property-group__owner${owner ? ` property-group__owner--${owner.color}` : ""}`} aria-hidden="true">{ownedByViewer ? "◆" : owner ? "◇" : "·"}</span>
-              <div><strong>{tile.name}</strong><small>{status}</small></div>
-            </div>
+              <div><strong>{tile.name}</strong>{onSelectTile ? <span className="controller-status-chips"><small>{ownedByViewer ? "Dein Besitz" : owner ? `Besitz: ${owner.name}` : "Frei"}</small>{ownership?.mortgaged && <small>Belehnt</small>}</span> : <small>{status}</small>}</div>
+              {onSelectTile && <span className="controller-member-sigil" aria-hidden="true">{visual.sigil}</span>}
+            </Member>
           );
         })}
       </div>
-      <p className={`property-group__build-status${buildAvailable ? " can-build" : ""}`}>{buildAvailable ? "✦ " : ""}{buildStatus}</p>
+      <p className={`property-group__build-status${buildAvailable ? " can-build" : ""}`}>{buildAvailable ? "✦ " : ""}{onSelectTile && missingCount > 0 ? `Fehlt: ${missingTiles.map((tile) => tile.name).join(" · ")}` : buildStatus}</p>
+      {onSelectTile && onSelect && groupDefinition && <button type="button" className="controller-board-focus" aria-pressed={selected} onClick={() => onSelect(groupDefinition.id)}>{selected ? "Markierung aufheben" : "Gruppe auf dem Board markieren"}</button>}
     </div>
   );
 }

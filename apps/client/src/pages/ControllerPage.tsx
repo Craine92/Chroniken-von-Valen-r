@@ -1,21 +1,10 @@
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   BOARD_TILES,
   DUNGEON_RELEASE_COST,
-  calculatePropertyRent,
-  canBuildOnProperty,
   canSellBuilding,
   canMortgageProperty,
-  canRedeemMortgage,
-  getBuildingName,
-  getMortgageRedemptionCost,
-  getMortgageValue,
-  isGroupEconomicallyActive,
-  describeCardEffects,
   getCardDefinition,
-  getPropertyGroup,
-  getPropertyGroupTiles,
-  ownsCompletePropertyGroup,
   SOCKET_EVENTS,
   type GameState,
   type CreateTradeOfferRequest,
@@ -27,7 +16,7 @@ import { Ambience } from "../components/Ambience";
 import { BrandMark } from "../components/BrandMark";
 import { ConnectionBadge } from "../components/ConnectionBadge";
 import { PropertyCard } from "../components/PropertyCard";
-import { PropertyGroupOverview } from "../components/PropertyGroupOverview";
+import { ControllerPossessions } from "../components/ControllerPossessions";
 import { TradePanel } from "../components/TradePanel";
 import { CardReveal } from "../components/CardReveal";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
@@ -35,6 +24,7 @@ import { GameResultPanel } from "../components/GameResultPanel";
 import { createValenorSocket } from "../lib/socket";
 import { audioManager } from "../audio/AudioManager";
 import { GameAudioEventTracker } from "../audio/game-audio-events";
+import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
 
 function normalizeRoomCode(value: string): string {
   const lettersAndNumbers = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -159,15 +149,25 @@ export function ControllerPage() {
   const [signalSent, setSignalSent] = useState(false);
   const [gameState, setGameState] = useState<GameState>();
   const [selectedPropertyGroupId, setSelectedPropertyGroupId] = useState<PropertyGroupId>();
-  const [turnNotice, setTurnNotice] = useState<{ currentName: string; own: boolean }>();
+  const [controllerTab, setControllerTab] = useState("action");
+  useEffect(() => {
+    const updateTab = () => {
+      const tab = window.location.hash.replace("#controller-", "");
+      setControllerTab(["action", "property", "trade", "journal"].includes(tab) ? tab : "action");
+      window.scrollTo({ top: 0, behavior: "auto" });
+    };
+    updateTab();
+    window.addEventListener("hashchange", updateTab);
+    return () => window.removeEventListener("hashchange", updateTab);
+  }, []);
+  const mobileFeedback = useMobileFeedback(gameState, player?.id);
+  const [feedbackHeight, setFeedbackHeight] = useState(0);
   const playerRef = useRef<Player | undefined>(undefined);
   const nameRef = useRef("");
   const roomRef = useRef(roomCode);
   const signalTimer = useRef<number | undefined>(undefined);
-  const turnNoticeTimer = useRef<number | undefined>(undefined);
-  const lastTradeNoticeId = useRef<string | undefined>(undefined);
   const audioTracker = useRef(new GameAudioEventTracker());
-  const incomingTrade = gameState?.trades.find((trade) => trade.recipientId === player?.id && trade.status === "pending");
+  const incomingTradeCount = gameState?.trades.filter((trade) => trade.recipientId === player?.id && trade.status === "pending").length ?? 0;
 
   useEffect(() => {
     if (error) audioManager.play("UI_ERROR");
@@ -233,28 +233,10 @@ export function ControllerPage() {
 
     return () => {
       window.clearTimeout(signalTimer.current);
-      window.clearTimeout(turnNoticeTimer.current);
       socket.removeAllListeners();
       socket.disconnect();
     };
   }, [socket]);
-
-  useEffect(() => {
-    if (!gameState?.currentPlayerId || !player) return;
-    const current = gameState.players.find((candidate) => candidate.id === gameState.currentPlayerId);
-    if (!current) return;
-    const own = current.id === player.id;
-    setTurnNotice({ currentName: current.name, own });
-    if (own) navigator.vibrate?.(70);
-    window.clearTimeout(turnNoticeTimer.current);
-    turnNoticeTimer.current = window.setTimeout(() => setTurnNotice(undefined), 2_400);
-  }, [gameState?.currentPlayerId, player?.id]);
-
-  useEffect(() => {
-    if (!incomingTrade || incomingTrade.id === lastTradeNoticeId.current) return;
-    lastTradeNoticeId.current = incomingTrade.id;
-    navigator.vibrate?.([70, 50, 70]);
-  }, [incomingTrade?.id]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -451,13 +433,15 @@ export function ControllerPage() {
     const ownedTiles = gameState.propertyOwnerships
       .filter((ownership) => ownership.ownerId === player.id)
       .map((ownership) => ({ ownership, tile: BOARD_TILES[ownership.tileIndex]! }));
-    const propertyGroups = [...new Set(ownedTiles.filter(({ tile }) => tile.type === "property").map(({ tile }) => tile.propertyGroupId!))];
-    const specialOwnedTiles = ownedTiles.filter(({ tile }) => tile.type !== "property");
+
+
     const payment = gameState.pendingPayment?.payerId === player.id ? gameState.pendingPayment : undefined;
     const hasLegalPaymentSale = payment && ownedTiles.some(({ tile }) => canSellBuilding(gameState, player.id, tile.index).allowed || canMortgageProperty(gameState, player.id, tile.index).allowed);
     return (
-      <main className={`controller-page controller-page--active player-theme--${player.color}`}>
+      <main className={`controller-page controller-page--active player-theme--${player.color}`}
+        style={{ "--mobile-feedback-space": feedbackHeight ? `${feedbackHeight + 24}px` : "0px" } as CSSProperties}>
         <Ambience />
+        <MobileFeedbackToast snapshot={mobileFeedback.snapshot} onDismiss={mobileFeedback.dismiss} onHeightChange={setFeedbackHeight} />
         <section className="controller-card controller-card--started">
           <BrandMark compact />
           <header className={`controller-player-bar controller-player-bar--${player.color}`}>
@@ -465,8 +449,6 @@ export function ControllerPage() {
             <div><strong>{activePlayer.name}</strong><small>RUNDE {gameState.currentRound} · {activePlayer.dungeon.inDungeon ? "IM KERKER" : gameState.currentPlayerId === player.id ? "AM ZUG" : "BEREIT"}</small></div>
             <b><i className="valenor-coin" aria-hidden="true">V</i>{activePlayer.gold.toLocaleString("de-DE")}</b>
           </header>
-          {turnNotice && <MobileTurnNotice currentName={turnNotice.currentName} own={turnNotice.own} />}
-          {incomingTrade && <MobileTradeNotice proposerName={gameState.players.find((candidate) => candidate.id === incomingTrade.proposerId)?.name ?? "Unbekannt"} />}
           <div className={`player-orb player-orb--${player.color}`} aria-hidden="true">
             <span>{player.name.charAt(0).toUpperCase()}</span>
           </div>
@@ -483,7 +465,8 @@ export function ControllerPage() {
           <QuickGameClockDisplay clock={gameState.quickGameClock} compact />
           {gameState.quickGameClock?.expired && <p className="controller-last-round">DIE LETZTE RUNDE</p>}
           <ConnectionBadge connected={connected} />
-          <div className="controller-divider" id="controller-action"><span>✦</span></div>
+          <div id="controller-action" hidden={controllerTab !== "action"}>
+          <div className="controller-divider"><span>✦</span></div>
           {isCurrent && gameState.turnPhase === "dungeonDecision" ? (
             <DungeonDecisionPanel
               failedAttempts={activePlayer.dungeon.failedAttempts}
@@ -569,87 +552,15 @@ export function ControllerPage() {
             </div>
           )}
           {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} onDeclareBankruptcy={declareBankruptcy} />}
-          <section className="ownership-list" id="controller-property">
-            <div className="ownership-list__heading">
-              <h2>Mein Besitz</h2>
-              <div className="held-cards-inline">{(activePlayer.heldCards ?? []).length} besondere Karten</div>
-              <div className="building-bank"><span>BANK</span><b>Bauwerke {gameState.buildingBank.settlementUnitsAvailable} / 32</b><b>Großbauten {gameState.buildingBank.grandStructuresAvailable} / 12</b></div>
-            </div>
-            <section className="held-cards">
-              <h3>Besondere Karten</h3>
-              {(activePlayer.heldCards ?? []).length === 0 ? <p>Keine besonderen Karten.</p> : (activePlayer.heldCards ?? []).map((held) => {
-                const card = getCardDefinition(held.cardId);
-                return <article key={held.cardId}><strong>{card.title}</strong><span>{describeCardEffects(card)}</span></article>;
-              })}
-            </section>
-            {ownedTiles.length === 0 && <p>Noch keine Ländereien, Häfen oder Versorgungswerke.</p>}
-            {propertyGroups.map((propertyGroupId) => {
-              const groupDefinition = getPropertyGroup(propertyGroupId)!;
-              const complete = ownsCompletePropertyGroup(gameState.propertyOwnerships, player.id, propertyGroupId);
-              const economicallyActive = isGroupEconomicallyActive(gameState.propertyOwnerships, player.id, propertyGroupId);
-              const groupTiles = getPropertyGroupTiles(propertyGroupId);
-              const buildAvailable = groupTiles.some((tile) => canBuildOnProperty(gameState, player.id, tile.index).allowed);
-              return (
-                <section className="property-group" key={propertyGroupId}>
-                  <PropertyGroupOverview
-                    propertyGroup={groupDefinition.displayName}
-                    tiles={groupTiles}
-                    ownerships={gameState.propertyOwnerships}
-                    players={gameState.players}
-                    viewerId={player.id}
-                    buildAvailable={buildAvailable}
-                    economicallyActive={economicallyActive}
-                    selected={selectedPropertyGroupId === groupDefinition.id}
-                    onSelect={selectPropertyGroup}
-                  />
-                  {ownedTiles.filter(({ tile }) => tile.propertyGroupId === propertyGroupId).map(({ tile, ownership }) => {
-                    const build = canBuildOnProperty(gameState, player.id, tile.index);
-                    const sell = canSellBuilding(gameState, player.id, tile.index);
-                    const mortgage = canMortgageProperty(gameState, player.id, tile.index);
-                    const redeem = canRedeemMortgage(gameState, player.id, tile.index);
-                    const currentRent = calculatePropertyRent(gameState.propertyOwnerships, tile, player.id);
-                    const nextLevel = Math.min(5, ownership.buildingLevel + 1) as 0 | 1 | 2 | 3 | 4 | 5;
-                    return (
-                      <div className="property-management" key={tile.index}>
-                        <PropertyCard tile={tile} ownership={ownership} owner={activePlayer} compact completeGroup={complete} groupEconomicallyActive={economicallyActive} />
-                        <div className="property-management__summary">
-                          <span>Aktuelle Miete <b>{currentRent} Gold</b></span>
-                          {ownership.buildingLevel < 5 && tile.economy?.rentSchedule && tile.region && (
-                            <span>Nächste Stufe <b>{getBuildingName(tile.region, nextLevel)} · {tile.economy.rentSchedule[nextLevel]} Gold</b></span>
-                          )}
-                        </div>
-                        <div className="property-management__actions">
-                          <button type="button" disabled={!connected || !build.allowed} onClick={() => manageBuilding(SOCKET_EVENTS.propertyBuild, tile.index)}>Bauen · {tile.economy?.buildCost} Gold</button>
-                          <button type="button" disabled={!connected || !sell.allowed} onClick={() => manageBuilding(SOCKET_EVENTS.propertySellBuilding, tile.index)}>Baustufe verkaufen</button>
-                        </div>
-                        <div className="mortgage-actions">
-                          {ownership.mortgaged ? (
-                            <button type="button" disabled={!connected || !redeem.allowed} onClick={() => manageMortgage(SOCKET_EVENTS.propertyRedeemMortgage, tile.index)}>Hypothek auslösen · {getMortgageRedemptionCost(tile)} Gold</button>
-                          ) : (
-                            <button type="button" disabled={!connected || !mortgage.allowed} onClick={() => manageMortgage(SOCKET_EVENTS.propertyMortgage, tile.index)}>Beleihen · +{getMortgageValue(tile)} Gold</button>
-                          )}
-                        </div>
-                        {!build.allowed && <p>{build.reason}</p>}
-                        {ownership.buildingLevel > 0 && !sell.allowed && <p>{sell.reason}</p>}
-                      </div>
-                    );
-                  })}
-                </section>
-              );
-            })}
-            {specialOwnedTiles.map(({ tile, ownership }) => {
-              const mortgage = canMortgageProperty(gameState, player.id, tile.index);
-              const redeem = canRedeemMortgage(gameState, player.id, tile.index);
-              return <div className="property-management" key={tile.index}><PropertyCard tile={tile} ownership={ownership} owner={activePlayer} compact /><div className="mortgage-actions">{ownership.mortgaged ? <button disabled={!connected || !redeem.allowed} onClick={() => manageMortgage(SOCKET_EVENTS.propertyRedeemMortgage, tile.index)}>Hypothek auslösen · {getMortgageRedemptionCost(tile)} Gold</button> : <button disabled={!connected || !mortgage.allowed} onClick={() => manageMortgage(SOCKET_EVENTS.propertyMortgage, tile.index)}>Beleihen · +{getMortgageValue(tile)} Gold</button>}</div></div>;
-            })}
-          </section>
-          <div id="controller-trade"><TradePanel state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onDecision={decideTrade} /></div>
-          {gameState.economyLog.at(-1) && <p className="controller-log" id="controller-journal">{gameState.economyLog.at(-1)!.message}</p>}
+          </div>
+          <div hidden={controllerTab !== "property"}><ControllerPossessions state={gameState} playerId={player.id} connected={connected} selectedGroupId={selectedPropertyGroupId} onSelectGroup={selectPropertyGroup} onBuild={manageBuilding} onMortgage={manageMortgage} /></div>
+          <div id="controller-trade" hidden={controllerTab !== "trade"}><TradePanel state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onDecision={decideTrade} /></div>
+          <section id="controller-journal" hidden={controllerTab !== "journal"}><h2>Journal</h2>{gameState.economyLog.at(-1) ? <p className="controller-log">{gameState.economyLog.at(-1)!.message}</p> : <p>Noch keine Einträge.</p>}</section>
           <nav className="controller-nav" aria-label="Controller-Bereiche">
-            <a href="#controller-action"><span>✦</span>Aktion</a>
-            <a href="#controller-property"><span>♜</span>Besitz</a>
-            <a href="#controller-trade"><span>◇</span>Handel</a>
-            <a href="#controller-journal"><span>☷</span>Journal</a>
+            <a href="#controller-action" aria-current={controllerTab === "action" ? "page" : undefined}><span>✦</span>Aktion</a>
+            <a href="#controller-property" aria-current={controllerTab === "property" ? "page" : undefined}><span>♜</span>Besitz</a>
+            <a href="#controller-trade" aria-current={controllerTab === "trade" ? "page" : undefined}><span>◇</span>Handel{incomingTradeCount > 0 && <b className="controller-trade-badge" aria-label={`${incomingTradeCount} offene Handelsangebote`}>{incomingTradeCount}</b>}</a>
+            <a href="#controller-journal" aria-current={controllerTab === "journal" ? "page" : undefined}><span>☷</span>Journal</a>
           </nav>
           {error && <p className="form-error" role="alert">{error}</p>}
         </section>

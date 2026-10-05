@@ -54,7 +54,7 @@ test("variant selection uses only available files and avoids an immediate repeat
   assert.equal(selectAudioVariant([], undefined), undefined);
 });
 
-test("confirmed dice, movement and start passage produce semantic local cues", () => {
+test("confirmed dice produce a cue but movement and start passage wait for animation", () => {
   const previous = gameState();
   const dice = clone(previous);
   dice.lastDiceRoll = { die1: 3, die2: 5, total: 8, isDouble: false };
@@ -63,10 +63,12 @@ test("confirmed dice, movement and start passage produce semantic local cues", (
 
   const movement = clone(dice);
   movement.lastMovement = { kind: "normal", sequence: 1, playerId: "p1", from: 39, to: 2, path: [0, 1, 2], passedStart: true, landedTile: BOARD_TILES[2]! };
-  assert.deepEqual(names(deriveGameAudioEvents(dice, movement)), ["START_PASS"]);
+  assert.deepEqual(names(deriveGameAudioEvents(dice, movement)), []);
+  movement.economyLog.push({ id: "start", kind: "start", message: "Runentor", playerIds: ["p1"], amount: 200, createdAt: 2 });
+  assert.deepEqual(names(deriveGameAudioEvents(dice, movement)), []);
 });
 
-test("realm crossings and ordinary movement are distinguished without changing game state", () => {
+test("state sync never emits movement or realm audio and leaves game state unchanged", () => {
   const previous = gameState();
   const original = JSON.stringify(previous);
   const realmIndices = BOARD_TILES.filter((tile) => tile.region);
@@ -74,12 +76,30 @@ test("realm crossings and ordinary movement are distinguished without changing g
   const to = realmIndices.find((tile) => tile.region !== from.region)!;
   const next = clone(previous);
   next.lastMovement = { kind: "normal", sequence: 1, playerId: "p1", from: from.index, to: to.index, path: [to.index], passedStart: false, landedTile: to };
-  assert.deepEqual(names(deriveGameAudioEvents(previous, next)), ["REALM_TRANSITION"]);
+  assert.deepEqual(names(deriveGameAudioEvents(previous, next)), []);
   assert.equal(JSON.stringify(previous), original);
 
   const ordinary = clone(previous);
   ordinary.lastMovement = { kind: "normal", sequence: 2, playerId: "p1", from: from.index, to: from.index, path: [from.index], passedStart: false, landedTile: from };
-  assert.deepEqual(names(deriveGameAudioEvents(previous, ordinary)), ["TOKEN_MOVE"]);
+  assert.deepEqual(names(deriveGameAudioEvents(previous, ordinary)), []);
+  const sync = clone(previous);
+  sync.players[0]!.position = to.index;
+  assert.deepEqual(names(deriveGameAudioEvents(previous, sync)), []);
+});
+
+test("movement variants retain all three local files and avoid consecutive repeats", () => {
+  const paths = AUDIO_CUES.TOKEN_MOVE.paths;
+  assert.deepEqual(paths, [1, 2, 3].map((number) => `/assets/audio/sfx/movement/token-0${number}.ogg`));
+  let previous: string | undefined;
+  const selected = new Set<string>();
+  for (let index = 0; index < 12; index += 1) {
+    const next = selectAudioVariant(paths, previous, () => (index % 3) / 3);
+    assert.notEqual(next, previous);
+    selected.add(next!);
+    previous = next;
+  }
+  assert.equal(selected.size, 3);
+  assert.ok(AUDIO_CUES.TOKEN_MOVE.cooldownMs < 90 + 100);
 });
 
 test("cards receive draw plus one delayed, action-specific result cue", () => {

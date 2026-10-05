@@ -18,6 +18,7 @@ export interface AudioSettings {
   sfxEnabled: boolean;
   uiEnabled: boolean;
   masterMuted: boolean;
+  hapticsEnabled: boolean;
 }
 
 export type AudioOutputRole = "primary" | "controller";
@@ -30,7 +31,8 @@ export const DEFAULT_AUDIO_SETTINGS: Readonly<AudioSettings> = {
   musicEnabled: true,
   sfxEnabled: true,
   uiEnabled: true,
-  masterMuted: false
+  masterMuted: false,
+  hapticsEnabled: true
 };
 
 const clampVolume = (value: unknown, fallback: number): number =>
@@ -46,7 +48,8 @@ export function normalizeAudioSettings(value: unknown): AudioSettings {
     musicEnabled: typeof input.musicEnabled === "boolean" ? input.musicEnabled : true,
     sfxEnabled: typeof input.sfxEnabled === "boolean" ? input.sfxEnabled : true,
     uiEnabled: typeof input.uiEnabled === "boolean" ? input.uiEnabled : true,
-    masterMuted: typeof input.masterMuted === "boolean" ? input.masterMuted : false
+    masterMuted: typeof input.masterMuted === "boolean" ? input.masterMuted : false,
+    hapticsEnabled: typeof input.hapticsEnabled === "boolean" ? input.hapticsEnabled : true
   };
 }
 
@@ -56,7 +59,7 @@ export function selectAudioVariant(paths: readonly string[], previousPath: strin
   return candidates[Math.min(candidates.length - 1, Math.floor(random() * candidates.length))];
 }
 
-class AudioManager {
+export class AudioManager {
   private settings = this.readSettings();
   private outputRole: AudioOutputRole = "primary";
   private gameActive = false;
@@ -122,6 +125,7 @@ class AudioManager {
     this.armed = true;
     this.unlockHandler = () => { void this.unlock(); };
     window.addEventListener("pointerdown", this.unlockHandler, { capture: true });
+    window.addEventListener("click", this.unlockHandler, { capture: true });
     window.addEventListener("keydown", this.unlockHandler, { capture: true });
   }
 
@@ -145,10 +149,17 @@ class AudioManager {
     try {
       this.audioContext ??= this.createAudioContext();
       if (this.audioContext && this.audioContext.state === "suspended") await this.audioContext.resume();
+      if (!this.audioContext || this.audioContext.state !== "running") return;
       this.unlocked = true;
       this.ensureGainGraph();
-      // Dice are the first timing-sensitive game cue; warm their small buffers after consent.
-      void this.loadCue("DICE_ROLL");
+      // Warm timing-sensitive buffers after consent, before dice and field arrivals.
+      if (this.outputRole === "controller") {
+        void this.loadCue("MOBILE_TURN");
+        void this.loadCue("MOBILE_TRADE_OFFER");
+      } else {
+        void this.loadCue("DICE_ROLL");
+        void this.loadCue("TOKEN_MOVE");
+      }
       document.documentElement.dataset.gameAudio = "ready";
       if (this.gameActive && this.outputRole === "primary") await this.startMusic();
     } catch {
@@ -159,8 +170,9 @@ class AudioManager {
   play(event: AudioEvent): void {
     const cue = AUDIO_CUES[event];
     if (!this.unlocked || !this.audioContext || this.settings.masterMuted) return;
+    if (cue.controllerOnly && this.outputRole !== "controller") return;
     const controllerResult = event === "VICTORY" || event === "DEFEAT";
-    if (cue.group === "SFX" && (!this.settings.sfxEnabled || (this.outputRole === "controller" && !controllerResult))) return;
+    if (cue.group === "SFX" && (!this.settings.sfxEnabled || (this.outputRole === "controller" && !controllerResult && !cue.controllerOnly))) return;
     if (cue.group === "UI" && !this.settings.uiEnabled) return;
     const now = performance.now();
     if (now - (this.lastPlayedAt.get(event) ?? -Infinity) < cue.cooldownMs) return;
@@ -168,6 +180,7 @@ class AudioManager {
 
     void this.loadCue(event).then((available) => {
       if (available.length === 0 || !this.audioContext || this.activeSources.size >= 16) return;
+      if (cue.controllerOnly && (this.outputRole !== "controller" || !this.settings.sfxEnabled || this.settings.masterMuted)) return;
       const path = selectAudioVariant(available.map((entry) => entry.path), this.previousVariants.get(event));
       const selected = available.find((entry) => entry.path === path);
       if (!selected) return;
@@ -186,6 +199,7 @@ class AudioManager {
     this.stopMusic();
     if (typeof window !== "undefined" && this.unlockHandler) {
       window.removeEventListener("pointerdown", this.unlockHandler, true);
+      window.removeEventListener("click", this.unlockHandler, true);
       window.removeEventListener("keydown", this.unlockHandler, true);
     }
     if (typeof document !== "undefined" && this.uiClickHandler) document.removeEventListener("click", this.uiClickHandler, true);
@@ -263,13 +277,20 @@ class AudioManager {
   private loadCue(event: AudioEvent): Promise<readonly { path: string; buffer: AudioBuffer }[]> {
     const existing = this.cueLoads.get(event);
     if (existing) return existing;
-    const load = Promise.all(AUDIO_CUES[event].paths.map(async (path) => ({ path, buffer: await this.loadBuffer(path) })))
-      .then((entries) => entries.filter((entry): entry is { path: string; buffer: AudioBuffer } => Boolean(entry.buffer)));
+    const load = (async () => {
+      const cue = AUDIO_CUES[event];
+      if (cue.overridePath) {
+        const buffer = await this.loadBuffer(cue.overridePath, true);
+        if (buffer) return [{ path: cue.overridePath, buffer }];
+      }
+      const entries = await Promise.all(cue.paths.map(async (path) => ({ path, buffer: await this.loadBuffer(path) })));
+      return entries.filter((entry): entry is { path: string; buffer: AudioBuffer } => Boolean(entry.buffer));
+    })();
     this.cueLoads.set(event, load);
     return load;
   }
 
-  private loadBuffer(path: string): Promise<AudioBuffer | undefined> {
+  private loadBuffer(path: string, optional = false): Promise<AudioBuffer | undefined> {
     const existing = this.bufferLoads.get(path);
     if (existing) return existing;
     const load = (async () => {
@@ -279,7 +300,7 @@ class AudioManager {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await this.audioContext.decodeAudioData(await response.arrayBuffer());
       } catch {
-        this.warnOnce(path, `Optionaler Audioeffekt fehlt oder ist ungültig: ${path}`);
+        if (!optional) this.warnOnce(path, `Optionaler Audioeffekt fehlt oder ist ungültig: ${path}`);
         return undefined;
       }
     })();
@@ -299,7 +320,14 @@ class AudioManager {
     source.onended = () => this.activeSources.delete(source);
     this.activeSources.add(source);
     if (cue.duckMusic) this.duckMusic(Math.max(700, buffer.duration * 1_000 + 250));
-    source.start();
+    if (cue.maxDurationMs) {
+      const duration = Math.min(buffer.duration, cue.maxDurationMs / 1000);
+      const at = this.audioContext.currentTime;
+      gain.gain.setValueAtTime(cue.volume, at);
+      gain.gain.setValueAtTime(cue.volume, at + Math.max(0, duration - 0.04));
+      gain.gain.linearRampToValueAtTime(0, at + duration);
+      source.start(0, 0, duration);
+    } else source.start();
   }
 
   private duckMusic(durationMs: number): void {

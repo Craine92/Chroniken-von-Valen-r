@@ -1,0 +1,156 @@
+/* Smartphone companion UI. Every rule is scoped to the controller route. */
+.controller-page { --controller-nav-space: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
+.controller-page [hidden] { display: none !important; }
+.controller-page .controller-card { min-width: 0; min-height: 100svh; padding: max(1rem, env(safe-area-inset-top, 0px)) 1rem var(--controller-nav-space); }
+.controller-page .controller-card > .brand-mark { min-height: 44px; margin-right: 3.5rem; }
+.controller-page .controller-card--started > .brand-mark { margin-top: var(--mobile-feedback-space, 0px); }
+.controller-page .controller-card--started { overflow: clip; }
+.controller-page:has(.mobile-feedback-toast) .controller-card--started { clip-path: inset(var(--mobile-feedback-clip, 0px) 0 0 0); }
+.controller-page .controller-card--started > .controller-card__intro,
+.controller-page .controller-card--started > .controller-gold { display: none; }
+.controller-page .controller-player-bar { top: calc(max(.5rem, env(safe-area-inset-top, 0px)) + var(--mobile-feedback-space, 0px)); margin-bottom: 1rem; padding-right: 3.6rem; grid-template-columns: auto minmax(0, 1fr) auto; }
+.controller-page .controller-player-bar strong { overflow-wrap: anywhere; font-size: .9rem; }
+.controller-page .controller-player-bar small { font-size: .65rem; line-height: 1.5; }
+.controller-page .controller-player-bar b { font-size: .95rem; white-space: nowrap; }
+.controller-page .mobile-turn-notice,
+.controller-page .mobile-trade-notice { position: static; margin-bottom: .75rem; }
+.controller-page .mobile-trade-notice strong { min-width: 0; overflow-wrap: anywhere; }
+.controller-page .controller-nav { bottom: env(safe-area-inset-bottom, 0px); width: min(100%, 500px); border-bottom: 0; }
+.controller-page .controller-nav::after { content: ""; position: absolute; inset: 100% -1px auto; height: env(safe-area-inset-bottom, 0px); background: #08080b; }
+.controller-page .controller-nav a { min-height: 4rem; font-size: .7rem; font-weight: 700; letter-spacing: .04em; }
+.controller-page .controller-nav a[aria-current="page"] { color: #f5d99a; background: rgba(216,185,104,.1); box-shadow: inset 0 2px #d8b968; }
+.controller-page #controller-action,
+.controller-page #controller-property,
+.controller-page #controller-trade,
+.controller-page #controller-journal { scroll-margin-top: 6rem; min-width: 0; }
+.controller-page .ownership-list,
+.controller-page .trade-panel { margin-top: .75rem; padding: .8rem; gap: 1rem; }
+.controller-page .ownership-list__heading { display: grid; gap: .35rem; }
+.controller-page .ownership-list__heading p { margin: 0; color: #b9adb2; font-size: .8rem; line-height: 1.5; }
+.controller-page .ownership-list > p { color: #b9adb2; font-size: .85rem; line-height: 1.5; }
+.controller-page .property-group { margin-top: 0; padding: .8rem; border-top: 3px solid var(--property-group-accent); border-left: 3px solid var(--property-group-accent); background: linear-gradient(130deg, color-mix(in srgb, var(--property-group-accent) 10%, #141017), #0d0c11); }
+.controller-page .property-group__header { grid-template-columns: 2.2rem minmax(0, 1fr); gap: .55rem; }
+.controller-page .property-group__identity strong { white-space: normal; overflow: visible; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
+.controller-page .property-group__identity small { font-size: .67rem; letter-spacing: .06em; }
+.controller-page .property-group__progress { grid-column: 1 / -1; justify-content: space-between; padding-top: .4rem; }
+.controller-page .property-group__progress > b { font-size: 1rem; font-weight: 800; }
+.controller-page .property-group__nodes i { width: .85rem; height: .85rem; }
+.controller-page .property-group__members { grid-template-columns: 1fr; gap: .45rem; }
+.controller-page .property-group__member { width: 100%; min-height: 52px; grid-template-columns: 1.25rem minmax(0, 1fr) auto; gap: .6rem; padding: .55rem; text-align: left; cursor: pointer; border-radius: 3px; }
+.controller-page .property-group__member strong { white-space: normal; overflow: visible; font-size: .88rem; line-height: 1.3; overflow-wrap: anywhere; }
+.controller-page .property-group__member small { white-space: normal; overflow: visible; color: #d0c4ce; font-size: .68rem; line-height: 1.4; }
+.controller-page .property-group__member:focus-visible { outline: 2px solid var(--property-group-accent); outline-offset: 2px; }
+.controller-page .controller-member-sigil { color: var(--property-group-accent); }
+.controller-page .property-group__build-status { padding: .6rem; color: #cabfc8; font-size: .72rem; line-height: 1.5; letter-spacing: .025em; overflow-wrap: anywhere; }
+.controller-page .controller-status-chips { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .25rem; }
+.controller-page .controller-status-chips > * { padding: .2rem .4rem; color: #e1d7cc; background: rgba(0,0,0,.28); border: 1px solid rgba(229,204,151,.18); border-radius: 3px; font-size: .7rem; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }
+.controller-page .controller-board-focus,
+.controller-page .controller-back { min-height: 44px; padding: .55rem .65rem; color: #d8c698; background: rgba(0,0,0,.2); border: 1px solid rgba(216,185,104,.25); font-size: .75rem; cursor: pointer; }
+.controller-page .controller-board-focus[aria-pressed="true"] { border-color: var(--property-group-accent); color: var(--property-group-accent); }
+.controller-page details > summary { padding: .75rem .2rem; color: #ead4a4; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.controller-page .controller-other-groups[open] { display: grid; gap: .85rem; }
+.controller-page .controller-possession-extras { padding-top: .2rem; border-top: 1px solid rgba(216,185,104,.18); }
+.controller-page .controller-possession-extras .building-bank { margin-top: .75rem; flex-wrap: wrap; font-size: .75rem; }
+.controller-page .held-cards { font-size: .85rem; line-height: 1.5; }
+.controller-page .controller-special-properties { display: grid; gap: .5rem; }
+.controller-page .controller-special-properties h3 { margin: 0 0 .3rem; color: #e6d6b6; font: 1rem Georgia, serif; }
+.controller-page .controller-special-properties button { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .4rem .6rem; min-height: 48px; padding: .65rem; color: #eee0cc; background: #15131a; border: 1px solid #76623e; text-align: left; }
+.controller-page .controller-special-properties small { grid-column: 2; color: #b6a8b1; }
+.controller-page .controller-detail-heading { scroll-margin-top: 6rem; }
+.controller-page .controller-property-detail { display: grid; gap: .9rem; }
+.controller-page .controller-detail-card { padding: .85rem; gap: .85rem; border-top: 3px solid var(--property-group-accent); border-left: 3px solid var(--property-group-accent); }
+.controller-page .controller-detail-card header { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .65rem; }
+.controller-page .controller-detail-sigil { color: var(--property-group-accent); font-size: 1.5rem; }
+.controller-page .controller-detail-card h3 { margin: 0; color: #f4dba9; font: 700 1.3rem/1.2 Georgia, serif; overflow-wrap: anywhere; }
+.controller-page .controller-detail-card header p { margin: .3rem 0 0; color: var(--property-group-accent); font-size: .8rem; line-height: 1.4; }
+.controller-page .controller-detail-card dl,
+.controller-page .controller-rent-schedule dl { display: grid; gap: .55rem; margin: 0; }
+.controller-page .controller-detail-card dl > div,
+.controller-page .controller-rent-schedule dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; font-size: .8rem; line-height: 1.45; }
+.controller-page .controller-detail-card dt,
+.controller-page .controller-rent-schedule dt { color: #c5b7b6; }
+.controller-page .controller-detail-card dd,
+.controller-page .controller-rent-schedule dd { margin: 0; color: #f0dfb8; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.controller-page .controller-rent-highlights { display: grid; gap: .6rem; }
+.controller-page .controller-rent-highlights > div { display: grid; gap: .3rem; padding: .75rem; border-left: 2px solid var(--property-group-accent); background: rgba(0,0,0,.22); }
+.controller-page .controller-rent-highlights small { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.controller-page .controller-rent-highlights strong { color: #f6dfa8; font-size: 1.2rem; }
+.controller-page .controller-rent-highlights b { color: #e6d7c1; font-size: .85rem; }
+.controller-page .controller-property-actions { display: grid; gap: .7rem; }
+.controller-page .controller-property-actions button,
+.controller-page .trade-decisions button,
+.controller-page .trade-create > button { width: 100%; min-height: 48px; padding: .65rem; color: #e7d5ad; background: #1a1518; border: 1px solid #8b7146; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.controller-page .controller-property-actions p,
+.controller-page .controller-disabled-reason { margin: .35rem 0 0; color: #c7b9b8; font-size: .78rem; line-height: 1.45; }
+.controller-page .controller-property-actions button:disabled,
+.controller-page .trade-panel button:disabled { opacity: .5; cursor: not-allowed; }
+.controller-page button.controller-primary-action { color: #19120d; background: linear-gradient(140deg, #d6b768, #f0d899); border-color: #f1db9d; font-weight: 800; }
+.controller-page .controller-rent-schedule { padding: .25rem .65rem .65rem; border: 1px solid rgba(216,185,104,.2); }
+.controller-page .trade-panel h3 { font-size: .9rem; line-height: 1.4; letter-spacing: .03em; }
+.controller-page .trade-card { padding: .8rem; gap: .8rem; }
+.controller-page .trade-card > strong { font-size: .9rem; line-height: 1.4; overflow-wrap: anywhere; }
+.controller-page .trade-card > div.trade-side { display: grid; grid-template-columns: 1fr; }
+.controller-page .trade-side { display: grid; gap: .65rem; min-width: 0; padding-block: .75rem; border-top: 1px solid rgba(216,185,104,.2); }
+.controller-page .trade-side h4 { margin: 0; color: #ecd6a3; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
+.controller-page .trade-assets { display: grid; gap: .5rem; min-width: 0; }
+.controller-page .trade-assets span { padding: 0; border: 0; background: transparent; }
+.controller-page .trade-property { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .55rem; padding: .65rem; border: 1px solid color-mix(in srgb, var(--property-group-accent) 45%, transparent); border-left: 3px solid var(--property-group-accent); background: color-mix(in srgb, var(--property-group-accent) 8%, #101016); text-align: left; }
+.controller-page .trade-property__sigil { color: var(--property-group-accent); font-size: 1.1rem; }
+.controller-page .trade-property__identity { display: grid; min-width: 0; gap: .25rem; }
+.controller-page .trade-property__identity strong { color: #f4e5ce; font-size: .9rem; line-height: 1.35; overflow-wrap: anywhere; }
+.controller-page .trade-property__identity small { color: var(--property-group-accent); font-size: .75rem; text-transform: none; letter-spacing: 0; line-height: 1.4; }
+.controller-page .trade-property__identity > span { color: #c6b8c2; font-size: .72rem; line-height: 1.4; overflow-wrap: anywhere; }
+.controller-page .trade-property-options { display: grid; gap: .85rem; }
+.controller-page .trade-region { display: grid; gap: .5rem; min-width: 0; margin: 0; padding: .55rem; border: 1px solid color-mix(in srgb, var(--property-group-accent) 40%, transparent); border-top: 3px solid var(--property-group-accent); }
+.controller-page .trade-region legend { max-width: 100%; padding: .15rem .35rem; color: var(--property-group-accent); font-size: .85rem; font-weight: 700; overflow-wrap: anywhere; }
+.controller-page .trade-property-options label.trade-property { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; min-height: 72px; margin: 0; padding: .65rem; border-left: 3px solid var(--property-group-accent); font-size: .8rem; cursor: pointer; }
+.controller-page .trade-property-options input[type="checkbox"] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.controller-page .trade-property__check { align-self: center; color: var(--property-group-accent); font-size: 1.15rem; font-weight: 800; }
+.controller-page .trade-property.is-selected { border-color: var(--property-group-accent); background: color-mix(in srgb, var(--property-group-accent) 17%, #101016); box-shadow: inset 0 0 0 1px var(--property-group-accent), 0 0 12px color-mix(in srgb, var(--property-group-accent) 15%, transparent); }
+.controller-page .trade-property:focus-within { outline: 2px solid var(--property-group-accent); outline-offset: 2px; }
+.controller-page .trade-create { display: grid; gap: .75rem; }
+.controller-page .trade-create:not([open]) { display: block; }
+.controller-page .trade-create > label,
+.controller-page .trade-side > label { display: grid; gap: .4rem; color: #d3c3ce; font-size: .8rem; }
+.controller-page .trade-create select,
+.controller-page .trade-create input[type="number"] { box-sizing: border-box; min-width: 0; width: 100%; min-height: 48px; padding: .65rem; color: #f1e2c4; background: #111017; border: 1px solid #7f6a47; border-radius: 3px; font-size: 1rem; }
+.controller-page .trade-side label.trade-held-option { grid-template-columns: auto minmax(0, 1fr); min-height: 44px; align-items: center; font-size: .8rem; }
+.controller-page .trade-gold,
+.controller-page .trade-held-card { color: #ead199; font-size: .85rem; font-weight: 700; line-height: 1.5; }
+.controller-page .trade-empty { margin: 0; color: #b9adb7; font-size: .8rem; }
+.controller-page .trade-summary { padding: .75rem; border: 1px solid #8f7444; background: rgba(216,185,104,.045); }
+.controller-page .trade-decisions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.controller-page .trade-history article > span { font-size: .8rem; overflow-wrap: anywhere; }
+body:has(.controller-page) .audio-settings { top: max(1rem, env(safe-area-inset-top, 0px)); bottom: auto; right: max(.75rem, calc((100vw - 500px) / 2 + .75rem)); }
+body:has(.controller-page) .audio-settings__trigger { width: 44px; height: 44px; }
+body:has(.controller-page) .audio-settings__panel { top: 3.25rem; bottom: auto; max-height: calc(100svh - 8rem - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain; }
+/* Reserve space only while a toast is visible, including when the header is sticky. */
+.controller-page .mobile-feedback-toast {
+  position: fixed; z-index: 110; top: calc(env(safe-area-inset-top, 0px) + 1rem);
+  left: calc(50% - 26px); box-sizing: border-box; width: min(calc(100% - 4.75rem), 424px);
+  display: grid; grid-template-columns: 1.4rem minmax(0, 1fr) 2.75rem; gap: .55rem;
+  padding: .8rem .45rem .8rem .8rem; transform: translateX(-50%);
+  color: #f0e2ca; border: 1px solid var(--feedback-accent); border-left-width: 3px;
+  border-radius: 5px; background: rgba(20, 16, 24, .97); backdrop-filter: blur(12px);
+  box-shadow: 0 6px 25px rgba(0,0,0,.5); text-align: left;
+  animation: controller-feedback-enter 220ms ease-out both;
+}
+.controller-page .mobile-feedback-toast.is-exiting { animation: controller-feedback-exit 220ms ease-in both; pointer-events: none; }
+.controller-page .mobile-feedback-toast__icon { color: var(--feedback-accent); font-size: 1.25rem; padding-top: .1rem; }
+.controller-page .mobile-feedback-toast__content { min-width: 0; }
+.controller-page .mobile-feedback-toast strong { display: block; color: var(--feedback-accent); font-size: .88rem; line-height: 1.4; letter-spacing: .045em; overflow-wrap: anywhere; }
+.controller-page .mobile-feedback-toast p { margin: .3rem 0 0; font-size: .85rem; line-height: 1.45; overflow-wrap: anywhere; }
+.controller-page .mobile-feedback-toast button { min-height: 44px; cursor: pointer; color: #ecd5a0; background: #241d24; border: 1px solid #907447; border-radius: 3px; }
+.controller-page .mobile-feedback-toast__content button { margin-top: .65rem; width: 100%; padding: .5rem; font-size: .75rem; font-weight: 800; }
+.controller-page button.mobile-feedback-toast__close { align-self: start; border: 0; background: transparent; font-size: 1.35rem; }
+.controller-page .controller-nav a { position: relative; }
+.controller-page .controller-trade-badge { position: absolute; top: .25rem; right: .45rem; min-width: 1.1rem; padding: .15rem; border-radius: 50%; background: #d8b968; color: #161016; font-size: .7rem; line-height: 1; }
+body:has(.controller-page) .audio-settings__toggles { grid-template-columns: 1fr 1fr; }
+@keyframes controller-feedback-enter { from { opacity: 0; transform: translate(-50%, -.6rem); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes controller-feedback-exit { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -.3rem); } }
+@media (prefers-reduced-motion: reduce) {
+  .controller-page .mobile-feedback-toast { animation-name: controller-feedback-fade-in; }
+  .controller-page .mobile-feedback-toast.is-exiting { animation-name: controller-feedback-fade-out; }
+}
+@keyframes controller-feedback-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes controller-feedback-fade-out { from { opacity: 1; } to { opacity: 0; } }

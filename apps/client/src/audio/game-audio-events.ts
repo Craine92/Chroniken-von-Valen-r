@@ -1,18 +1,9 @@
-import { BOARD_TILES, getCardDefinition, type GameState } from "@valenor/shared";
+import { getCardDefinition, type GameState } from "@valenor/shared";
 import type { AudioEvent } from "./audio-config";
 
 export interface ScheduledAudioEvent {
   event: AudioEvent;
   delayMs?: number;
-}
-
-function movementCue(state: GameState): AudioEvent {
-  const movement = state.lastMovement!;
-  if (movement.passedStart) return "START_PASS";
-  const route = [movement.from, ...movement.path];
-  const regions = route.map((index) => BOARD_TILES[index]?.region).filter((region): region is NonNullable<typeof region> => Boolean(region));
-  if (regions.some((region, index) => index > 0 && region !== regions[index - 1])) return "REALM_TRANSITION";
-  return "TOKEN_MOVE";
 }
 
 function cardEvent(cardId: string): AudioEvent {
@@ -33,7 +24,8 @@ function economyCue(previous: GameState, next: GameState): AudioEvent | undefine
     case "rent": return "PROPERTY_RENT";
     case "tax": return "GOLD_PAY";
     case "auction": return "PROPERTY_BUY";
-    case "start": return "START_PASS";
+    // Passage audio comes from the visible field arrival, not the gold/state update.
+    case "start": return undefined;
     case "bankruptcy": return "EVENT_NEGATIVE";
     case "mortgage": {
       const playerId = entry.playerIds[0];
@@ -57,10 +49,6 @@ export function deriveGameAudioEvents(previous: GameState, next: GameState, view
   const nextDice = next.lastDiceRoll ? `${next.turnContext.rollSequence}:${next.lastDiceRoll.die1}:${next.lastDiceRoll.die2}` : "";
   const diceChanged = Boolean(nextDice && nextDice !== previousDice);
   if (diceChanged) events.push({ event: "DICE_ROLL" });
-
-  const previousMovement = previous.lastMovement ? `${previous.lastMovement.sequence ?? previous.turnContext.movementSequence}:${previous.lastMovement.from}:${previous.lastMovement.to}` : "";
-  const nextMovement = next.lastMovement ? `${next.lastMovement.sequence ?? next.turnContext.movementSequence}:${next.lastMovement.from}:${next.lastMovement.to}` : "";
-  if (nextMovement && nextMovement !== previousMovement) events.push({ event: movementCue(next), ...(diceChanged ? { delayMs: 420 } : {}) });
 
   if (next.lastBuildingAction?.id && next.lastBuildingAction.id !== previous.lastBuildingAction?.id) {
     events.push({ event: next.lastBuildingAction.type === "build" ? "PROPERTY_UPGRADE" : "GOLD_GAIN" });

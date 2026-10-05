@@ -12,6 +12,12 @@ import { BoardTileRenderer } from "../tiles/BoardTileRenderer";
 import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
 import { DEFAULT_BOARD_PRESENTATION_MODE, getBoardVisualScale, type BoardPresentationMode } from "../board-presentation";
 import { getTokenPointerGeometry, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
+import { audioManager } from "../../audio/AudioManager";
+
+function getMovementSignature(state: GameState): string {
+  const movement = state.lastMovement;
+  return movement ? `${movement.sequence ?? state.turnContext.rollSequence}-${movement.kind}-${movement.from}-${movement.to}` : "";
+}
 
 const PLAYER_COLORS = {
   violet: 0xa16deb,
@@ -56,6 +62,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   constructor(gameState: GameState, private readonly presentationMode: BoardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE) {
     super("valenor-board");
     this.state = gameState;
+    this.lastMovementSignature = getMovementSignature(gameState);
   }
 
   create() {
@@ -123,6 +130,8 @@ export class ValenorBoardScene extends Phaser.Scene {
     if (!this.boardReady) {
       this.state = next;
       this.pendingState = next;
+      // A snapshot received before the board exists is placement, not a visible move.
+      this.lastMovementSignature = getMovementSignature(next);
       return;
     }
     const diceSignature = next.lastDiceRoll
@@ -133,7 +142,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.animateDice(next.lastDiceRoll!.die1, next.lastDiceRoll!.die2);
     }
 
-    const movementSignature = next.lastMovement ? `${next.lastMovement.sequence ?? next.turnContext.rollSequence}-${next.lastMovement.kind}-${next.lastMovement.from}-${next.lastMovement.to}` : "";
+    const movementSignature = getMovementSignature(next);
     if (["moving", "dungeonTransfer", "cardMoving"].includes(next.turnPhase) && movementSignature && movementSignature !== this.lastMovementSignature) {
       this.lastMovementSignature = movementSignature;
       if (next.lastMovement?.kind === "dungeonTransfer") this.animateDungeonTransfer(next);
@@ -643,6 +652,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     if (!movement) return;
     const token = this.tokens.get(movement.playerId);
     if (!token) return;
+    let previousRegion = BOARD_TILES[movement.from]?.region;
     const step = (index: number) => {
       const tileIndex = movement.path[index];
       if (tileIndex === undefined) return;
@@ -683,6 +693,10 @@ export class ValenorBoardScene extends Phaser.Scene {
             ease: "Sine.In",
             onComplete: () => {
               token.setScale(1);
+              audioManager.play("TOKEN_MOVE");
+              if (tileIndex === 0 && movement.passedStart) audioManager.play("START_PASS");
+              if (region && previousRegion && region !== previousRegion) audioManager.play("REALM_TRANSITION");
+              previousRegion = region ?? previousRegion;
               if (index === movement.path.length - 1) this.animateLanding(tileIndex, trailColor);
               else step(index + 1);
             }

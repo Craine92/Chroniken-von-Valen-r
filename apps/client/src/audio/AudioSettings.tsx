@@ -11,7 +11,7 @@ function VolumeControl({ label, value, onChange }: { label: string; value: numbe
   );
 }
 
-export function AudioSettingsPanel() {
+export function AudioSettingsPanel({ role = "primary" }: { role?: AudioOutputRole }) {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => audioManager.getSettings());
 
@@ -34,6 +34,7 @@ export function AudioSettingsPanel() {
             <button type="button" aria-pressed={settings.musicEnabled} onClick={() => update({ musicEnabled: !settings.musicEnabled })}><i />Musik {settings.musicEnabled ? "an" : "aus"}</button>
             <button type="button" aria-pressed={settings.sfxEnabled} onClick={() => update({ sfxEnabled: !settings.sfxEnabled })}><i />Effekte {settings.sfxEnabled ? "an" : "aus"}</button>
             <button type="button" aria-pressed={settings.uiEnabled} onClick={() => update({ uiEnabled: !settings.uiEnabled })}><i />UI {settings.uiEnabled ? "an" : "aus"}</button>
+            {role === "controller" && <button type="button" aria-pressed={settings.hapticsEnabled} onClick={() => update({ hapticsEnabled: !settings.hapticsEnabled })}><i />Haptik {settings.hapticsEnabled ? "an" : "aus"}</button>}
           </div>
           <button className="audio-settings__mute" type="button" aria-pressed={settings.masterMuted} data-audio-cue={settings.masterMuted ? "UI_CONFIRM" : "UI_CANCEL"} onClick={() => update({ masterMuted: !settings.masterMuted })}>{settings.masterMuted ? "Ton wieder einschalten" : "Alles stummschalten"}</button>
         </aside>
@@ -48,6 +49,5 @@ export function AudioRuntime({ role }: { role: AudioOutputRole }) {
     audioManager.arm();
     return audioManager.bindUiSounds();
   }, [role]);
-  return <AudioSettingsPanel />;
+  return <AudioSettingsPanel role={role} />;
 }
-

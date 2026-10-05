@@ -1,9 +1,21 @@
-import { getCardDefinition, type GameState } from "@valenor/shared";
+import { BOARD_TILES, getCardDefinition, type GameState, type RegionType } from "@valenor/shared";
 import type { AudioEvent } from "./audio-config";
 
 export interface ScheduledAudioEvent {
   event: AudioEvent;
   delayMs?: number;
+}
+
+export function deriveMovementStepAudioEvents(
+  tileIndex: number,
+  passedStart: boolean,
+  previousRegion: RegionType | undefined
+): AudioEvent[] {
+  const events: AudioEvent[] = ["TOKEN_MOVE"];
+  const region = BOARD_TILES[tileIndex]?.region;
+  if (tileIndex === 0 && passedStart) events.push("START_PASS");
+  if (region && previousRegion && region !== previousRegion) events.push("REALM_TRANSITION");
+  return events;
 }
 
 function cardEvent(cardId: string): AudioEvent {

@@ -5,9 +5,13 @@ import {
   DEFAULT_MUSIC_VOLUME,
   DEFAULT_SFX_VOLUME,
   DEFAULT_UI_VOLUME,
+  isAudioEventAllowedForRole,
   MUSIC_TRACK,
-  type AudioEvent
+  type AudioEvent,
+  type AudioOutputRole
 } from "./audio-config";
+
+export type { AudioOutputRole } from "./audio-config";
 
 export interface AudioSettings {
   masterVolume: number;
@@ -20,8 +24,6 @@ export interface AudioSettings {
   masterMuted: boolean;
   hapticsEnabled: boolean;
 }
-
-export type AudioOutputRole = "primary" | "controller";
 
 export const DEFAULT_AUDIO_SETTINGS: Readonly<AudioSettings> = {
   masterVolume: DEFAULT_MASTER_VOLUME,
@@ -61,7 +63,7 @@ export function selectAudioVariant(paths: readonly string[], previousPath: strin
 
 export class AudioManager {
   private settings = this.readSettings();
-  private outputRole: AudioOutputRole = "primary";
+  private outputRole: AudioOutputRole = "board";
   private gameActive = false;
   private armed = false;
   private unlocked = false;
@@ -100,7 +102,7 @@ export class AudioManager {
       // Private browsing and storage policies must never make audio game-critical.
     }
     this.syncVolumes();
-    if (!this.settings.musicEnabled || this.settings.masterMuted || this.outputRole !== "primary") this.pauseMusic();
+    if (!this.settings.musicEnabled || this.settings.masterMuted || this.outputRole !== "board") this.pauseMusic();
     else if (this.gameActive && this.unlocked) void this.startMusic();
     this.subscribers.forEach((listener) => listener(this.getSettings()));
   }
@@ -117,7 +119,7 @@ export class AudioManager {
       this.stopMusic();
       return;
     }
-    if (this.unlocked && this.outputRole === "primary") void this.startMusic();
+    if (this.unlocked && this.outputRole === "board") void this.startMusic();
   }
 
   arm(): void {
@@ -153,15 +155,12 @@ export class AudioManager {
       this.unlocked = true;
       this.ensureGainGraph();
       // Warm timing-sensitive buffers after consent, before dice and field arrivals.
-      if (this.outputRole === "controller") {
-        void this.loadCue("MOBILE_TURN");
-        void this.loadCue("MOBILE_TRADE_OFFER");
-      } else {
+      if (this.outputRole === "board") {
         void this.loadCue("DICE_ROLL");
         void this.loadCue("TOKEN_MOVE");
       }
       document.documentElement.dataset.gameAudio = "ready";
-      if (this.gameActive && this.outputRole === "primary") await this.startMusic();
+      if (this.gameActive && this.outputRole === "board") await this.startMusic();
     } catch {
       // Autoplay restrictions can reject resume/play. A later interaction retries safely.
     }
@@ -170,9 +169,8 @@ export class AudioManager {
   play(event: AudioEvent): void {
     const cue = AUDIO_CUES[event];
     if (!this.unlocked || !this.audioContext || this.settings.masterMuted) return;
-    if (cue.controllerOnly && this.outputRole !== "controller") return;
-    const controllerResult = event === "VICTORY" || event === "DEFEAT";
-    if (cue.group === "SFX" && (!this.settings.sfxEnabled || (this.outputRole === "controller" && !controllerResult && !cue.controllerOnly))) return;
+    if (!isAudioEventAllowedForRole(event, this.outputRole)) return;
+    if (cue.group === "SFX" && !this.settings.sfxEnabled) return;
     if (cue.group === "UI" && !this.settings.uiEnabled) return;
     const now = performance.now();
     if (now - (this.lastPlayedAt.get(event) ?? -Infinity) < cue.cooldownMs) return;
@@ -180,7 +178,10 @@ export class AudioManager {
 
     void this.loadCue(event).then((available) => {
       if (available.length === 0 || !this.audioContext || this.activeSources.size >= 16) return;
-      if (cue.controllerOnly && (this.outputRole !== "controller" || !this.settings.sfxEnabled || this.settings.masterMuted)) return;
+      // The application surface was already authoritatively checked when play() was requested.
+      // Routes are full-page surfaces, so a mutable second role check can only drop a valid
+      // board cue while its first buffer is loading.
+      if ((cue.group === "SFX" && !this.settings.sfxEnabled) || this.settings.masterMuted) return;
       const path = selectAudioVariant(available.map((entry) => entry.path), this.previousVariants.get(event));
       const selected = available.find((entry) => entry.path === path);
       if (!selected) return;
@@ -247,12 +248,12 @@ export class AudioManager {
   }
 
   private musicTargetVolume(): number {
-    if (this.settings.masterMuted || !this.settings.musicEnabled || this.outputRole !== "primary") return 0;
+    if (this.settings.masterMuted || !this.settings.musicEnabled || this.outputRole !== "board") return 0;
     return this.settings.masterVolume * this.settings.musicVolume * this.musicDuckMultiplier;
   }
 
   private async startMusic(): Promise<void> {
-    if (!this.gameActive || !this.unlocked || this.outputRole !== "primary" || !this.settings.musicEnabled || this.settings.masterMuted || typeof Audio === "undefined") return;
+    if (!this.gameActive || !this.unlocked || this.outputRole !== "board" || !this.settings.musicEnabled || this.settings.masterMuted || typeof Audio === "undefined") return;
     if (!this.music) {
       this.music = new Audio(MUSIC_TRACK.path);
       this.music.loop = MUSIC_TRACK.loop;
@@ -279,10 +280,6 @@ export class AudioManager {
     if (existing) return existing;
     const load = (async () => {
       const cue = AUDIO_CUES[event];
-      if (cue.overridePath) {
-        const buffer = await this.loadBuffer(cue.overridePath, true);
-        if (buffer) return [{ path: cue.overridePath, buffer }];
-      }
       const entries = await Promise.all(cue.paths.map(async (path) => ({ path, buffer: await this.loadBuffer(path) })));
       return entries.filter((entry): entry is { path: string; buffer: AudioBuffer } => Boolean(entry.buffer));
     })();
@@ -290,7 +287,7 @@ export class AudioManager {
     return load;
   }
 
-  private loadBuffer(path: string, optional = false): Promise<AudioBuffer | undefined> {
+  private loadBuffer(path: string): Promise<AudioBuffer | undefined> {
     const existing = this.bufferLoads.get(path);
     if (existing) return existing;
     const load = (async () => {
@@ -300,7 +297,7 @@ export class AudioManager {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await this.audioContext.decodeAudioData(await response.arrayBuffer());
       } catch {
-        if (!optional) this.warnOnce(path, `Optionaler Audioeffekt fehlt oder ist ungültig: ${path}`);
+        this.warnOnce(path, `Audioeffekt fehlt oder ist ungültig: ${path}`);
         return undefined;
       }
     })();
@@ -320,14 +317,7 @@ export class AudioManager {
     source.onended = () => this.activeSources.delete(source);
     this.activeSources.add(source);
     if (cue.duckMusic) this.duckMusic(Math.max(700, buffer.duration * 1_000 + 250));
-    if (cue.maxDurationMs) {
-      const duration = Math.min(buffer.duration, cue.maxDurationMs / 1000);
-      const at = this.audioContext.currentTime;
-      gain.gain.setValueAtTime(cue.volume, at);
-      gain.gain.setValueAtTime(cue.volume, at + Math.max(0, duration - 0.04));
-      gain.gain.linearRampToValueAtTime(0, at + duration);
-      source.start(0, 0, duration);
-    } else source.start();
+    source.start();
   }
 
   private duckMusic(durationMs: number): void {
@@ -364,4 +354,14 @@ export class AudioManager {
   }
 }
 
-export const audioManager = new AudioManager();
+type HotAudioScope = typeof globalThis & { __valenorAudioManager?: AudioManager };
+const hotAudioScope = globalThis as HotAudioScope;
+const existingHotManager = import.meta.hot ? hotAudioScope.__valenorAudioManager : undefined;
+
+// Vite can reload importers with different module URLs while an old manager keeps music alive.
+// Reusing the per-page instance keeps board events, unlock state and the registered surface together.
+export const audioManager = existingHotManager ?? new AudioManager();
+if (import.meta.hot) {
+  Object.setPrototypeOf(audioManager, AudioManager.prototype);
+  hotAudioScope.__valenorAudioManager = audioManager;
+}

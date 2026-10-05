@@ -26,21 +26,20 @@ export class MobileFeedbackEventTracker {
 
     if (state.currentPlayerId === playerId && state.turnPhase !== "determiningOrder" && state.turnPhase !== "turnTransition") {
       add({ id: `turn:${state.turnNumber}:${playerId}`, type: "turn", title: "DU BIST AM ZUG",
-        message: "Dein Abenteuer geht weiter.", sound: "MOBILE_TURN", hapticPattern: 80, icon: "✦" }, true);
+        message: "Dein Abenteuer geht weiter.", hapticPattern: 80, icon: "✦" }, true);
     }
     for (const trade of state.trades) {
       if (trade.recipientId !== playerId && trade.proposerId !== playerId) continue;
       if (trade.status === "pending" && trade.recipientId === playerId) {
         add({ id: `trade:${trade.id}:pending`, type: "tradeOffer", title: "HANDELSANGEBOT",
           message: `${name(trade.proposerId) ?? "Ein Gefährte"} möchte mit dir handeln.`,
-          sound: "MOBILE_TRADE_OFFER", hapticPattern: [80, 60, 80], icon: "◇",
+          hapticPattern: [80, 60, 80], icon: "◇",
           actionLabel: "HANDEL ANSEHEN", action: openControllerTrade }, true);
       } else if (trade.status === "accepted" || trade.status === "rejected") {
         const accepted = trade.status === "accepted";
         add({ id: `trade:${trade.id}:${trade.status}`, type: accepted ? "tradeAccepted" : "tradeRejected",
           title: accepted ? "HANDEL ANGENOMMEN" : "HANDEL ABGELEHNT",
           message: accepted ? "Der Handel wurde abgeschlossen." : "Das Angebot wurde abgelehnt.",
-          sound: accepted ? "MOBILE_TRADE_ACCEPTED" : "MOBILE_TRADE_REJECTED",
           hapticPattern: accepted ? 60 : undefined, icon: "◇" });
       }
     }
@@ -51,13 +50,13 @@ export class MobileFeedbackEventTracker {
         (state.turnContext.pendingExtraRoll || state.turnPhase === "waitingForRoll") &&
         !viewer.dungeon.inDungeon && !["rolling", "moving", "landed", "awaitingCardDraw", "cardResolving", "cardMoving", "dungeonTransfer"].includes(state.turnPhase)) {
       add({ id: `double:${turn.id}`, type: "double", title: "PASCH!",
-        message: "Du darfst erneut würfeln.", sound: "MOBILE_DOUBLE", hapticPattern: [50, 40, 50], icon: "⚄" });
+        message: "Du darfst erneut würfeln.", hapticPattern: [50, 40, 50], icon: "⚄" });
     } else if (initial && turn) this.seen.add(`double:${turn.id}`);
     const building = state.lastBuildingAction;
     if (building?.playerId === playerId && building.type === "build") {
       add({ id: `build:${building.id}`, type: "build", title: "BAU ABGESCHLOSSEN",
         message: `${BOARD_TILES[building.tileIndex]?.name ?? "Dein Grundstück"}: ${building.buildingName} · Stufe ${building.toLevel}`,
-        accent: region(building.tileIndex)?.accent, icon: region(building.tileIndex)?.sigil ?? "♜", sound: "MOBILE_BUILD" });
+        accent: region(building.tileIndex)?.accent, icon: region(building.tileIndex)?.sigil ?? "♜" });
     }
     for (const entry of state.economyLog) {
       if (!entry.playerIds.includes(playerId)) continue;
@@ -68,7 +67,7 @@ export class MobileFeedbackEventTracker {
         add({ id: `economy:${entry.id}`, type: "purchase", title: "GRUNDSTÜCK ERWORBEN",
           message: tile ? `${tile.name} gehört jetzt dir.` : entry.message,
           accent: tile ? region(tile.index)?.accent : undefined,
-          icon: tile ? region(tile.index)?.sigil ?? "♜" : "♜", sound: "MOBILE_PURCHASE" });
+          icon: tile ? region(tile.index)?.sigil ?? "♜" : "♜" });
       } else if (entry.kind === "rent" && entry.playerIds.length === 2 && entry.amount !== undefined) {
         // EconomyService records payer first, recipient second, after settlement.
         const [payer, recipient] = entry.playerIds;
@@ -77,7 +76,7 @@ export class MobileFeedbackEventTracker {
         if (!other) continue;
         add({ id: `economy:${entry.id}`, type: "coin", title: received ? "MIETE ERHALTEN" : "MIETE GEZAHLT",
           message: `${received ? "+" : "−"}${Math.abs(entry.amount)} Gold ${received ? "von" : "an"} ${other}`,
-          icon: "V", sound: "MOBILE_COIN" });
+          icon: "V" });
       } else if (entry.kind === "system") {
         // CardService's draw log has a unique ID, including repeated draws of the same card.
         // Effect/payment logs deliberately do not match this authoritative draw record.
@@ -86,7 +85,7 @@ export class MobileFeedbackEventTracker {
         if (adventure || fate) add({ id: `card:${entry.id}`, type: adventure ? "adventure" : "fate",
           title: adventure ? "ABENTEUER" : "SCHICKSAL",
           message: entry.message.slice(`${viewer.name} zieht ${adventure ? "Abenteuer" : "Schicksal"}:`.length).trim(),
-          icon: adventure ? "✦" : "✧", sound: adventure ? "MOBILE_ADVENTURE" : "MOBILE_FATE" });
+          icon: adventure ? "✦" : "✧" });
       }
     }
     this.previous = state;

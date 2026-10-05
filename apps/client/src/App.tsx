@@ -12,7 +12,7 @@ export function App() {
 
   if (path === "/controller") return <><AudioRuntime role="controller" /><ControllerPage /></>;
   if (path === "/visual-qa" && VisualQaPage) return <Suspense fallback={null}><VisualQaPage /></Suspense>;
-  if (path === "/host" || path === "/") return <><AudioRuntime role="primary" /><HostPage /></>;
+  if (path === "/host" || path === "/") return <><AudioRuntime role="board" /><HostPage /></>;
 
   return (
     <main className="not-found">

@@ -20,7 +20,7 @@ function state(): GameState {
 const trade = (id: string): TradeOffer => ({ id, proposerId: "p2", recipientId: "p1", status: "pending",
   offer: { gold: 50, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [] }, createdAt: 2 });
 const notice = (id: string, type: MobileFeedback["type"] = "purchase"): MobileFeedback => ({
-  id, type, title: id, message: id, sound: "MOBILE_PURCHASE"
+  id, type, title: id, message: id
 });
 function clock() {
   let now = 0, sequence = 0;
@@ -54,6 +54,8 @@ test("incoming trade creates an actionable toast and opens the existing trade ta
   assert.match(events[0]!.message, /Tharok möchte mit dir handeln/);
   assert.equal(events[0]?.actionLabel, "HANDEL ANSEHEN");
   assert.equal(events[0]?.action, openControllerTrade);
+  assert.equal("sound" in events[0]!, false);
+  assert.deepEqual(events[0]?.hapticPattern, [80, 60, 80]);
   const previous = Object.getOwnPropertyDescriptor(globalThis, "window");
   let scrolled = false;
   Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { hash: "" }, scrollTo: () => { scrolled = true; } } });
@@ -67,7 +69,10 @@ test("own turn feedback occurs once per turn number, including consecutive turns
   const tracker = new MobileFeedbackEventTracker(), next = state();
   tracker.update(next, "p1");
   next.currentPlayerId = "p1"; next.turnNumber = 2;
-  assert.equal(tracker.update(structuredClone(next), "p1")[0]?.type, "turn");
+  const ownTurn = tracker.update(structuredClone(next), "p1")[0];
+  assert.equal(ownTurn?.type, "turn");
+  assert.equal("sound" in ownTurn!, false);
+  assert.equal(ownTurn?.hapticPattern, 80);
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
   next.turnPhase = "rolling"; next.turnContext.rollSequence++;
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
@@ -94,6 +99,7 @@ test("accepted and rejected trades are deduplicated by offer ID and status", () 
   next.trades[0]!.status = "accepted"; next.trades[1]!.status = "rejected";
   const events = tracker.update(structuredClone(next), "p1");
   assert.deepEqual(events.map((event) => event.type), ["tradeAccepted", "tradeRejected"]);
+  assert.ok(events.every((event) => !("sound" in event)));
   assert.equal(events[0]?.hapticPattern, 60); assert.equal(events[1]?.hapticPattern, undefined);
   assert.deepEqual(tracker.update(next, "p1"), []);
 });
@@ -114,6 +120,7 @@ test("purchase, actual building name/level and settled rent come from confirmed 
   const purchase = events.find((event) => event.type === "purchase")!;
   assert.match(purchase.message, /Flüsterhain gehört jetzt dir/); assert.equal(purchase.accent, "#9b5de5");
   assert.deepEqual(events.filter((event) => event.type === "coin").map((event) => event.message), ["+60 Gold von Tharok", "−20 Gold an Tharok"]);
+  assert.ok(events.every((event) => !("sound" in event)));
   assert.equal(JSON.stringify(next), frozen);
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
 });
@@ -124,7 +131,9 @@ test("double feedback waits for landing and never promises a bonus for third dou
   next.turnContext.pendingExtraRoll = true; next.turnPhase = "moving";
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
   next.turnPhase = "waitingForEndTurn";
-  assert.equal(tracker.update(structuredClone(next), "p1")[0]?.type, "double");
+  const double = tracker.update(structuredClone(next), "p1")[0];
+  assert.equal(double?.type, "double");
+  assert.equal("sound" in double!, false);
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
   next.lastTurnAction = { id: "third", kind: "thirdDouble", playerId: "p1", createdAt: 3 };
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
@@ -136,27 +145,31 @@ test("own card-draw log IDs announce repeated cards once each, without duplicati
   const next = state(), tracker = new MobileFeedbackEventTracker(); tracker.update(next, "p1");
   const record = (id: string, message: string) => ({ id, kind: "system" as const, message, playerIds: ["p1"], createdAt: 2 });
   next.economyLog.push(record("card-a", "Myrra zieht Abenteuer: Der Weg."), record("effect", "Myrra erhält 100 Gold."));
-  assert.deepEqual(tracker.update(structuredClone(next), "p1").map((event) => event.type), ["adventure"]);
+  const firstDraw = tracker.update(structuredClone(next), "p1");
+  assert.deepEqual(firstDraw.map((event) => event.type), ["adventure"]);
+  assert.ok(firstDraw.every((event) => !("sound" in event)));
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
   next.economyLog.push(record("card-b", "Myrra zieht Abenteuer: Der Weg."), record("card-c", "Myrra zieht Schicksal: Die Nacht."));
-  assert.deepEqual(tracker.update(next, "p1").map((event) => event.type), ["adventure", "fate"]);
+  const repeatedDraws = tracker.update(next, "p1");
+  assert.deepEqual(repeatedDraws.map((event) => event.type), ["adventure", "fate"]);
+  assert.ok(repeatedDraws.every((event) => !("sound" in event)));
 });
 
-test("disabled effects and haptics suppress only their optional channels", () => {
+test("mobile feedback never plays audio and respects the haptics setting", () => {
   const calls: string[] = [];
   const feedback = { ...notice("turn"), hapticPattern: 80 };
-  const manager = { getSettings: () => ({ ...DEFAULT_AUDIO_SETTINGS, sfxEnabled: false, hapticsEnabled: false }), play: () => { calls.push("sound"); } };
+  const manager = { getSettings: () => ({ ...DEFAULT_AUDIO_SETTINGS, hapticsEnabled: false }), play: () => { calls.push("sound"); } };
   const device = { vibrate: () => { calls.push("haptic"); return true; } };
   playMobileFeedback(feedback, manager, device); assert.deepEqual(calls, []);
-  manager.getSettings = () => ({ ...DEFAULT_AUDIO_SETTINGS, sfxEnabled: true, hapticsEnabled: false });
-  playMobileFeedback(feedback, manager, device); assert.deepEqual(calls, ["sound"]);
+  manager.getSettings = () => ({ ...DEFAULT_AUDIO_SETTINGS, hapticsEnabled: true });
+  playMobileFeedback(feedback, manager, device); assert.deepEqual(calls, ["haptic"]);
   assert.equal(normalizeAudioSettings({ hapticsEnabled: false }).hapticsEnabled, false);
   assert.equal(normalizeAudioSettings({ hapticsEnabled: "invalid" }).hapticsEnabled, true);
 });
 
-test("missing or rejecting vibration and blocked sound never throw", () => {
+test("missing or rejecting vibration never throws", () => {
   const feedback = { ...notice("turn"), hapticPattern: 80 };
-  const manager = { getSettings: () => ({ ...DEFAULT_AUDIO_SETTINGS }), play: () => { throw Error("blocked"); } };
+  const manager = { getSettings: () => ({ ...DEFAULT_AUDIO_SETTINGS }) };
   assert.doesNotThrow(() => playMobileFeedback(feedback, manager, {} as Pick<Navigator, "vibrate">));
   assert.doesNotThrow(() => playMobileFeedback(feedback, manager, { vibrate: () => { throw Error("blocked"); } }));
 });

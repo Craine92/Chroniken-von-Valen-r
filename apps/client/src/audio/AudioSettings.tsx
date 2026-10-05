@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { audioManager, type AudioOutputRole, type AudioSettings as Settings } from "./AudioManager";
 
 function VolumeControl({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
@@ -11,7 +11,7 @@ function VolumeControl({ label, value, onChange }: { label: string; value: numbe
   );
 }
 
-export function AudioSettingsPanel({ role = "primary" }: { role?: AudioOutputRole }) {
+export function AudioSettingsPanel({ role = "board" }: { role?: AudioOutputRole }) {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => audioManager.getSettings());
 
@@ -44,10 +44,10 @@ export function AudioSettingsPanel({ role = "primary" }: { role?: AudioOutputRol
 }
 
 export function AudioRuntime({ role }: { role: AudioOutputRole }) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     audioManager.setOutputRole(role);
     audioManager.arm();
     return audioManager.bindUiSounds();
-  }, [role]);
+  }, [role, audioManager]);
   return <AudioSettingsPanel role={role} />;
 }

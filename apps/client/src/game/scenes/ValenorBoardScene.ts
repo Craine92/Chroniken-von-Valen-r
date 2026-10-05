@@ -13,6 +13,7 @@ import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
 import { DEFAULT_BOARD_PRESENTATION_MODE, getBoardVisualScale, type BoardPresentationMode } from "../board-presentation";
 import { getTokenPointerGeometry, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
 import { audioManager } from "../../audio/AudioManager";
+import { deriveMovementStepAudioEvents } from "../../audio/game-audio-events";
 
 function getMovementSignature(state: GameState): string {
   const movement = state.lastMovement;
@@ -128,10 +129,9 @@ export class ValenorBoardScene extends Phaser.Scene {
 
   applyGameState(next: GameState) {
     if (!this.boardReady) {
-      this.state = next;
       this.pendingState = next;
-      // A snapshot received before the board exists is placement, not a visible move.
-      this.lastMovementSignature = getMovementSignature(next);
+      // Keep the constructor snapshot as the visual origin. A newer pending snapshot may
+      // contain the first real move and must still be animated once the board is ready.
       return;
     }
     const diceSignature = next.lastDiceRoll
@@ -663,11 +663,17 @@ export class ValenorBoardScene extends Phaser.Scene {
       if (pointer && movingPlayer) this.drawTokenPointer(pointer, tileIndex, 1, 0, PLAYER_COLORS[movingPlayer.color]);
       const position = { x: fieldPosition.x + slot.x, y: fieldPosition.y + slot.y };
       const region = BOARD_TILES[tileIndex]?.region;
+      const playArrivalAudio = () => {
+        deriveMovementStepAudioEvents(tileIndex, movement.passedStart, previousRegion)
+          .forEach((event) => audioManager.play(event));
+        previousRegion = region ?? previousRegion;
+      };
       const trailColor = region ? REGION_TRAIL[region] : 0xd7bb78;
       const trail = this.add.circle(token.x, token.y, region === "orcs" ? 3.5 : 4.5, trailColor, 0.42).setDepth(BOARD_DEPTHS.effects);
       this.tweens.add({ targets: trail, alpha: 0, scale: region === "orcs" ? 3 : 2.2, y: trail.y - 8, duration: 420, onComplete: () => trail.destroy() });
       if (this.reducedMotion) {
         token.setPosition(position.x, position.y - 5);
+        playArrivalAudio();
         if (index === movement.path.length - 1) this.animateLanding(tileIndex, trailColor);
         else step(index + 1);
         return;
@@ -693,10 +699,7 @@ export class ValenorBoardScene extends Phaser.Scene {
             ease: "Sine.In",
             onComplete: () => {
               token.setScale(1);
-              audioManager.play("TOKEN_MOVE");
-              if (tileIndex === 0 && movement.passedStart) audioManager.play("START_PASS");
-              if (region && previousRegion && region !== previousRegion) audioManager.play("REALM_TRANSITION");
-              previousRegion = region ?? previousRegion;
+              playArrivalAudio();
               if (index === movement.path.length - 1) this.animateLanding(tileIndex, trailColor);
               else step(index + 1);
             }

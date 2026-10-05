@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { BOARD_TILES, type GameState } from "@valenor/shared";
-import { AUDIO_CUES, MUSIC_TRACK } from "./audio-config";
+import { AUDIO_CUES, MUSIC_TRACK, isAudioEventAllowedForRole, type AudioEvent } from "./audio-config";
 import { DEFAULT_AUDIO_SETTINGS, normalizeAudioSettings, selectAudioVariant } from "./AudioManager";
-import { GameAudioEventTracker, deriveGameAudioEvents } from "./game-audio-events";
+import { GameAudioEventTracker, deriveGameAudioEvents, deriveMovementStepAudioEvents } from "./game-audio-events";
 
 function gameState(): GameState {
   return {
@@ -32,6 +34,23 @@ test("audio manifest declares streaming music and all five automatic dice varian
   assert.deepEqual(AUDIO_CUES.DICE_ROLL.paths, [1, 2, 3, 4, 5].map((number) => `/assets/audio/sfx/dice/dice-0${number}.ogg`));
   assert.equal(AUDIO_CUES.UI_CLICK.group, "UI");
   assert.equal(AUDIO_CUES.VICTORY.duckMusic, true);
+});
+
+test("every registered SFX path resolves to an installed public asset", () => {
+  for (const [event, cue] of Object.entries(AUDIO_CUES)) {
+    for (const path of cue.paths) {
+      const asset = fileURLToPath(new URL(`../../public${path}`, import.meta.url));
+      assert.equal(existsSync(asset), true, `${event} references missing asset ${path}`);
+    }
+  }
+});
+
+test("audio roles keep every sound on TV and the controller silent", () => {
+  const boardEvents = Object.keys(AUDIO_CUES) as AudioEvent[];
+  for (const event of boardEvents) {
+    assert.equal(isAudioEventAllowedForRole(event, "board"), true, `${event} must play on TV`);
+    assert.equal(isAudioEventAllowedForRole(event, "controller"), false, `${event} must stay silent on smartphones`);
+  }
 });
 
 test("settings validation restores defaults and clamps persisted values", () => {
@@ -99,7 +118,20 @@ test("movement variants retain all three local files and avoid consecutive repea
     previous = next;
   }
   assert.equal(selected.size, 3);
-  assert.ok(AUDIO_CUES.TOKEN_MOVE.cooldownMs < 90 + 100);
+  assert.equal(AUDIO_CUES.TOKEN_MOVE.cooldownMs, 0);
+});
+
+test("each visible field arrival emits one movement cue, including all six steps", () => {
+  const oneStep = deriveMovementStepAudioEvents(1, false, BOARD_TILES[0]?.region);
+  assert.equal(oneStep.filter((event) => event === "TOKEN_MOVE").length, 1);
+
+  let previousRegion = BOARD_TILES[0]?.region;
+  const sixSteps = [1, 2, 3, 4, 5, 6].flatMap((tileIndex) => {
+    const events = deriveMovementStepAudioEvents(tileIndex, false, previousRegion);
+    previousRegion = BOARD_TILES[tileIndex]?.region ?? previousRegion;
+    return events;
+  });
+  assert.equal(sixSteps.filter((event) => event === "TOKEN_MOVE").length, 6);
 });
 
 test("cards receive draw plus one delayed, action-specific result cue", () => {

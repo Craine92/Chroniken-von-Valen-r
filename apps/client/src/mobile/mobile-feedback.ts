@@ -1,5 +1,4 @@
 import { audioManager, type AudioSettings } from "../audio/AudioManager";
-import type { AudioEvent } from "../audio/audio-config";
 
 export type MobileFeedbackType = "turn" | "tradeOffer" | "tradeAccepted" | "tradeRejected" | "purchase" | "build" | "coin" | "adventure" | "fate" | "double";
 export interface MobileFeedback {
@@ -7,7 +6,6 @@ export interface MobileFeedback {
   type: MobileFeedbackType;
   title: string;
   message: string;
-  sound?: AudioEvent;
   hapticPattern?: number | number[] | undefined;
   duration?: number;
   accent?: string | undefined;
@@ -23,13 +21,10 @@ export function openControllerTrade(): void {
 
 export function playMobileFeedback(
   feedback: MobileFeedback,
-  manager: Pick<typeof audioManager, "getSettings" | "play"> = audioManager,
+  manager: Pick<typeof audioManager, "getSettings"> = audioManager,
   device: Pick<Navigator, "vibrate"> | undefined = typeof navigator === "undefined" ? undefined : navigator
 ): void {
   const settings: AudioSettings = manager.getSettings();
-  if (feedback.sound && settings.sfxEnabled && !settings.masterMuted) {
-    try { manager.play(feedback.sound); } catch { /* Visual feedback still works without audio. */ }
-  }
   if (feedback.hapticPattern && settings.hapticsEnabled && device && "vibrate" in device && typeof device.vibrate === "function") {
     try { device.vibrate(feedback.hapticPattern); } catch { /* Optional browser enhancement. */ }
   }

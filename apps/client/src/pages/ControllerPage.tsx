@@ -22,8 +22,6 @@ import { CardReveal } from "../components/CardReveal";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 import { GameResultPanel } from "../components/GameResultPanel";
 import { createValenorSocket } from "../lib/socket";
-import { audioManager } from "../audio/AudioManager";
-import { GameAudioEventTracker } from "../audio/game-audio-events";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
 
 function normalizeRoomCode(value: string): string {
@@ -166,23 +164,7 @@ export function ControllerPage() {
   const nameRef = useRef("");
   const roomRef = useRef(roomCode);
   const signalTimer = useRef<number | undefined>(undefined);
-  const audioTracker = useRef(new GameAudioEventTracker());
   const incomingTradeCount = gameState?.trades.filter((trade) => trade.recipientId === player?.id && trade.status === "pending").length ?? 0;
-
-  useEffect(() => {
-    if (error) audioManager.play("UI_ERROR");
-  }, [error]);
-
-  useEffect(() => {
-    if (!gameState) {
-      audioTracker.current.reset();
-      return;
-    }
-    const resultEvents = audioTracker.current.update(gameState, player?.id)
-      .filter(({ event }) => event === "VICTORY" || event === "DEFEAT");
-    const timers = resultEvents.map(({ event, delayMs = 0 }) => window.setTimeout(() => audioManager.play(event), delayMs));
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [gameState, player?.id]);
 
   const join = (requestedName: string, reconnecting = false) => {
     const normalizedRoom = roomRef.current.trim().toUpperCase();

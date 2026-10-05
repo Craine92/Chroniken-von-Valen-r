@@ -73,12 +73,12 @@ test("variant selection uses only available files and avoids an immediate repeat
   assert.equal(selectAudioVariant([], undefined), undefined);
 });
 
-test("confirmed dice produce a cue but movement and start passage wait for animation", () => {
+test("dice, movement and start passage stay out of generic state-sync audio", () => {
   const previous = gameState();
   const dice = clone(previous);
   dice.lastDiceRoll = { die1: 3, die2: 5, total: 8, isDouble: false };
   dice.turnContext.rollSequence = 1;
-  assert.deepEqual(names(deriveGameAudioEvents(previous, dice)), ["DICE_ROLL"]);
+  assert.deepEqual(names(deriveGameAudioEvents(previous, dice)), []);
 
   const movement = clone(dice);
   movement.lastMovement = { kind: "normal", sequence: 1, playerId: "p1", from: 39, to: 2, path: [0, 1, 2], passedStart: true, landedTile: BOARD_TILES[2]! };

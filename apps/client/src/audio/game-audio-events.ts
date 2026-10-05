@@ -57,10 +57,8 @@ function resultCue(state: GameState, viewerId?: string): AudioEvent {
 
 export function deriveGameAudioEvents(previous: GameState, next: GameState, viewerId?: string): ScheduledAudioEvent[] {
   const events: ScheduledAudioEvent[] = [];
-  const previousDice = previous.lastDiceRoll ? `${previous.turnContext.rollSequence}:${previous.lastDiceRoll.die1}:${previous.lastDiceRoll.die2}` : "";
-  const nextDice = next.lastDiceRoll ? `${next.turnContext.rollSequence}:${next.lastDiceRoll.die1}:${next.lastDiceRoll.die2}` : "";
-  const diceChanged = Boolean(nextDice && nextDice !== previousDice);
-  if (diceChanged) events.push({ event: "DICE_ROLL" });
+  // Dice audio is coupled directly to the visible board animation in ValenorBoardScene.
+  // Keeping it out of state-diff audio avoids lifecycle/HMR races and duplicate roll cues.
 
   if (next.lastBuildingAction?.id && next.lastBuildingAction.id !== previous.lastBuildingAction?.id) {
     events.push({ event: next.lastBuildingAction.type === "build" ? "PROPERTY_UPGRADE" : "GOLD_GAIN" });

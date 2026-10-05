@@ -4,12 +4,20 @@ import { createGame } from "./createGame";
 import type { ValenorBoardScene } from "./scenes/ValenorBoardScene";
 import { GameSceneBridge } from "./GameSceneBridge";
 import { DEFAULT_BOARD_PRESENTATION_MODE, type BoardPresentationMode } from "./board-presentation";
+import { audioManager } from "../audio/AudioManager";
+
+function getDiceSignature(state: GameState): string {
+  return state.lastDiceRoll
+    ? `${state.turnContext.rollSequence}-${state.lastDiceRoll.die1}-${state.lastDiceRoll.die2}`
+    : "";
+}
 
 export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode = DEFAULT_BOARD_PRESENTATION_MODE }: { gameState: GameState; focusedPropertyGroupId?: PropertyGroupId | undefined; presentationMode?: BoardPresentationMode | undefined }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<ValenorBoardScene | null>(null);
   const initialStateRef = useRef(gameState);
   const bridgeRef = useRef<GameSceneBridge | null>(null);
+  const lastDiceSignatureRef = useRef(getDiceSignature(gameState));
   const [loading, setLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   if (!bridgeRef.current) bridgeRef.current = new GameSceneBridge(gameState);
@@ -33,6 +41,15 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
 
   useEffect(() => {
     bridgeRef.current!.update(gameState);
+
+    const diceSignature = getDiceSignature(gameState);
+    const diceVisible = ["rolling", "dungeonRolling", "dungeonTransfer"].includes(gameState.turnPhase);
+    if (diceVisible && diceSignature && diceSignature !== lastDiceSignatureRef.current) {
+      lastDiceSignatureRef.current = diceSignature;
+      // Keep the roll cue on the board surface itself so it follows the same state transition
+      // that drives the visible dice animation, independent of generic React event tracking.
+      audioManager.play("DICE_ROLL");
+    }
   }, [gameState]);
 
   useEffect(() => {

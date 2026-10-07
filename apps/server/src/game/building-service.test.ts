@@ -8,6 +8,10 @@ import {
   canBuildOnProperty,
   canSellBuilding,
   getBuildingName,
+  CHRONICLE_EVENTS,
+  getRegionalChronicleDefinition,
+  getEffectiveBuildCost,
+  getEffectiveBuildingSaleValue,
   ownsCompletePropertyGroup,
   type BuildingLevel,
   type GameState
@@ -129,13 +133,13 @@ test("the first and last property expose every authoritative rent tier", () => {
   }), [200, 600, 1400, 1700, 2000]);
 });
 
-test("building is authoritative, charges configured gold, updates bank, level and journal", () => {
+test("building charges configured gold and updates level and journal without changing legacy stock", () => {
   const game = state();
   own(game, "p1", [1, 3]);
   buildings.build(game, "p1", 1);
   assert.equal(game.players[0]!.gold, 1_950);
   assert.equal(game.propertyOwnerships[0]!.buildingLevel, 1);
-  assert.equal(game.buildingBank.settlementUnitsAvailable, 31);
+  assert.equal(game.buildingBank.settlementUnitsAvailable, 32);
   assert.match(game.economyLog.at(-1)!.message, /Wurzelhütte.*50 Gold/);
   assert.equal(game.lastBuildingAction?.tileIndex, 1);
 });
@@ -167,33 +171,33 @@ test("normal selling refunds half the build cost and follows reverse even distri
   buildings.sell(game, "p1", 6);
   assert.equal(game.players[0]!.gold, gold + 25);
   assert.equal(game.propertyOwnerships[0]!.buildingLevel, 2);
-  assert.equal(game.buildingBank.settlementUnitsAvailable, 33);
+  assert.equal(game.buildingBank.settlementUnitsAvailable, 32);
   assert.equal(canSellBuilding(game, "p1", 6).allowed, false);
   assert.throws(() => buildings.sell(game, "p2", 8), /gehört dir nicht/);
 });
 
-test("level five exchanges four settlement units for one grand structure and reverses safely", () => {
+test("level five can be built and sold with zero legacy bank stock", () => {
   const game = state();
   own(game, "p1", [[1, 4], [3, 4]]);
-  game.buildingBank.settlementUnitsAvailable = 24;
+  game.buildingBank = { settlementUnitsAvailable: 0, grandStructuresAvailable: 0 };
   buildings.build(game, "p1", 1);
   assert.equal(game.propertyOwnerships[0]!.buildingLevel, 5);
-  assert.deepEqual(game.buildingBank, { settlementUnitsAvailable: 28, grandStructuresAvailable: 11 });
+  assert.deepEqual(game.buildingBank, { settlementUnitsAvailable: 0, grandStructuresAvailable: 0 });
   buildings.sell(game, "p1", 1);
-  assert.deepEqual(game.buildingBank, { settlementUnitsAvailable: 24, grandStructuresAvailable: 12 });
+  assert.deepEqual(game.buildingBank, { settlementUnitsAvailable: 0, grandStructuresAvailable: 0 });
   game.propertyOwnerships[0]!.buildingLevel = 5;
   game.buildingBank.settlementUnitsAvailable = 3;
-  assert.match(canSellBuilding(game, "p1", 1).reason!, /nicht über genügend/);
+  assert.equal(canSellBuilding(game, "p1", 1).allowed, true);
 });
 
-test("bank shortages and level five maximum block construction", () => {
+test("zero legacy stock permits construction while the level five maximum stays enforced", () => {
   const game = state();
   own(game, "p1", [[1, 0], [3, 0]]);
   game.buildingBank.settlementUnitsAvailable = 0;
-  assert.equal(canBuildOnProperty(game, "p1", 1).allowed, false);
+  assert.equal(canBuildOnProperty(game, "p1", 1).allowed, true);
   game.propertyOwnerships.forEach((entry) => { entry.buildingLevel = 4; });
   game.buildingBank.grandStructuresAvailable = 0;
-  assert.equal(canBuildOnProperty(game, "p1", 1).allowed, false);
+  assert.equal(canBuildOnProperty(game, "p1", 1).allowed, true);
   game.propertyOwnerships[0]!.buildingLevel = 5;
   assert.match(canBuildOnProperty(game, "p1", 1).reason!, /größte Festung/);
 });
@@ -213,7 +217,7 @@ test("paymentRequired permits only sales and a deliberate authoritative settleme
   assert.equal(game.turnPhase, "waitingForEndTurn");
 });
 
-test("AI builds complete affordable regions evenly and respects reserve and bank", () => {
+test("AI builds complete affordable regions evenly and respects reserve without a bank limit", () => {
   const game = state();
   own(game, "p2", [1, 3]);
   const first = ai.decideBuildingAction(game, "p2");
@@ -224,7 +228,7 @@ test("AI builds complete affordable regions evenly and respects reserve and bank
   assert.equal(ai.decideBuildingAction(game, "p2"), undefined);
   game.players[1]!.gold = 2_000;
   game.buildingBank.settlementUnitsAvailable = 0;
-  assert.equal(ai.decideBuildingAction(game, "p2"), undefined);
+  assert.notEqual(ai.decideBuildingAction(game, "p2"), undefined);
 });
 
 test("AI emergency strategy chooses a legal sale during paymentRequired", () => {
@@ -233,6 +237,37 @@ test("AI emergency strategy chooses a legal sale during paymentRequired", () => 
   game.turnPhase = "paymentRequired";
   game.pendingPayment = { payerId: "p2", amount: 300, reason: "Miete", payeeId: "p1" };
   assert.equal(ai.decideEmergencySale(game, "p2"), 37);
+});
+
+test("regional building prices are shared by validation and actual debit and expire correctly", () => {
+  for (const [id, expected] of [["builders-blessing",38],["resource-shortage",63]] as const) {
+    const game = state(); own(game,"p1",[1,3]); game.currentRound = 4;
+    game.activeChronicleEvent = {...getRegionalChronicleDefinition(CHRONICLE_EVENTS.find(event=>event.id===id)!,["elves"]),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
+    assert.equal(getEffectiveBuildCost(game,BOARD_TILES[1]!),expected);
+    const humanTile = BOARD_TILES.find(tile=>tile.type==='property'&&tile.region==='humans')!;
+    assert.equal(getEffectiveBuildCost(game,humanTile),humanTile.economy!.buildCost);
+    game.players[0]!.gold = expected-1; assert.equal(canBuildOnProperty(game,"p1",1).allowed,false);
+    game.players[0]!.gold = expected; buildings.build(game,"p1",1); assert.equal(game.players[0]!.gold,0); assert.equal(game.lastBuildingAction!.amount,expected);
+    game.currentRound = 6; assert.equal(getEffectiveBuildCost(game,BOARD_TILES[1]!),50);
+  }
+});
+
+test("golden construction boom sells for 75 percent of original cost, not discounted purchase cost", () => {
+  const game = state(); own(game,"p1",[[1,1],3]); game.currentRound = 4;
+  game.activeChronicleEvent = {...getRegionalChronicleDefinition(CHRONICLE_EVENTS[7]!,["elves"]),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
+  assert.equal(getEffectiveBuildingSaleValue(game,BOARD_TILES[1]!),38);
+  const humanTile = BOARD_TILES.find(tile=>tile.type==='property'&&tile.region==='humans')!;
+  assert.equal(getEffectiveBuildingSaleValue(game,humanTile),humanTile.economy!.buildCost! / 2);
+  buildings.sell(game,"p1",1); assert.equal(game.players[0]!.gold,2038); assert.equal(game.lastBuildingAction!.amount,38);
+  game.currentRound = 6; assert.equal(getEffectiveBuildingSaleValue(game,BOARD_TILES[1]!),25);
+});
+
+test("unlimited supply still requires gold, full ownership, no mortgage and a safe phase", () => {
+  const game = state(); own(game,"p1",[1,3]); game.buildingBank = {settlementUnitsAvailable:0,grandStructuresAvailable:0};
+  game.players[0]!.gold = 49; assert.equal(canBuildOnProperty(game,"p1",1).allowed,false);
+  game.players[0]!.gold = 50; game.propertyOwnerships[1]!.mortgaged = true; assert.equal(canBuildOnProperty(game,"p1",1).allowed,false);
+  game.propertyOwnerships[1]!.mortgaged = false; game.turnPhase = 'moving'; assert.equal(canBuildOnProperty(game,"p1",1).allowed,false);
+  game.turnPhase = 'waitingForRoll'; assert.equal(canBuildOnProperty(game,"p1",1).allowed,true);
 });
 
 test("realm building names are centralized for all five levels", () => {

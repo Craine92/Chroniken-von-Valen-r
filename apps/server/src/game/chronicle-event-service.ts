@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { BOARD_TILES, CHRONICLE_REGIONS, CHRONICLE_EVENTS, MAX_RELICS, RELIC_DEFINITIONS, RELIC_USE_MESSAGES, consumeRelic, isRelicArmed, getChronicleTargetRegions, getRegionalChronicleDefinition, isBuyableTile,
-  type GamePlayerState, type GameState, type RegionType, type RelicId } from "@valenor/shared";
+  type GamePlayerState, type GameState, type RegionType, type RelicId, type ChronicleEvent } from "@valenor/shared";
 import { completeQuests } from "./quest-service";
 
 /** The existing chooseIndex source supplies a value in [0, 1). */
@@ -8,15 +8,35 @@ export function pickAffectedRegionCount(random: number): number {
   return random < .5 ? 1 : random < .8 ? 2 : random < .95 ? 3 : 4;
 }
 
-export function pickChronicleRegions(chooseIndex: (count: number) => number = randomInt, previous: readonly RegionType[] = []): RegionType[] {
-  const count = pickAffectedRegionCount(chooseIndex(100) / 100);
-  const regions = Object.keys(CHRONICLE_REGIONS) as RegionType[];
-  const combinations = Array.from({ length: 15 }, (_, index) => regions.filter((_, bit) => ((index + 1) & (1 << bit)) !== 0)).filter(combination => combination.length === count);
+export function pickChronicleRegions(chooseIndex: (count: number) => number = randomInt, previous: readonly RegionType[] = [], regions: readonly RegionType[] = Object.keys(CHRONICLE_REGIONS) as RegionType[], requiredAny: readonly RegionType[] = []): RegionType[] {
+  const count = Math.min(pickAffectedRegionCount(chooseIndex(100) / 100), regions.length);
+  const combinations = Array.from({ length: (1 << regions.length) - 1 }, (_, index) => regions.filter((_, bit) => ((index + 1) & (1 << bit)) !== 0))
+    .filter(combination => combination.length === count && (!requiredAny.length || combination.some(region => requiredAny.includes(region))));
   const previousKey = [...previous].sort().join(",");
   const alternatives = combinations.filter(combination => [...combination].sort().join(",") !== previousKey);
   // Four regions have only one combination; retain the weighted count in that case.
   const candidates = alternatives.length ? alternatives : combinations;
   return [...candidates[chooseIndex(candidates.length)]!];
+}
+
+export function getUsefulChronicleRegions(state: GameState, definition: ChronicleEvent): RegionType[] {
+  const targets = getChronicleTargetRegions(definition);
+  const result = new Set<RegionType>();
+  for (const tile of BOARD_TILES) {
+    if (!tile.region || (targets.length && !targets.includes(tile.region)) || (definition.affectedTileTypes && !definition.affectedTileTypes.includes(tile.type))) continue;
+    const ownership = state.propertyOwnerships.find(entry => entry.tileIndex === tile.index);
+    const relevant = definition.effectType === "purchaseDiscount" ? isBuyableTile(tile) && !ownership :
+      definition.effectType === "mortgageDiscount" ? Boolean(ownership?.mortgaged) :
+      definition.effectType === "buildingSaleBonus" ? (ownership?.buildingLevel ?? 0) > 0 :
+      definition.effectType === "buildDiscount" || definition.effectType === "buildSurcharge" ? tile.type === "property" && (ownership?.buildingLevel ?? 0) < 5 : true;
+    if (relevant) result.add(tile.region);
+  }
+  return [...result];
+}
+
+export function isChronicleEventApplicable(state: GameState, definition: ChronicleEvent): boolean {
+  return ["purchaseDiscount", "mortgageDiscount", "buildingSaleBonus", "buildDiscount", "buildSurcharge"].includes(definition.effectType)
+    ? getUsefulChronicleRegions(state, definition).length > 0 : true;
 }
 
 /** Called once the server advances to the round following a completed round. */
@@ -26,11 +46,13 @@ export function advanceChronicleEvents(state: GameState, chooseIndex: (count: nu
   const completedRound = state.currentRound - 1;
   const previous = state.chronicleEventHistory?.at(-1);
   if (completedRound <= 0 || completedRound % 3 !== 0 || state.activeChronicleEvent || (previous && previous.startedAfterRound >= completedRound)) return;
-  const candidates = CHRONICLE_EVENTS.filter((event) => event.id !== previous?.id);
+  const candidates = CHRONICLE_EVENTS.filter((event) => event.id !== previous?.id && isChronicleEventApplicable(state, event));
   let definition = candidates[chooseIndex(candidates.length)]!;
   if (definition.effectType !== "startPassBonus") {
     const lastSameEvent = state.chronicleEventHistory?.filter(event => event.id === definition.id).at(-1);
-    definition = getRegionalChronicleDefinition(definition, pickChronicleRegions(chooseIndex, getChronicleTargetRegions(lastSameEvent)));
+    const usefulRegions = getUsefulChronicleRegions(state, definition);
+    const regions = ["mortgageDiscount", "buildingSaleBonus", "buildDiscount", "buildSurcharge"].includes(definition.effectType) ? usefulRegions : Object.keys(CHRONICLE_REGIONS) as RegionType[];
+    definition = getRegionalChronicleDefinition(definition, pickChronicleRegions(chooseIndex, getChronicleTargetRegions(lastSameEvent), regions, definition.effectType === "purchaseDiscount" ? usefulRegions : []));
   }
   const event = { ...definition, startedAfterRound: completedRound, startedAtRound: state.currentRound,
     expiresAtRound: state.currentRound + definition.durationRounds, startedAt: Date.now() };

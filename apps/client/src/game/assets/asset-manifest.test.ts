@@ -21,7 +21,7 @@ test("only reviewed core art is preloaded and pending slots retain procedural fa
   const assets = flattenAssetManifest();
   const ready = getPreloadAssets();
   const pending = assets.filter((asset) => asset.availability === "slot");
-  assert.equal(ready.length, 34);
+  assert.equal(ready.length, 36);
   assert.ok(ready.every((asset) => asset.availability === "ready" && asset.fallback === "procedural"));
   assert.ok(pending.length > 0);
   assert.ok(pending.every((asset) => asset.fallback === "procedural"));
@@ -47,7 +47,7 @@ test("dragon visuals contain one full-size dragon and exactly two subdued cyclic
     const visuals = getDragonTerritoryVisuals(tile);
     assert.deepEqual(visuals.map(visual => visual.tileIndex), expected);
     assert.equal(visuals.length, 3); assert.equal(visuals[0].scale, 1); assert.equal(visuals[0].alpha, 1);
-    for (const projection of visuals.slice(1)) { assert.equal(projection.scale, .5); assert.ok(projection.alpha >= .55 && projection.alpha <= .7); }
+    for (const projection of visuals.slice(1)) { assert.equal(projection.scale, .5); assert.equal(projection.alpha, .85); }
   }
 });
 
@@ -60,6 +60,14 @@ test("all four relics map centrally to existing 1254px PNG assets in Relicts", (
     const png = readFileSync(path);
     assert.equal(png.readUInt32BE(16), 1254); assert.equal(png.readUInt32BE(20), 1254);
     assert.ok(getPreloadAssets().includes(asset));
+  }
+});
+
+test("both deck frames are existing PNGs with their actual dimensions", () => {
+  for (const asset of Object.values(VALENOR_ASSETS.cards)) {
+    const png = readFileSync(new URL(`../../../public${asset.path}`, import.meta.url));
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [1058,1487]);
+    assert.equal(asset.availability,"ready");
   }
 });
 

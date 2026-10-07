@@ -1,4 +1,18 @@
 /* Smartphone companion UI. Every rule is scoped to the controller route. */
+.controller-page .property-group__entry { min-width:0; border:1px solid rgba(216,185,104,.2); border-radius:.4rem; overflow:hidden; }
+.controller-page .property-group__entry .property-group__member { border:0; }
+.controller-page .controller-property-level { display:flex; align-items:center; gap:.5rem; margin-top:.5rem; }
+.controller-page .controller-property-level > b { display:grid; place-items:center; flex:0 0 30px; height:30px; border:1px solid #c3a365; border-radius:.35rem; background:#131017; color:#f4dfad; font-size:16px; }
+.controller-page .controller-property-level > b.is-grand { border-color:#f1d281; background:#382915; color:#fff1b9; }
+.controller-page .controller-property-level small { font-size:14px; color:#e5d8bf; }
+.controller-page .controller-inline-build { display:block; width:calc(100% - 1rem); min-height:48px; margin:0 .5rem .5rem; padding:.6rem; border:1px solid #be9f5c; border-radius:.4rem; background:#362919; color:#ffe5ad; font-size:14px; font-weight:700; white-space:normal; cursor:pointer; }
+.controller-page .controller-inline-build:disabled { opacity:.5; cursor:default; }
+.controller-page .controller-inline-sell { display:block; width:calc(100% - 1rem); min-height:48px; margin:0 .5rem .5rem; padding:.6rem; border:1px solid #75664c; border-radius:.4rem; background:#201e19; color:#e4d7b6; font-size:13px; font-weight:600; white-space:normal; cursor:pointer; }
+.controller-page .controller-inline-sell:disabled { opacity:.5; cursor:default; }
+.controller-page .trade-decisions button.trade-counter-action { border-color:#bea36b; background:#33291d; color:#ffe3ab; }
+.controller-page .trade-decisions .controller-primary-action { grid-column:1 / -1; }
+.controller-page .trade-counter-cancel { width:100%; min-height:48px; margin-top:.5rem; }
+.controller-page .controller-inline-build-reason { margin:0 .7rem .6rem; color:#cbbda8; font-size:13px; line-height:1.4; overflow-wrap:anywhere; }
 .controller-page .controller-quests { display:grid; gap:.75rem; margin-block:1rem; }
 .controller-page .controller-quests h3 { display:flex; justify-content:space-between; gap:.5rem; font-size:15px; color:#ead4a4; }
 .controller-page .controller-quests article { min-width:0; padding:1rem; background:#16121b; border:1px solid #816b3e; border-radius:.65rem; }

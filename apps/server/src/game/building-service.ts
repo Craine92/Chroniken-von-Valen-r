@@ -4,6 +4,8 @@ import {
   canBuildOnProperty,
   canSellBuilding,
   getBuildingName,
+  getEffectiveBuildCost,
+  getEffectiveBuildingSaleValue,
   type BuildingLevel,
   type GameState
 } from "@valenor/shared";
@@ -18,17 +20,11 @@ export class BuildingService {
     const player = state.players.find((entry) => entry.id === playerId)!;
     const ownership = state.propertyOwnerships.find((entry) => entry.tileIndex === tileIndex)!;
     const tile = BOARD_TILES[tileIndex]!;
-    const cost = tile.economy!.buildCost!;
+    const cost = getEffectiveBuildCost(state, tile);
     const fromLevel = ownership.buildingLevel;
     const toLevel = (fromLevel + 1) as BuildingLevel;
 
     player.gold -= cost;
-    if (toLevel === 5) {
-      state.buildingBank.settlementUnitsAvailable += 4;
-      state.buildingBank.grandStructuresAvailable -= 1;
-    } else {
-      state.buildingBank.settlementUnitsAvailable -= 1;
-    }
     ownership.buildingLevel = toLevel;
     const buildingName = getBuildingName(tile.region!, toLevel);
     const message = fromLevel === 0
@@ -44,18 +40,12 @@ export class BuildingService {
     const player = state.players.find((entry) => entry.id === playerId)!;
     const ownership = state.propertyOwnerships.find((entry) => entry.tileIndex === tileIndex)!;
     const tile = BOARD_TILES[tileIndex]!;
-    const proceeds = tile.economy!.buildCost! / 2;
+    const proceeds = getEffectiveBuildingSaleValue(state, tile);
     const fromLevel = ownership.buildingLevel;
     const toLevel = (fromLevel - 1) as BuildingLevel;
     const buildingName = getBuildingName(tile.region!, fromLevel);
 
     player.gold += proceeds;
-    if (fromLevel === 5) {
-      state.buildingBank.grandStructuresAvailable += 1;
-      state.buildingBank.settlementUnitsAvailable -= 4;
-    } else {
-      state.buildingBank.settlementUnitsAvailable += 1;
-    }
     ownership.buildingLevel = toLevel;
     this.record(
       state,

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { BOARD_TILES, type GameState } from "@valenor/shared";
+import { BOARD_TILES, getEffectiveBuildingSaleValue, type GameState } from "@valenor/shared";
 import { advanceChronicleEvents, advanceWanderingDragon } from "./chronicle-event-service";
 
 export function completeBankruptcyTurn(state: GameState): void {
@@ -85,9 +85,7 @@ export class BankruptcyService {
     possessions.forEach((ownership) => {
       const tile = BOARD_TILES[ownership.tileIndex];
       if (tile?.type !== "property" || ownership.buildingLevel === 0) return;
-      buildingProceeds += ownership.buildingLevel * (tile.economy!.buildCost! / 2);
-      if (ownership.buildingLevel === 5) state.buildingBank.grandStructuresAvailable += 1;
-      else state.buildingBank.settlementUnitsAvailable += ownership.buildingLevel;
+      buildingProceeds += ownership.buildingLevel * getEffectiveBuildingSaleValue(state, tile);
       ownership.buildingLevel = 0;
     });
     debtor.gold += buildingProceeds;

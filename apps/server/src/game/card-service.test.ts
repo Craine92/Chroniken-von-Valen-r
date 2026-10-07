@@ -6,6 +6,8 @@ import {
   CARD_DEFINITIONS,
   DUNGEON_TILE_INDEX,
   FATE_CARDS,
+  getCardDefinition,
+  describeCardEffects,
   type DiceRoll,
   type GameState
 } from "@valenor/shared";
@@ -39,10 +41,10 @@ function putFirst(runtime: ReturnType<CardService["createRuntime"]>, deck: "adve
   runtime.decks[deck].drawPile = [...ids, ...runtime.decks[deck].drawPile.filter((id) => !wanted.has(id))];
 }
 
-test("card catalogue contains 24 typed cards per deck, unique IDs and one keepable release card each", () => {
-  assert.equal(ADVENTURE_CARDS.length, 24);
-  assert.equal(FATE_CARDS.length, 24);
-  assert.equal(new Set(CARD_DEFINITIONS.map((card) => card.id)).size, 48);
+test("card catalogue contains 28 typed cards per deck, unique IDs and one keepable release card each", () => {
+  assert.equal(ADVENTURE_CARDS.length, 28);
+  assert.equal(FATE_CARDS.length, 28);
+  assert.equal(new Set(CARD_DEFINITIONS.map((card) => card.id)).size, 56);
   for (const [deck, cards] of [["adventure", ADVENTURE_CARDS], ["fate", FATE_CARDS]] as const) {
     assert.ok(cards.every((card) => card.deck === deck && card.title && card.flavorText && card.effects.length > 0));
     assert.equal(cards.filter((card) => card.keepable && card.effects.some((effect) => effect.type === "keepDungeonRelease")).length, 1);
@@ -53,6 +55,28 @@ test("all forty board fields expose stable unique machine IDs", () => {
   assert.equal(BOARD_TILES.length, 40);
   assert.equal(new Set(BOARD_TILES.map((tile) => tile.id)).size, 40);
   assert.ok(BOARD_TILES.every((tile) => tile.id.trim().length > 0));
+});
+
+test('the eight added cards resolve through existing effects and return to their decks',()=>{
+  const cases=[['adv_025',[1650,1500,1500]],['adv_026',[1400,1500,1500]],['adv_028',[1450,1525,1525]],['fate_025',[1675,1500,1500]],['fate_026',[1375,1500,1500]],['fate_028',[1550,1475,1475]]] as const;
+  for(const [id,gold] of cases){
+    const definition=getCardDefinition(id), cards=new CardService(new SequenceCardShuffleSource([0])),runtime=cards.createRuntime(),game=state(definition.deck);
+    assert.ok(describeCardEffects(definition).includes('Gold')); putFirst(runtime,definition.deck,id);
+    cards.draw(game,runtime,'p1','human'); assert.deepEqual(game.players.map(p=>p.gold),gold);
+    cards.acknowledge(game,runtime,'p1','human'); assert.ok(runtime.decks[definition.deck].discardPile.includes(id));
+  }
+  for(const [id,destination] of [['adv_027',5],['fate_027',0]] as const){
+    const definition=getCardDefinition(id), cards=new CardService(new SequenceCardShuffleSource([0])),runtime=cards.createRuntime(),game=state(definition.deck),economy=new EconomyService();
+    game.players[0]!.position=39; putFirst(runtime,definition.deck,id); cards.draw(game,runtime,'p1','human');
+    assert.equal(game.lastMovement?.passedStart,true); cards.completeMovement(game,runtime); economy.resolveLanding(game);
+    assert.equal(game.players[0]!.position,destination); assert.equal(game.players[0]!.gold,1700);
+    if(destination===5) { assert.equal(game.turnPhase,'propertyDecision'); economy.buyCurrentTile(game,'p1'); }
+    cards.resumeAfterLanding(game,runtime); cards.acknowledge(game,runtime,'p1','human');
+    assert.ok(runtime.decks[definition.deck].discardPile.includes(id));
+  }
+  const decks=createDecks(new SequenceCardShuffleSource([0]));
+  assert.deepEqual([...decks.adventure.drawPile].sort(),ADVENTURE_CARDS.map(c=>c.id).sort());
+  assert.deepEqual([...decks.fate.drawPile].sort(),FATE_CARDS.map(c=>c.id).sort());
 });
 
 test("shuffle source is deterministic and exhausted decks reshuffle only discards", () => {

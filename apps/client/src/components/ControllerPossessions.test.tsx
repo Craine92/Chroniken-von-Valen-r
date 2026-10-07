@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BOARD_TILES, RELIC_DEFINITIONS, RELIC_ACTIONS, getPropertyGroupTiles, type GameState, type RelicId } from "@valenor/shared";
+import { BOARD_TILES, CHRONICLE_EVENTS, getRegionalChronicleDefinition, RELIC_DEFINITIONS, RELIC_ACTIONS, getPropertyGroupTiles, type GameState, type RelicId } from "@valenor/shared";
 import { RELIC_ASSETS } from "../game/assets/asset-manifest";
 import { ControllerPossessions, ControllerPropertyDetails } from "./ControllerPossessions";
 
@@ -48,6 +48,42 @@ test("all relics display their name, full explanation, icon and activation state
       assert.ok(markup.includes(RELIC_ACTIONS[id].status)); assert.match(markup, /controller-relic--armed/);
     }
   }
+});
+
+test("overview shows current building levels, names and a direct build button only for the lowest street", () => {
+  const game = state(); game.propertyOwnerships = [{tileIndex:1,ownerId:'p1',mortgaged:false,buildingLevel:2},{tileIndex:3,ownerId:'p1',mortgaged:false,buildingLevel:1}];
+  const markup = renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
+  assert.match(markup,/Stufe 2 · Baumhaus/); assert.match(markup,/Stufe 1 · Wurzelhütte/); assert.match(markup,/aria-label="Baustufe 2"/);
+  assert.equal((markup.match(/class="controller-inline-build"/g)??[]).length,1); assert.match(markup,/\+ BAUEN · 50 GOLD/);
+  assert.match(markup,/Zuerst Sternenlichtung ausbauen/); assert.doesNotMatch(markup,/controller-property-detail/);
+  assert.match(markup,/Unbegrenzt/); assert.doesNotMatch(markup,/Bauwerke \d+ \/ 32|Großbauten \d+ \/ 12/);
+});
+
+test("overview and detail use the actual regional chronicle build price and retain touch-safe separate controls", () => {
+  const game = state(); game.currentRound = 4;
+  game.activeChronicleEvent = {...getRegionalChronicleDefinition(CHRONICLE_EVENTS[4]!,['elves']),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
+  game.propertyOwnerships = getPropertyGroupTiles('group_mondhain').map(tile=>({tileIndex:tile.index,ownerId:'p1',mortgaged:false,buildingLevel:0}));
+  const markup = renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
+  assert.match(markup,/UNBEBAUT/); assert.match(markup,/\+ BAUEN · 38 GOLD/); assert.doesNotMatch(markup,/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/);
+  const detail = renderToStaticMarkup(<ControllerPropertyDetails state={game} playerId="p1" connected tile={BOARD_TILES[1]!} {...callbacks} />);
+  assert.match(detail,/Bauen · 38 Gold/); assert.match(detail,/Mietstaffel anzeigen/); assert.match(detail,/Baustufe verkaufen/);
+});
+
+test("direct sale is absent at level zero and uses even-sale eligibility and the current chronicle proceeds", () => {
+  const game = state();
+  game.propertyOwnerships = getPropertyGroupTiles('group_mondhain').map(tile=>({tileIndex:tile.index,ownerId:'p1',mortgaged:false,buildingLevel:0}));
+  const render = () => renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
+  assert.doesNotMatch(render(),/controller-inline-sell/);
+  game.propertyOwnerships[0]!.buildingLevel = 1; game.propertyOwnerships[1]!.buildingLevel = 2;
+  let markup = render();
+  assert.equal((markup.match(/class="controller-inline-sell"/g)??[]).length,1);
+  assert.match(markup,/− BAUSTUFE VERKAUFEN · \+25 GOLD/);
+  assert.match(markup,/Zuerst Baustufe auf Sternenlichtung reduzieren\./);
+  game.currentRound=4;
+  game.activeChronicleEvent={...getRegionalChronicleDefinition(CHRONICLE_EVENTS[7]!,['elves']),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
+  assert.match(render(),/− BAUSTUFE VERKAUFEN · \+38 GOLD/);
+  game.propertyOwnerships[1]!.buildingLevel=1;
+  assert.equal((render().match(/class="controller-inline-sell"/g)??[]).length,2);
 });
 
 test("mobile possessions start with compact groups and no expanded property details", () => {

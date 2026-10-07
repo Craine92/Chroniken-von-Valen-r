@@ -1,5 +1,6 @@
 import { BOARD_TILES, getPropertyGroupTiles, type BoardTile } from "./board";
 import type { GameState, PropertyOwnership } from "./game";
+import { getActiveChronicleEvent, isChronicleTileAffected } from "./chronicle-events";
 
 export interface FinanceEligibility { allowed: boolean; reason?: string }
 const FINANCE_SAFE_PHASES = ["waitingForRoll", "waitingForEndTurn"] as const;
@@ -13,6 +14,11 @@ export function getMortgageValue(tile: BoardTile): number {
 
 export function getMortgageRedemptionCost(tile: BoardTile): number {
   return Math.ceil((getMortgageValue(tile) * 110) / 100);
+}
+
+export function getEffectiveMortgageRedemptionCost(state: GameState, tile: BoardTile): number {
+  const event = getActiveChronicleEvent(state);
+  return Math.round(getMortgageRedemptionCost(tile) * (event?.effectType === "mortgageDiscount" && isChronicleTileAffected(event, tile) ? .75 : 1));
 }
 
 export function isGroupEconomicallyActive(ownerships: readonly PropertyOwnership[], ownerId: string, propertyGroup: string): boolean {
@@ -55,6 +61,6 @@ export function canRedeemMortgage(state: GameState, playerId: string, tileIndex:
   const ownership = getPropertyOwnership(state, tileIndex);
   if (!player || player.isBankrupt || !tile?.economy || !ownership || ownership.ownerId !== playerId) return { allowed: false, reason: "Dieses Feld gehört dir nicht." };
   if (!ownership.mortgaged) return { allowed: false, reason: "Dieses Feld ist nicht verpfändet." };
-  if (player.gold < getMortgageRedemptionCost(tile)) return { allowed: false, reason: "Nicht genügend Gold." };
+  if (player.gold < getEffectiveMortgageRedemptionCost(state, tile)) return { allowed: false, reason: "Nicht genügend Gold." };
   return { allowed: true };
 }

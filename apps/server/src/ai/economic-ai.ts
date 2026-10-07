@@ -3,6 +3,8 @@ import {
   canBuildOnProperty,
   canSellBuilding,
   getEffectivePurchasePrice,
+  getEffectiveBuildCost,
+  getEffectiveBuildingSaleValue,
   type AuctionBidIncrement,
   type GameState
 } from "@valenor/shared";
@@ -45,13 +47,13 @@ export class EconomicAi {
       .filter((ownership) => ownership.ownerId === playerId)
       .map((ownership) => ({ ownership, tile: BOARD_TILES[ownership.tileIndex]! }))
       .filter(({ tile }) => tile.type === "property" && canBuildOnProperty(state, playerId, tile.index).allowed)
-      .filter(({ tile }) => player.gold - tile.economy!.buildCost! >= AI_ECONOMY_CONFIG.buildingGoldReserve)
+      .filter(({ tile }) => player.gold - getEffectiveBuildCost(state, tile) >= AI_ECONOMY_CONFIG.buildingGoldReserve)
       .sort((left, right) => {
         const leftStarted = state.propertyOwnerships.some((entry) => entry.ownerId === playerId && entry.buildingLevel > 0 && BOARD_TILES[entry.tileIndex]?.propertyGroup === left.tile.propertyGroup);
         const rightStarted = state.propertyOwnerships.some((entry) => entry.ownerId === playerId && entry.buildingLevel > 0 && BOARD_TILES[entry.tileIndex]?.propertyGroup === right.tile.propertyGroup);
         if (leftStarted !== rightStarted) return leftStarted ? -1 : 1;
         if (left.ownership.buildingLevel !== right.ownership.buildingLevel) return left.ownership.buildingLevel - right.ownership.buildingLevel;
-        return left.tile.economy!.buildCost! - right.tile.economy!.buildCost!;
+        return getEffectiveBuildCost(state, left.tile) - getEffectiveBuildCost(state, right.tile);
       });
     return candidates[0]?.tile.index;
   }
@@ -60,8 +62,8 @@ export class EconomicAi {
     return state.propertyOwnerships
       .filter((ownership) => ownership.ownerId === playerId && canSellBuilding(state, playerId, ownership.tileIndex).allowed)
       .sort((left, right) => {
-        const leftCost = BOARD_TILES[left.tileIndex]?.economy?.buildCost ?? 0;
-        const rightCost = BOARD_TILES[right.tileIndex]?.economy?.buildCost ?? 0;
+        const leftCost = getEffectiveBuildingSaleValue(state, BOARD_TILES[left.tileIndex]!);
+        const rightCost = getEffectiveBuildingSaleValue(state, BOARD_TILES[right.tileIndex]!);
         return rightCost - leftCost || right.buildingLevel - left.buildingLevel;
       })[0]?.tileIndex;
   }

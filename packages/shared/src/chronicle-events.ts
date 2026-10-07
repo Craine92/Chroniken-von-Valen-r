@@ -13,7 +13,7 @@ export interface ChronicleEvent {
   description: string;
   effectSummary: string;
   durationRounds: number;
-  effectType: "purchaseDiscount" | "regionalRentBonus" | "startPassBonus" | "rentDiscount";
+  effectType: "purchaseDiscount" | "regionalRentBonus" | "startPassBonus" | "rentDiscount" | "buildDiscount" | "buildSurcharge" | "mortgageDiscount" | "buildingSaleBonus";
   targetRegion?: RegionType;
   targetRegions?: RegionType[];
   affectedTileTypes?: readonly BoardTileType[];
@@ -30,7 +30,11 @@ export const CHRONICLE_EVENTS: readonly ChronicleEvent[] = [
   { id: "traders-festival", title: "Fest der Händler", description: "Unverkaufte Grundstücke in den betroffenen Reichen kosten 20 % weniger.", effectSummary: "Kaufpreise: −20 %", durationRounds: 2, effectType: "purchaseDiscount", affectedTileTypes: ["property", "harbor", "utility"] },
   { id: "blood-moon", title: "Blutmond", description: "Grundstücksmieten in den betroffenen Reichen sind 25 % höher.", effectSummary: "Mieten: +25 %", durationRounds: 2, effectType: "regionalRentBonus", affectedTileTypes: ["property"] },
   { id: "runegate-blessing", title: "Segen des Runentors", description: "Beim Passieren des Runentors erhältst du insgesamt 300 Gold.", effectSummary: "Runentor: 300 statt 200 Gold", durationRounds: 2, effectType: "startPassBonus" },
-  { id: "four-realms-peace", title: "Frieden der vier Reiche", description: "Mieten in den betroffenen Reichen sind 25 % niedriger.", effectSummary: "Mieten: −25 %", durationRounds: 2, effectType: "rentDiscount", affectedTileTypes: ["property", "harbor", "utility"] }
+  { id: "four-realms-peace", title: "Frieden der vier Reiche", description: "Mieten in den betroffenen Reichen sind 25 % niedriger.", effectSummary: "Mieten: −25 %", durationRounds: 2, effectType: "rentDiscount", affectedTileTypes: ["property", "harbor", "utility"] },
+  { id: "builders-blessing", title: "Segen der Baumeister", description: "Bauwerke in den betroffenen Reichen kosten 25 % weniger.", effectSummary: "Baukosten: −25 %", durationRounds: 2, effectType: "buildDiscount", affectedTileTypes: ["property"] },
+  { id: "resource-shortage", title: "Rohstoffknappheit", description: "Bauwerke in den betroffenen Reichen kosten 25 % mehr.", effectSummary: "Baukosten: +25 %", durationRounds: 2, effectType: "buildSurcharge", affectedTileTypes: ["property"] },
+  { id: "crown-decree", title: "Erlass der Krone", description: "Hypotheken in den betroffenen Reichen können 25 % günstiger ausgelöst werden.", effectSummary: "Hypotheken-Auslösung: −25 %", durationRounds: 2, effectType: "mortgageDiscount", affectedTileTypes: ["property", "harbor", "utility"] },
+  { id: "golden-building-boom", title: "Goldene Baukonjunktur", description: "Beim Verkauf von Baustufen in den betroffenen Reichen erhältst du 75 % der ursprünglichen Baukosten.", effectSummary: "Gebäudeverkauf: 75 % Baukosten", durationRounds: 2, effectType: "buildingSaleBonus", affectedTileTypes: ["property"] }
 ];
 
 export function getBloodMoonDefinition(targetRegion: RegionType): ChronicleEvent {

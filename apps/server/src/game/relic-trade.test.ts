@@ -16,6 +16,60 @@ const assets = (relicIds: RelicId[] = [], gold = 0): TradeAssets => ({gold,prope
 const service = new TradeService();
 const create = (state: GameState, offered: RelicId[] = ["runestone"], requested: RelicId[] = []) => service.create(state,"p1",{recipientId:"p2",offer:assets(offered),request:assets(requested)});
 
+function counterFixture() {
+  const state=game();
+  state.players[0]!.relics=['runestone']; state.players[1]!.relics=['golden-feather'];
+  state.players[0]!.heldCards=[{cardId:'adv_024',deck:'adventure'}]; state.players[1]!.heldCards=[{cardId:'fate_024',deck:'fate'}];
+  state.propertyOwnerships=[{tileIndex:1,ownerId:'p1',buildingLevel:0,mortgaged:false},{tileIndex:3,ownerId:'p2',buildingLevel:0,mortgaged:false}];
+  const original=service.create(state,'p1',{recipientId:'p2',offer:{...assets(['runestone'],300),propertyTileIndices:[1],cardIds:['adv_024']},request:{...assets(['golden-feather'],50),propertyTileIndices:[3],cardIds:['fate_024']}});
+  const request={recipientId:'p1',counterToTradeId:original.id,offer:structuredClone(original.request),request:structuredClone(original.offer)};
+  return {state,original,request};
+}
+
+test('counter offers replace the original atomically and transfer all asset types with edited gold',()=>{
+  const {state,original,request}=counterFixture(); request.request.gold=250;
+  const counter=service.create(state,'p2',request);
+  assert.equal(original.status,'countered'); assert.equal(counter.status,'pending'); assert.equal(counter.counterToTradeId,original.id);
+  assert.equal(counter.proposerId,'p2'); assert.equal(counter.recipientId,'p1');
+  assert.deepEqual(counter.offer,original.request); assert.equal(counter.request.gold,250);
+  assert.equal(state.trades.filter(t=>t.status==='pending').length,1);
+  assert.throws(()=>service.accept(state,'p2',original.id)); assert.throws(()=>service.create(state,'p2',request));
+  service.accept(state,'p1',counter.id);
+  assert.deepEqual(state.players.map(p=>p.gold),[1300,1700]);
+  assert.deepEqual(state.players.map(p=>p.relics),[['golden-feather'],['runestone']]);
+  assert.deepEqual(state.players.map(p=>p.heldCards?.[0]?.cardId),['fate_024','adv_024']);
+  assert.deepEqual(state.propertyOwnerships.map(p=>p.ownerId),['p2','p1']);
+});
+
+test('each invalid counter leaves the original and the entire state unchanged',()=>{
+  const mutations: ((fixture:ReturnType<typeof counterFixture>)=>void)[]=[
+    f=>{f.request.counterToTradeId='missing';},
+    f=>{f.original.status='rejected';},
+    f=>{f.request.recipientId='p2';},
+    f=>{f.request.offer.gold=9999;},
+    f=>{f.request.offer.propertyTileIndices=[1];},
+    f=>{f.state.propertyOwnerships[0]!.buildingLevel=1;},
+    f=>{f.state.players[1]!.heldCards=[];},
+    f=>{f.state.players[1]!.relics=[];},
+    f=>{f.state.players[1]!.armedRelics=['golden-feather'];},
+    f=>{f.state.players[1]!.relics=['golden-feather','merchant-seal']; f.request.offer.relicIds=[];},
+    f=>{f.request.offer.relicIds=['golden-feather','golden-feather'];}
+  ];
+  for(const change of mutations){
+    const fixture=counterFixture(); change(fixture); const before=JSON.stringify(fixture.state);
+    assert.throws(()=>service.create(fixture.state,'p2',fixture.request)); assert.equal(JSON.stringify(fixture.state),before);
+  }
+  const fixture=counterFixture(), before=JSON.stringify(fixture.state);
+  assert.throws(()=>service.create(fixture.state,'stranger',fixture.request)); assert.equal(JSON.stringify(fixture.state),before);
+});
+
+test('a counter to a counter has one pending version and can still be rejected',()=>{
+  const {state,request}=counterFixture(); const counter=service.create(state,'p2',request);
+  const next=service.create(state,'p1',{recipientId:'p2',counterToTradeId:counter.id,offer:counter.request,request:counter.offer});
+  assert.equal(counter.status,'countered'); assert.equal(state.trades.filter(t=>t.status==='pending').length,1);
+  service.reject(state,'p2',next.id); assert.equal(next.status,'rejected');
+});
+
 test("an inactive relic alone is a valid offer and transfers without activation", () => {
   const state = game(); state.players[0]!.relics = ["runestone"];
   const trade = create(state); service.accept(state,"p2",trade.id);

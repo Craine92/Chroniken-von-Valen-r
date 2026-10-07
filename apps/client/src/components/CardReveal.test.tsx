@@ -10,8 +10,8 @@ test("adventure reveal renders fantasy title, flavor and transparent gold effect
   assert.match(markup, /Lohn des Runenschmieds/);
   assert.match(markup, /Du erhältst 100 Gold/);
   assert.match(markup, /card-reveal--adventure/);
-  assert.match(markup, /card-reveal__illustration/);
-  assert.match(markup, /card-reveal__corner--top/);
+  assert.match(markup, /src="\/assets\/cards\/CardAbenteuer.png"/);
+  assert.match(markup, /width="1058" height="1487"/);
 });
 
 test("fate reveal uses moon styling and exposes a repair rule", () => {
@@ -20,7 +20,7 @@ test("fate reveal uses moon styling and exposes a repair rule", () => {
   assert.match(markup, /Riss im Schicksalsgewebe/);
   assert.match(markup, /25 Gold je Baueinheit/);
   assert.match(markup, /card-reveal--fate/);
-  assert.match(markup, /card-reveal__illustration/);
+  assert.match(markup, /src="\/assets\/cards\/CardSchicksal.png"/);
 });
 
 test("movement, dungeon and keepable effects are readable without hidden rules", () => {

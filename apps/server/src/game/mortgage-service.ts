@@ -3,7 +3,7 @@ import {
   BOARD_TILES,
   canMortgageProperty,
   canRedeemMortgage,
-  getMortgageRedemptionCost,
+  getEffectiveMortgageRedemptionCost,
   getMortgageValue,
   type GameState
 } from "@valenor/shared";
@@ -27,7 +27,7 @@ export class MortgageService {
     const player = state.players.find((entry) => entry.id === playerId)!;
     const ownership = state.propertyOwnerships.find((entry) => entry.tileIndex === tileIndex)!;
     const tile = BOARD_TILES[tileIndex]!;
-    const cost = getMortgageRedemptionCost(tile);
+    const cost = getEffectiveMortgageRedemptionCost(state, tile);
     player.gold -= cost;
     ownership.mortgaged = false;
     this.log(state, `${player.name} löst die Hypothek auf ${tile.name} für ${cost} Gold aus.`, playerId, -cost);

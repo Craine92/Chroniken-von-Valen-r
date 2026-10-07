@@ -236,14 +236,16 @@ test("consecutive double actions receive distinct banner instances", () => {
   }
 });
 
-test("the action log renders only the two newest complete entries", () => {
+test("the action log renders up to four newest entries in reverse chronological order without changing history", () => {
   const state = startedGameState(2);
-  state.economyLog = [
-    { id: "old", kind: "system", message: "Ältester Eintrag", playerIds: [], createdAt: 1 },
-    { id: "middle", kind: "system", message: "Mittlerer Eintrag", playerIds: [], createdAt: 2 },
-    { id: "new", kind: "system", message: "Neuester Eintrag", playerIds: [], createdAt: 3 }
-  ];
-  const markup = renderToStaticMarkup(<GameExperience gameState={state} />);
-  assert.doesNotMatch(markup, /Ältester Eintrag/);
-  assert.match(markup, /Neuester Eintrag.*Mittlerer Eintrag/);
+  for (const count of [0,1,2,3,4,7]) {
+    state.economyLog = Array.from({length:count}, (_, index) => ({ id:`action-${index}`, kind:"system" as const, message:`Aktion ${index}: Myrra verkauft eine Baustufe auf Sternenlichtung und erhält 38 Gold.`, playerIds:[], createdAt:index }));
+    const before=JSON.stringify(state.economyLog);
+    const markup = renderToStaticMarkup(<GameExperience gameState={state} />);
+    const log=markup.match(/<aside class="economy-log"[^>]*>(.*?)<\/aside>/)![1]!;
+    const messages=[...log.matchAll(/<p\b[^>]*>(.*?)<\/p>/g)].map(match=>match[1]);
+    assert.deepEqual(messages,state.economyLog.slice(-4).reverse().map(entry=>entry.message));
+    assert.equal(messages.length,Math.min(count,4));
+    assert.equal(JSON.stringify(state.economyLog),before);
+  }
 });

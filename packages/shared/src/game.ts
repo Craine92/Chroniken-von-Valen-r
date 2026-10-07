@@ -224,9 +224,10 @@ export interface GameResult {
   durationPlayedMs?: number;
 }
 
-export type TradeOfferStatus = "pending" | "accepted" | "rejected" | "cancelled";
+export type TradeOfferStatus = "pending" | "accepted" | "rejected" | "cancelled" | "countered";
 
 export interface TradeOffer {
+  counterToTradeId?: string;
   id: string;
   proposerId: string;
   recipientId: string;

@@ -138,7 +138,7 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
         <GameHud gameState={gameState} />
         <aside className="economy-log" aria-live="polite">
           <strong>LETZTE AKTIONEN</strong>
-          {gameState.economyLog.slice(-2).reverse().map((entry) => <p key={entry.id}>{entry.message}</p>)}
+          {gameState.economyLog.slice(-4).reverse().map((entry) => <p key={entry.id} title={entry.message}>{entry.message}</p>)}
         </aside>
       </aside>
       <section className="board-stage" aria-label="Brettbereich">

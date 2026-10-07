@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_TILES, CHRONICLE_EVENTS, calculatePropertyRent, getChronicleRoundsRemaining,
   getBloodMoonDefinition, getRegionalChronicleDefinition, getChronicleTargetRegions, getEffectivePurchasePrice, getEffectiveRent, getPropertyGroupTiles, getStartPassReward, type GameState, type RegionType } from "@valenor/shared";
-import { advanceChronicleEvents, pickAffectedRegionCount, pickChronicleRegions } from "./chronicle-event-service";
+import { advanceChronicleEvents, pickAffectedRegionCount, pickChronicleRegions, isChronicleEventApplicable, getUsefulChronicleRegions } from "./chronicle-event-service";
 import { RoomManager } from "../room-manager";
 import { completeBankruptcyTurn } from "./bankruptcy-service";
 import { EconomyService } from "./economy-service";
@@ -113,9 +113,42 @@ test("active and historical targetRegion arrays remain isolated from client snap
   const next = manager.getGameState(room.code)!; assert.deepEqual(next.activeChronicleEvent!.targetRegions,["elves","humans"]); assert.deepEqual(next.chronicleEventHistory![0]!.targetRegions,["elves","humans"]);
 });
 
-test("the server starts the first of exactly four chronicles after round 3 completes", () => {
+test("applicability excludes sold-out festivals, missing mortgages and missing buildings", () => {
+  const state = game(), festival = CHRONICLE_EVENTS[0]!, decree = CHRONICLE_EVENTS[6]!, boom = CHRONICLE_EVENTS[7]!;
+  assert.equal(isChronicleEventApplicable(state,festival),true); assert.equal(isChronicleEventApplicable(state,decree),false); assert.equal(isChronicleEventApplicable(state,boom),false);
+  state.propertyOwnerships = BOARD_TILES.filter(tile=>['property','harbor','utility'].includes(tile.type)).map(tile=>({tileIndex:tile.index,ownerId:'p1',mortgaged:false,buildingLevel:0}));
+  assert.equal(isChronicleEventApplicable(state,festival),false);
+  state.propertyOwnerships[0]!.mortgaged = true; assert.equal(isChronicleEventApplicable(state,decree),true);
+  assert.deepEqual(getUsefulChronicleRegions(state,decree),[BOARD_TILES[state.propertyOwnerships[0]!.tileIndex]!.region]);
+  state.propertyOwnerships[1]!.buildingLevel = 1; assert.equal(isChronicleEventApplicable(state,boom),true);
+  state.currentRound = 4; advanceChronicleEvents(state,()=>0); assert.notEqual(state.activeChronicleEvent!.id,'traders-festival');
+});
+
+test("festival targets always include an unsold field even when the RNG favors sold-out regions", () => {
+  for (const roll of [0,50,80,95]) {
+    const state = game(); state.currentRound = 4;
+    const free = BOARD_TILES.find(tile=>tile.type==='property'&&tile.region==='steppe')!;
+    state.propertyOwnerships = BOARD_TILES.filter(tile=>tile.economy && tile.index !== free.index).map(tile=>({tileIndex:tile.index,ownerId:'p1',mortgaged:false,buildingLevel:0}));
+    const choices = [0,roll,0]; advanceChronicleEvents(state,()=>choices.shift()!);
+    assert.equal(state.activeChronicleEvent!.id,'traders-festival'); assert.ok(state.activeChronicleEvent!.targetRegions!.includes('steppe'));
+    assert.equal(state.activeChronicleEvent!.targetRegions!.length,pickAffectedRegionCount(roll / 100));
+    assert.equal(isChronicleEventApplicable(state,getRegionalChronicleDefinition(CHRONICLE_EVENTS[0]!,['elves'])),false);
+  }
+});
+
+test("mortgage and sale events select useful regions and clamp the weighted count to availability", () => {
+  for (const index of [6,7]) {
+    const state = game(); state.currentRound = 4; const tile = BOARD_TILES.find(tile=>tile.type==='property'&&tile.region==='humans')!;
+    state.propertyOwnerships = [{tileIndex:tile.index,ownerId:'p1',mortgaged:index===6,buildingLevel:index===7?1:0}];
+    const available = CHRONICLE_EVENTS.filter(event=>isChronicleEventApplicable(state,event)); const chosen = available.findIndex(event=>event.id===CHRONICLE_EVENTS[index]!.id);
+    const choices = [chosen,95,0]; advanceChronicleEvents(state,()=>choices.shift()!);
+    assert.equal(state.activeChronicleEvent!.id,CHRONICLE_EVENTS[index]!.id); assert.deepEqual(state.activeChronicleEvent!.targetRegions,['humans']);
+  }
+});
+
+test("the server starts the first of exactly eight chronicles after round 3 completes", () => {
   const state = game();
-  assert.equal(CHRONICLE_EVENTS.length, 4);
+  assert.equal(CHRONICLE_EVENTS.length, 8);
   completeRound(state); completeRound(state);
   assert.equal(state.currentRound, 3);
   assert.equal(Boolean(state.activeChronicleEvent), false);

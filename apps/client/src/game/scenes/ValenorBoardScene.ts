@@ -796,7 +796,7 @@ export class ValenorBoardScene extends Phaser.Scene {
           if (!this.reducedMotion) this.tweens.add({ targets: territory, alpha: .45, scale: 1.1, duration: 1600, yoyo: true, repeat: -1, ease: "Sine.InOut" });
         }
         const shadow = this.add.ellipse(0, 31, 65, 18, 0x000000, main ? .3 : .2);
-        const glow = this.add.circle(0, -4, 32, 0xf0ae43, main ? .14 : .08);
+        const glow = this.add.circle(0, -4, 32, 0xf0ae43, main ? .14 : .12);
         if (frames.length) {
           const sprite = this.add.sprite(0, -16, frames[0]!.key).setDisplaySize(96, 96).play(DRAGON_ANIMATION.key);
           if (main) this.dragonSprite = sprite;

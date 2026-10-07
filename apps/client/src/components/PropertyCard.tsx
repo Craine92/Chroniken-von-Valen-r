@@ -1,4 +1,4 @@
-import { getBuildingName, getEffectivePurchasePrice, getMortgageRedemptionCost, getMortgageValue, type BoardTile, type GamePlayerState, type GameState, type PropertyOwnership } from "@valenor/shared";
+import { getBuildingName, getEffectivePurchasePrice, getEffectiveBuildCost, getEffectiveMortgageRedemptionCost, getMortgageRedemptionCost, getMortgageValue, type BoardTile, type GamePlayerState, type GameState, type PropertyOwnership } from "@valenor/shared";
 
 const TYPE_LABEL = { property: "Land", harbor: "Hafen", utility: "Versorgung" } as const;
 
@@ -22,11 +22,11 @@ export function PropertyCard({ tile, ownership, owner, state, compact = false, c
         <div><dt>Kaufpreis</dt><dd>{state ? getEffectivePurchasePrice(state, tile) : tile.economy.purchasePrice} Gold</dd></div>
         {tile.economy.baseRent !== undefined && <div><dt>Grundmiete</dt><dd>{tile.economy.baseRent} Gold</dd></div>}
         <div><dt>Hypothekenwert</dt><dd>{getMortgageValue(tile)} Gold</dd></div>
-        {ownership?.mortgaged && <div><dt>Auslösung</dt><dd>{getMortgageRedemptionCost(tile)} Gold</dd></div>}
+        {ownership?.mortgaged && <div><dt>Auslösung</dt><dd>{state ? getEffectiveMortgageRedemptionCost(state, tile) : getMortgageRedemptionCost(tile)} Gold</dd></div>}
         {ownership && tile.type === "property" && tile.region && tile.economy.buildCost && (
           <>
             <div><dt>Baustufe</dt><dd>{ownership.buildingLevel} · {getBuildingName(tile.region, ownership.buildingLevel)}</dd></div>
-            <div><dt>Baukosten</dt><dd>{tile.economy.buildCost} Gold</dd></div>
+            <div><dt>Baukosten</dt><dd>{state ? getEffectiveBuildCost(state, tile) : tile.economy.buildCost} Gold</dd></div>
           </>
         )}
       </dl>

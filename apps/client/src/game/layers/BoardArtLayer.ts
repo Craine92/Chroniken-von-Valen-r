@@ -105,7 +105,7 @@ export class BoardArtLayer {
     if (signature === this.chronicleSignature) return;
     this.clearChronicleMarkers();
     this.chronicleSignature = signature;
-    const aura = event?.effectType === "regionalRentBonus" ? 0x9b263e : event?.effectType === "purchaseDiscount" ? 0x87a466 : 0xb5c6d7;
+    const aura = event && ["regionalRentBonus", "buildSurcharge"].includes(event.effectType) ? 0x9b263e : event && ["purchaseDiscount", "buildDiscount", "mortgageDiscount", "buildingSaleBonus"].includes(event.effectType) ? 0x87a466 : 0xb5c6d7;
     regions.forEach(region => {
       const points = this.realmPoints.get(region);
       if (!points) return;

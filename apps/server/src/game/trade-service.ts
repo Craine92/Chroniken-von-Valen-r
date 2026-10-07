@@ -3,6 +3,7 @@ import { BOARD_TILES, MAX_RELICS, RELIC_DEFINITIONS, isRelicTradeBound, getCardD
 import { completeQuests, ownershipQuestTypes } from "./quest-service";
 
 export interface CreateTradeRequest {
+  counterToTradeId?: string;
   recipientId: string;
   offer: TradeAssets;
   request: TradeAssets;
@@ -13,20 +14,25 @@ const SAFE_PHASES = new Set(["waitingForRoll", "waitingForEndTurn"]);
 export class TradeService {
   create(state: GameState, proposerId: string, request: CreateTradeRequest): TradeOffer {
     this.requireSafePhase(state);
+    const original = request.counterToTradeId === undefined ? undefined : this.requirePending(state, request.counterToTradeId);
+    if (original && (original.recipientId !== proposerId || original.proposerId !== request.recipientId)) {
+      throw new Error("Nur der Empfänger kann dem ursprünglichen Anbieter ein Gegenangebot senden.");
+    }
     const offer: TradeOffer = {
       id: randomUUID(), proposerId, recipientId: request.recipientId,
       offer: this.normalizeAssets(request.offer), request: this.normalizeAssets(request.request),
-      status: "pending", createdAt: Date.now()
+      status: "pending", createdAt: Date.now(), ...(original ? { counterToTradeId: original.id } : {})
     };
     this.validate(state, offer);
     if (offer.offer.gold === 0 && offer.request.gold === 0 && offer.offer.propertyTileIndices.length === 0 && offer.request.propertyTileIndices.length === 0 && !(offer.offer.cardIds?.length) && !(offer.request.cardIds?.length) && !offer.offer.relicIds?.length && !offer.request.relicIds?.length) {
       throw new Error("Ein Handelsangebot muss mindestens einen Wert enthalten.");
     }
+    if (original) original.status = "countered";
     state.trades.push(offer);
     state.lastTradeAction = { id: randomUUID(), type: "created", proposerId, recipientId: offer.recipientId, createdAt: Date.now() };
     const proposer = state.players.find((player) => player.id === proposerId)!;
     const recipient = state.players.find((player) => player.id === offer.recipientId)!;
-    this.log(state, `${proposer.name} unterbreitet ${recipient.name} ein Handelsangebot.`, [proposerId, recipient.id]);
+    this.log(state, `${proposer.name} unterbreitet ${recipient.name} ein ${original ? "Gegenangebot" : "Handelsangebot"}.`, [proposerId, recipient.id]);
     return offer;
   }
 

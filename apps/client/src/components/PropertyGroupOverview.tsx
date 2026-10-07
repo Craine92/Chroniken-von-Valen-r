@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { getPropertyGroup, type BoardTile, type GamePlayerState, type PropertyGroupId, type PropertyOwnership } from "@valenor/shared";
+import { getPropertyGroup, getBuildingName, canBuildOnProperty, canSellBuilding, getEffectiveBuildingSaleValue, getEffectiveBuildCost, type BoardTile, type GamePlayerState, type GameState, type PropertyGroupId, type PropertyOwnership } from "@valenor/shared";
 import { getPropertyGroupVisual } from "../game/tiles/board-tile-theme";
 
 interface PropertyGroupOverviewProps {
@@ -13,6 +13,10 @@ interface PropertyGroupOverviewProps {
   selected?: boolean;
   onSelect?: (groupId: PropertyGroupId) => void;
   onSelectTile?: (tileIndex: number) => void;
+  gameState?: GameState;
+  connected?: boolean;
+  onBuild?: (tileIndex: number) => void;
+  onSell?: (tileIndex: number) => void;
 }
 
 export function PropertyGroupOverview({
@@ -25,7 +29,11 @@ export function PropertyGroupOverview({
   economicallyActive,
   selected = false,
   onSelect,
-  onSelectTile
+  onSelectTile,
+  gameState,
+  connected = true,
+  onBuild,
+  onSell
 }: PropertyGroupOverviewProps) {
   const visual = getPropertyGroupVisual(propertyGroup);
   const groupDefinition = getPropertyGroup(propertyGroup);
@@ -82,6 +90,9 @@ export function PropertyGroupOverview({
           const ownership = ownershipByTile.get(tile.index);
           const owner = ownership ? playerById.get(ownership.ownerId) : undefined;
           const ownedByViewer = ownership?.ownerId === viewerId;
+          const level = ownership?.buildingLevel ?? 0;
+          const build = ownedByViewer && gameState ? canBuildOnProperty(gameState, viewerId, tile.index) : undefined;
+          const sell = ownedByViewer && gameState && level > 0 ? canSellBuilding(gameState, viewerId, tile.index) : undefined;
           const status = ownership?.mortgaged
             ? "Belehnt"
             : ownedByViewer
@@ -90,17 +101,25 @@ export function PropertyGroupOverview({
                 ? `Besitz: ${owner.name}`
                 : "Noch frei";
           return (
-            <Member className={`property-group__member${ownedByViewer ? " is-owned" : ""}${owner && !ownedByViewer ? " is-rival" : ""}`} key={tile.index} type={onSelectTile ? "button" : undefined} onClick={onSelectTile ? () => onSelectTile(tile.index) : undefined}>
+            <div className="property-group__entry" key={tile.index}>
+            <Member className={`property-group__member${ownedByViewer ? " is-owned" : ""}${owner && !ownedByViewer ? " is-rival" : ""}`} type={onSelectTile ? "button" : undefined} onClick={onSelectTile ? () => onSelectTile(tile.index) : undefined}>
               <span className={`property-group__owner${owner ? ` property-group__owner--${owner.color}` : ""}`} aria-hidden="true">{ownedByViewer ? "◆" : owner ? "◇" : "·"}</span>
-              <div><strong>{tile.name}</strong>{onSelectTile ? <span className="controller-status-chips"><small>{ownedByViewer ? "Dein Besitz" : owner ? `Besitz: ${owner.name}` : "Frei"}</small>{ownership?.mortgaged && <small>Belehnt</small>}</span> : <small>{status}</small>}</div>
+              <div><strong>{tile.name}</strong>{onSelectTile ? <span className="controller-status-chips"><small>{ownedByViewer ? "Dein Besitz" : owner ? `Besitz: ${owner.name}` : "Frei"}</small>{ownership?.mortgaged && <small>Belehnt</small>}</span> : <small>{status}</small>}
+                {ownedByViewer && tile.region && <span className="controller-property-level"><b className={level === 5 ? "is-grand" : undefined} aria-label={`Baustufe ${level}`}>{level}</b><small>{level === 0 ? "UNBEBAUT" : `Stufe ${level} · ${getBuildingName(tile.region, level)}`}</small></span>}
+              </div>
               {onSelectTile && <span className="controller-member-sigil" aria-hidden="true">{visual.sigil}</span>}
             </Member>
+            {onBuild && gameState && build?.allowed && <button type="button" className="controller-inline-build" disabled={!connected} onClick={event => { event.stopPropagation(); onBuild(tile.index); }}>+ BAUEN · {getEffectiveBuildCost(gameState, tile)} GOLD</button>}
+            {onBuild && gameState && build && !build.allowed && complete && economicallyActive && level < 5 && connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase) && <p className="controller-inline-build-reason">{build.reason?.replace(/^Du musst zuerst /, "Zuerst ")}</p>}
+            {onSell && gameState && sell?.allowed && <button type="button" className="controller-inline-sell" disabled={!connected} onClick={event => { event.stopPropagation(); onSell(tile.index); }}>− BAUSTUFE VERKAUFEN · +{getEffectiveBuildingSaleValue(gameState, tile)} GOLD</button>}
+            {onSell && sell && !sell.allowed && connected && sell.reason?.startsWith("Du musst zuerst eine höhere Baustufe auf ") && <p className="controller-inline-build-reason">{sell.reason.replace("Du musst zuerst eine höhere Baustufe auf ", "Zuerst Baustufe auf ").replace(/ verkaufen\.$/, " reduzieren.")}</p>}
+            </div>
           );
         })}
       </div>
       <p className={`property-group__build-status${buildAvailable ? " can-build" : ""}`}>
         {buildAvailable ? "✦ " : ""}{onSelectTile && missingCount > 0 ? `Fehlt: ${missingTiles.map((tile) => tile.name).join(" · ")}` : buildStatus}
-        {onSelectTile && buildAvailable && <span className="property-group__build-hint">Grundstück auswählen</span>}
+        {onSelectTile && buildAvailable && <span className="property-group__build-hint">{onBuild ? "Direkt bei der Straße bauen" : "Grundstück auswählen"}</span>}
       </p>
       {onSelectTile && onSelect && groupDefinition && <button type="button" className="controller-board-focus" aria-pressed={selected} onClick={() => onSelect(groupDefinition.id)}>{selected ? "Markierung aufheben" : "Gruppe auf dem Board markieren"}</button>}
     </div>

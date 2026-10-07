@@ -88,6 +88,7 @@ export interface GameActionResult extends EventResult {
 }
 
 export interface CreateTradeOfferRequest {
+  counterToTradeId?: string;
   recipientId: string;
   offer: TradeAssets;
   request: TradeAssets;

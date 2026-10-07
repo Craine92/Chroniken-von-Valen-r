@@ -1,7 +1,10 @@
 import { BOARD_TILES, getPropertyGroupTiles, type RegionType } from "./board";
 import { ownsCompletePropertyGroup } from "./economy";
 import type { BuildingLevel, GameState, PropertyOwnership } from "./game";
+import { getActiveChronicleEvent, isChronicleTileAffected } from "./chronicle-events";
+import type { BoardTile } from "./board";
 
+// Legacy snapshot fields only; construction and sales have no global stock limit.
 export const BUILDING_BANK_CAPACITY = {
   settlementUnits: 32,
   grandStructures: 12
@@ -28,6 +31,18 @@ export interface BuildingEligibility {
 
 export function getBuildingName(region: RegionType, level: BuildingLevel): string {
   return level === 0 ? "Unbebaut" : REALM_BUILDING_THEMES[region].names[level - 1]!;
+}
+
+export function getEffectiveBuildCost(state: GameState, tile: BoardTile): number {
+  const base = tile.economy?.buildCost ?? 0, event = getActiveChronicleEvent(state);
+  const factor = isChronicleTileAffected(event, tile) ? event?.effectType === "buildDiscount" ? .75 : event?.effectType === "buildSurcharge" ? 1.25 : 1 : 1;
+  return Math.round(base * factor);
+}
+
+export function getEffectiveBuildingSaleValue(state: GameState, tile: BoardTile): number {
+  const event = getActiveChronicleEvent(state);
+  const factor = event?.effectType === "buildingSaleBonus" && isChronicleTileAffected(event, tile) ? .75 : .5;
+  return Math.round((tile.economy?.buildCost ?? 0) * factor);
 }
 
 export function getPropertyOwnership(state: Pick<GameState, "propertyOwnerships">, tileIndex: number): PropertyOwnership | undefined {
@@ -72,12 +87,7 @@ export function canBuildOnProperty(state: GameState, playerId: string, tileIndex
     const nextTile = getPropertyGroupTiles(tile.propertyGroup).find((groupTile) => getPropertyOwnership(state, groupTile.index)?.buildingLevel === minimum);
     return { allowed: false, reason: `Du musst zuerst ${nextTile?.name ?? "ein anderes Grundstück"} ausbauen.` };
   }
-  if (player.gold < tile.economy.buildCost) return { allowed: false, reason: "Nicht genügend Gold." };
-  if (ownership.buildingLevel === 4) {
-    if (state.buildingBank.grandStructuresAvailable < 1) return { allowed: false, reason: "Die Bank besitzt keine freien Großbauten." };
-  } else if (state.buildingBank.settlementUnitsAvailable < 1) {
-    return { allowed: false, reason: "Die Bank besitzt keine freien Bauwerke." };
-  }
+  if (player.gold < getEffectiveBuildCost(state, tile)) return { allowed: false, reason: "Nicht genügend Gold." };
   return { allowed: true };
 }
 
@@ -107,9 +117,6 @@ export function canSellBuilding(state: GameState, playerId: string, tileIndex: n
   if (ownership.buildingLevel !== maximum) {
     const nextTile = getPropertyGroupTiles(tile.propertyGroup).find((groupTile) => getPropertyOwnership(state, groupTile.index)?.buildingLevel === maximum);
     return { allowed: false, reason: `Du musst zuerst eine höhere Baustufe auf ${nextTile?.name ?? "einem anderen Grundstück"} verkaufen.` };
-  }
-  if (ownership.buildingLevel === 5 && state.buildingBank.settlementUnitsAvailable < 4) {
-    return { allowed: false, reason: "Die Bank verfügt nicht über genügend Bauwerke." };
   }
   return { allowed: true };
 }

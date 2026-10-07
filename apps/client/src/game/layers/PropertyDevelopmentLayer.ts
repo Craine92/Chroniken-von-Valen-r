@@ -59,20 +59,21 @@ export class PropertyDevelopmentLayer {
 
   private createDevelopment(tileIndex: number, region: RegionType, level: BuildingLevel): Phaser.GameObjects.Container {
     const place = getTilePlacement(tileIndex);
-    const inner = getInnerEdgeOffset(tileIndex, 34);
+    const artScale = level === 5 ? 1.33 : 1.38;
+    const inner = getInnerEdgeOffset(tileIndex, place.side === "top" ? (level === 5 ? 56 : 46) : 34);
     const container = this.scene.add.container(place.x + inner.x, place.y + inner.y).setRotation(place.rotation).setScale(this.visualScale).setDepth(BOARD_DEPTHS.buildings);
-    const shadow = this.scene.add.ellipse(2, 10, level === 5 ? 48 : 37, level === 5 ? 19 : 13, 0x000000, .42);
-    const ground = this.scene.add.ellipse(0, 7, level === 5 ? 44 : 34, level === 5 ? 16 : 11, region === "orcs" ? 0x583426 : region === "steppe" ? 0x74613b : 0x2d3a2d, .92).setStrokeStyle(1, REALM_LIGHT[region], .42);
-    const glow = this.scene.add.circle(0, 0, level === 5 ? 26 : 19, REALM_LIGHT[region], level === 5 ? 0.24 : 0.13);
+    const shadow = this.scene.add.ellipse(2, 10, (level === 5 ? 48 : 37) * artScale, (level === 5 ? 19 : 13) * artScale, 0x000000, .55);
+    const ground = this.scene.add.ellipse(0, 7, (level === 5 ? 44 : 34) * artScale, (level === 5 ? 16 : 11) * artScale, region === "orcs" ? 0x583426 : region === "steppe" ? 0x74613b : 0x2d3a2d, .92).setStrokeStyle(2, REALM_LIGHT[region], .62);
+    const glow = this.scene.add.circle(0, 0, (level === 5 ? 26 : 19) * artScale, REALM_LIGHT[region], level === 5 ? .33 : .2);
     container.add([shadow, ground, glow]);
     const artAsset = getBuildingAsset(region, level);
     if (artAsset && hasLoadedAsset(this.scene, artAsset)) {
       const building = fitImage(
         this.scene.add.image(0, -10, artAsset.key),
-        level === 5 ? 46 : 38 + level,
-        level === 5 ? 62 : 50 + level,
+        (level === 5 ? 46 : 38 + level) * artScale,
+        (level === 5 ? 62 : 50 + level) * artScale,
         "contain"
-      ).setOrigin(.5, .78).setRotation(-place.rotation);
+      ).setName("building-art").setOrigin(.5, .78).setRotation(-place.rotation);
       const rank = this.scene.add.graphics().setPosition(0, 10).setRotation(-place.rotation);
       const pipCount = level === 5 ? 1 : level;
       for (let index = 0; index < pipCount; index += 1) {
@@ -83,20 +84,22 @@ export class PropertyDevelopmentLayer {
       this.addLevelBadge(container, place.rotation, level);
       return container;
     }
-    if (level === 5) this.drawGrandStructure(container, region);
-    else this.drawSettlement(container, region, level);
+    const art = this.scene.add.container(0, 0).setName("building-art").setScale(artScale);
+    container.add(art);
+    if (level === 5) this.drawGrandStructure(art, region);
+    else this.drawSettlement(art, region, level);
     this.addLevelBadge(container, place.rotation, level);
     return container;
   }
 
   private addLevelBadge(container: Phaser.GameObjects.Container, rotation: number, level: BuildingLevel): void {
-    const badge = this.scene.add.graphics().setPosition(18, 12).setRotation(-rotation);
-    badge.fillStyle(0x08080b, .94).fillRoundedRect(-11, -7, 22, 14, 4);
-    badge.lineStyle(1.5, level === 5 ? 0xf3d681 : 0xd8bd78, .98).strokeRoundedRect(-11, -7, 22, 14, 4);
-    const label = this.scene.add.text(18, 12, `L${level}`, {
-      color: level === 5 ? "#fff0a8" : "#fff7dc", fontFamily: "Arial,sans-serif", fontSize: "9px", fontStyle: "bold",
+    const badge = this.scene.add.graphics().setName("building-level-badge").setPosition(24, 12).setRotation(-rotation);
+    badge.fillStyle(level === 5 ? 0x261d0d : 0x08080b, .96).fillRoundedRect(-17, -12, 34, 24, 5);
+    badge.lineStyle(level === 5 ? 2.5 : 2, level === 5 ? 0xf3d681 : 0xd8bd78, .98).strokeRoundedRect(-17, -12, 34, 24, 5);
+    const label = this.scene.add.text(24, 12, `${level}`, {
+      color: level === 5 ? "#fff0a8" : "#fff7dc", fontFamily: "Arial,sans-serif", fontSize: "16px", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 2
-    }).setOrigin(.5).setRotation(-rotation).setResolution(2);
+    }).setName("building-level-label").setOrigin(.5).setRotation(-rotation).setResolution(2);
     container.add([badge, label]);
   }
 

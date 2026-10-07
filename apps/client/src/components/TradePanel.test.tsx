@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { GameState } from "@valenor/shared";
-import { TradePanel } from "./TradePanel";
+import { TradePanel, getCounterOfferTemplate } from "./TradePanel";
 import { RELIC_ASSETS } from "../game/assets/asset-manifest";
 
 function state(): GameState {
@@ -98,4 +98,24 @@ test("rejected offers retain grouped property identities in collapsed history", 
   assert.match(markup, /Abgelehnt/);
   assert.match(markup, /<details class="trade-section trade-history">/);
   assert.match(markup, /Silberbach · 3er-Gruppe/);
+});
+
+test("incoming offers expose a counter action and replaced offers have clear history", () => {
+  const game=state();
+  const render=()=>renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={()=>undefined} onDecision={()=>undefined} />);
+  assert.match(render(),/>Gegenangebot<\/button>/);
+  game.turnPhase='dungeonDecision'; assert.match(render(),/disabled=""[^>]*>Gegenangebot/);
+  game.trades[0]!.status='countered'; assert.match(render(),/Durch Gegenangebot ersetzt/);
+});
+
+test("counter template mirrors every asset and remains editable without changing the original", () => {
+  const original=state().trades[0]!;
+  original.offer.cardIds=['adv_024']; original.offer.relicIds=['runestone'];
+  original.request.cardIds=['fate_024']; original.request.relicIds=['golden-feather'];
+  const before=JSON.stringify(original), template=getCounterOfferTemplate(original);
+  assert.equal(template.recipientId,original.proposerId); assert.equal(template.counterToTradeId,original.id);
+  assert.deepEqual(template.offer,original.request); assert.deepEqual(template.request,original.offer);
+  template.offer.gold=250; template.offer.propertyTileIndices.splice(0); template.offer.cardIds!.splice(0); template.offer.relicIds!.splice(0);
+  template.request.propertyTileIndices.push(3); template.request.cardIds!.splice(0); template.request.relicIds!.splice(0);
+  assert.equal(JSON.stringify(original),before); assert.equal(original.status,'pending');
 });

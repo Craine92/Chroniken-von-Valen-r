@@ -137,8 +137,8 @@ export const VALENOR_ASSETS = {
     steppeScoutShaman: imageSlot("character-steppe-scout-shaman", "/assets/characters/steppe-scout-shaman.png", 543, 714, "ready")
   },
   cards: {
-    adventureFrame: imageSlot("card-adventure-frame", "/assets/cards/adventure-frame.webp", 768, 1080),
-    fateFrame: imageSlot("card-fate-frame", "/assets/cards/fate-frame.webp", 768, 1080)
+    adventureFrame: imageSlot("card-adventure-frame", "/assets/cards/CardAbenteuer.png", 1058, 1487, "ready"),
+    fateFrame: imageSlot("card-fate-frame", "/assets/cards/CardSchicksal.png", 1058, 1487, "ready")
   },
   ui: {
     boardFieldHorizontal: imageSlot("field-base-horizontal", "/assets/ui/board/field_base_horizontal.png", 1086, 1448, "ready"),
@@ -174,8 +174,8 @@ export function getDragonTerritoryVisuals(tileIndex: number) {
   const count = BOARD_TILES.length;
   return [
     { tileIndex, scale: 1, alpha: 1 },
-    { tileIndex: (tileIndex + count - 1) % count, scale: .5, alpha: .62 },
-    { tileIndex: (tileIndex + 1) % count, scale: .5, alpha: .62 }
+    { tileIndex: (tileIndex + count - 1) % count, scale: .5, alpha: .85 },
+    { tileIndex: (tileIndex + 1) % count, scale: .5, alpha: .85 }
   ] as const;
 }
 

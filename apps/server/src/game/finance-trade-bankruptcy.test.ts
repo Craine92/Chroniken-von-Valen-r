@@ -5,6 +5,9 @@ import {
   calculatePropertyRent,
   canBuildOnProperty,
   getMortgageRedemptionCost,
+  CHRONICLE_EVENTS,
+  getRegionalChronicleDefinition,
+  getEffectiveMortgageRedemptionCost,
   getMortgageValue,
   type BuildingLevel,
   type GameState
@@ -74,6 +77,15 @@ test("mortgages reject duplicates, foreign ownership and groups containing build
   mortgages.mortgage(state, "p1", 1);
   assert.throws(() => mortgages.mortgage(state, "p1", 1), /bereits verpfändet/);
   assert.throws(() => mortgages.mortgage(state, "p2", 3), /gehört dir nicht/);
+});
+
+test("crown decree discounts only regional mortgage redemption and validates the actual discounted amount", () => {
+  const state = game(); own(state,'p1',[[1,0,true],[15,0,true]]); state.currentRound = 4;
+  state.activeChronicleEvent = {...getRegionalChronicleDefinition(CHRONICLE_EVENTS[6]!,['elves']),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
+  assert.equal(getEffectiveMortgageRedemptionCost(state,BOARD_TILES[1]!),25); assert.equal(getEffectiveMortgageRedemptionCost(state,BOARD_TILES[15]!),110);
+  state.players[0]!.gold = 24; assert.throws(()=>mortgages.redeem(state,'p1',1),/Nicht genügend/);
+  state.players[0]!.gold = 25; mortgages.redeem(state,'p1',1); assert.equal(state.players[0]!.gold,0); assert.equal(state.propertyOwnerships[0]!.mortgaged,false);
+  state.currentRound = 6; assert.equal(getEffectiveMortgageRedemptionCost(state,BOARD_TILES[1]!),33);
 });
 
 test("mortgages redeem for principal plus ten percent and never overdraft", () => {

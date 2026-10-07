@@ -52,7 +52,11 @@ export const ADVENTURE_CARDS: readonly CardDefinition[] = [
   adventure("adv_021", "Steinlausplage", "Winzige Runenfresser nagen an Mauern und Fundamenten deines Besitzes.", { type: "repair", settlementUnitCost: 40, grandStructureCost: 115 }),
   adventure("adv_022", "Ketten der Kronengarde", "Ein verwechselt geglaubtes Siegel bringt dich ohne Umweg in den Dunklen Kerker.", { type: "goToDungeon" }),
   adventure("adv_023", "Pakt des dunklen Magiers", "Die versprochene Abkürzung endet hinter eisenbeschlagenen Kerkertoren.", { type: "goToDungeon" }),
-  adventure("adv_024", "Siegel der freien Pfade", "Das Zeichen der Wegwächter öffnet einmal selbst die Tore des Dunklen Kerkers.", { type: "keepDungeonRelease" }, true)
+  adventure("adv_024", "Siegel der freien Pfade", "Das Zeichen der Wegwächter öffnet einmal selbst die Tore des Dunklen Kerkers.", { type: "keepDungeonRelease" }, true),
+  adventure("adv_025", "Der verlorene Schatz", "Unter den Wurzeln einer uralten Eiche entdeckst du eine Truhe, deren Schloss längst dem Rost erlegen ist.", { type: "receiveFromBank", amount: 150 }),
+  adventure("adv_026", "Überfall am Weltenweg", "Räuber brechen aus dem Unterholz hervor. Deine Börse überlebt die Begegnung nicht unversehrt.", { type: "payBank", amount: 100 }),
+  adventure("adv_027", "Schiff der freien Kapitäne", "Eine fremde Besatzung bietet dir eine schnelle Passage entlang der Küsten Valenørs an.", { type: "moveToNearest", target: "harbor", collectStart: true, resolveDestination: true }),
+  adventure("adv_028", "Festmahl der Gefährten", "Du lädst deine Weggefährten an eine reich gedeckte Tafel. Großzügigkeit hat ihren Preis.", { type: "payEachPlayer", amount: 25 })
 ];
 
 export const FATE_CARDS: readonly CardDefinition[] = [
@@ -79,7 +83,11 @@ export const FATE_CARDS: readonly CardDefinition[] = [
   fate("fate_021", "Riss im Schicksalsgewebe", "Unsichtbare Spannungen erschüttern jedes deiner errichteten Bauwerke.", { type: "repair", settlementUnitCost: 25, grandStructureCost: 100 }),
   fate("fate_022", "Nachtfrost der Mondlosen", "Eis sprengt Mauern und lässt selbst große Hallen ächzen.", { type: "repair", settlementUnitCost: 40, grandStructureCost: 115 }),
   fate("fate_023", "Urteil der drei Seher", "Drei übereinstimmende Schatten bedeuten nur eines: den Dunklen Kerker.", { type: "goToDungeon" }),
-  fate("fate_024", "Gunst der Mondseherin", "Ihr silbernes Zeichen löst einmal die Ketten des Dunklen Kerkers.", { type: "keepDungeonRelease" }, true)
+  fate("fate_024", "Gunst der Mondseherin", "Ihr silbernes Zeichen löst einmal die Ketten des Dunklen Kerkers.", { type: "keepDungeonRelease" }, true),
+  fate("fate_025", "Die goldene Prophezeiung", "Die Seher erkennen Wohlstand auf deinem Weg und ihre Worte werden schneller wahr als erwartet.", { type: "receiveFromBank", amount: 175 }),
+  fate("fate_026", "Schatten über der Krone", "Eine düstere Weissagung zwingt dich zu einer kostspieligen Opfergabe.", { type: "payBank", amount: 125 }),
+  fate("fate_027", "Ruf des Runentors", "Die alten Runen flammen auf und ziehen dich über die Wege Valenørs zurück zum Tor.", { type: "moveToTile", targetTileId: "runentor", direction: "forward", collectStart: true, resolveDestination: true }),
+  fate("fate_028", "Gunst der Gefährten", "Das Schicksal wendet die Herzen deiner Weggefährten zu deinen Gunsten.", { type: "receiveFromEachPlayer", amount: 25 })
 ];
 
 export const CARD_DEFINITIONS: readonly CardDefinition[] = [...ADVENTURE_CARDS, ...FATE_CARDS];

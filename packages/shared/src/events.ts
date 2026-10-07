@@ -1,5 +1,5 @@
 import type { AuctionBidIncrement } from "./economy";
-import type { GameConfig, GameRoom, GameState, MagicSignal, Player, PlayerColor, TradeAssets, TavernChoice } from "./game";
+import type { GameConfig, GameRoom, GameState, MagicSignal, Player, PlayerColor, PlayerCharacterId, TradeAssets, TavernChoice } from "./game";
 import type { PropertyGroupId } from "./property-groups";
 import type { RelicId } from "./relics";
 
@@ -9,11 +9,15 @@ export const SOCKET_EVENTS = {
   roomUpdate: "room:update",
   roomAddComputer: "room:addComputer",
   roomRemoveComputer: "room:removeComputer",
+  roomRemovePlayer: "room:removePlayer",
+  roomRemoved: "room:removed",
   roomUpdateConfig: "room:updateConfig",
   playerJoin: "player:join",
   playerDisconnect: "player:disconnect",
   playerReconnect: "player:reconnect",
   playerUpdateColor: "player:updateColor",
+  playerUpdateCharacter: "player:updateCharacter",
+  playerUpdateReady: "player:updateReady",
   playerMagicSignal: "player:magicSignal",
   propertyGroupFocus: "property:groupFocus",
   gameStart: "game:start",
@@ -43,6 +47,7 @@ export const SOCKET_EVENTS = {
   tradeCancel: "trade:cancel",
   playerDeclareBankruptcy: "player:declareBankruptcy",
   gameNewChronicle: "game:newChronicle",
+  gameReturnToLobby: "game:returnToLobby",
   auctionBid: "auction:bid",
   auctionWithdraw: "auction:withdraw",
   errorMessage: "error:message"
@@ -109,10 +114,13 @@ export interface ClientToServerEvents {
   "room:join": (request: JoinRoomRequest, callback: (result: JoinRoomResult) => void) => void;
   "room:addComputer": (callback: (result: RoomMutationResult) => void) => void;
   "room:removeComputer": (playerId: string, callback: (result: RoomMutationResult) => void) => void;
+  "room:removePlayer": (playerId: string, callback: (result: RoomMutationResult) => void) => void;
   "room:updateConfig": (config: GameConfig, callback: (result: RoomMutationResult) => void) => void;
   "player:join": (request: JoinRoomRequest, callback: (result: JoinRoomResult) => void) => void;
   "player:magicSignal": (callback: (result: EventResult) => void) => void;
   "player:updateColor": (color: PlayerColor, callback: (result: RoomMutationResult) => void) => void;
+  "player:updateCharacter": (characterId: PlayerCharacterId, callback: (result: RoomMutationResult) => void) => void;
+  "player:updateReady": (ready: boolean, callback: (result: RoomMutationResult) => void) => void;
   "property:groupFocus": (groupId: PropertyGroupId, active: boolean, callback: (result: EventResult) => void) => void;
   "game:start": (callback: (result: StartGameResult) => void) => void;
   "game:rollOrder": (callback: (result: GameActionResult) => void) => void;
@@ -140,11 +148,13 @@ export interface ClientToServerEvents {
   "trade:cancel": (tradeId: string, callback: (result: GameActionResult) => void) => void;
   "player:declareBankruptcy": (callback: (result: GameActionResult) => void) => void;
   "game:newChronicle": (callback: (result: RoomMutationResult) => void) => void;
+  "game:returnToLobby": (callback: (result: RoomMutationResult) => void) => void;
   "auction:bid": (increment: AuctionBidIncrement, callback: (result: GameActionResult) => void) => void;
   "auction:withdraw": (callback: (result: GameActionResult) => void) => void;
 }
 
 export interface ServerToClientEvents {
+  "room:removed": (message: string) => void;
   "room:update": (room: GameRoom) => void;
   "player:join": (player: Player) => void;
   "player:disconnect": (player: Player) => void;

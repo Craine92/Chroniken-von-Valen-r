@@ -1,3 +1,4 @@
+import { startReadyGame } from "../test-fixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_TILES, CHRONICLE_EVENTS, calculatePropertyRent, getChronicleRoundsRemaining,
@@ -12,7 +13,7 @@ function game(tileIndex = 1): GameState {
   return {
     roomId: "VAL-CHRONICLE", status: "playing", config: { mode: "chronicles" },
     players: ["p1", "p2", "p3"].map((id) => ({ id, name: id, type: "human", color: "violet",
-      connectionState: "connected", gold: 1500, position: tileIndex, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } })),
+      characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1500, position: tileIndex, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } })),
     turnOrder: ["p1", "p2", "p3"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 1, turnNumber: 1, turnPhase: "landed",
     turnContext: { consecutiveDoubles: 0, pendingExtraRoll: false, rollSequence: 1 },
@@ -105,7 +106,7 @@ test("legacy single-region snapshots migrate to targetRegions and blessing remai
 });
 
 test("active and historical targetRegion arrays remain isolated from client snapshots", () => {
-  const manager = new RoomManager(), {room} = manager.createRoom("host"); manager.joinRoom(room.code,"human","s1"); manager.addComputer(room.code,"host"); manager.startGame(room.code,"host");
+  const manager = new RoomManager(), {room} = manager.createRoom("host"); manager.joinRoom(room.code,"human","s1"); manager.addComputer(room.code,"host"); startReadyGame(manager,room.code,"host");
   const live = (manager as unknown as {rooms:Map<string,{gameState:GameState}>}).rooms.get(room.code)!.gameState;
   live.currentRound = 4; const choices = [1,50,0]; advanceChronicleEvents(live,() => choices.shift()!);
   const snapshot = manager.getGameState(room.code)!; snapshot.activeChronicleEvent!.targetRegions!.length = 0;

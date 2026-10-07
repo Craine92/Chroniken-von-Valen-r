@@ -10,8 +10,8 @@ function state(): GameState {
   return {
     roomId: "VAL-TRADE", status: "playing", config: { mode: "chronicles" },
     players: [
-      { id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected", gold: 500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
-      { id: "p2", name: "Justine", type: "human", color: "green", connectionState: "connected", gold: 600, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
+      { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
+      { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: 600, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
     ],
     turnOrder: ["p1", "p2"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 1, turnNumber: 1, turnPhase: "waitingForRoll",

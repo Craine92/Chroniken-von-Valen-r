@@ -9,7 +9,7 @@ function state(): GameState {
   return {
     roomId: "VAL-MOBILE", startedAt: 1, status: "playing", config: { mode: "chronicles" },
     players: ["p1", "p2"].map((id, index) => ({ id, name: index ? "Tharok" : "Myrra", type: "human", color: index ? "green" : "violet",
-      connectionState: "connected", gold: 1500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } })),
+      characterId: "humanKnight" as const, connectionState: "connected", gold: 1500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } })),
     turnOrder: ["p1", "p2"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p2", currentTurnIndex: 1, currentRound: 1, turnNumber: 1, turnPhase: "waitingForRoll",
     turnContext: { consecutiveDoubles: 0, pendingExtraRoll: false, rollSequence: 0 },

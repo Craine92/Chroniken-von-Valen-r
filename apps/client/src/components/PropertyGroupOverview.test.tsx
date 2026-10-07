@@ -6,8 +6,8 @@ import { BOARD_TILES, type GamePlayerState, type PropertyOwnership } from "@vale
 import { PropertyGroupOverview } from "./PropertyGroupOverview";
 
 const players: GamePlayerState[] = [
-  { id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected", gold: 1_500, position: 1, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
-  { id: "p2", name: "Justine", type: "human", color: "green", connectionState: "connected", gold: 1_500, position: 3, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
+  { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1_500, position: 1, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
+  { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: 1_500, position: 3, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
 ];
 
 const mondhain = BOARD_TILES.filter((tile) => tile.propertyGroup === "Mondhain");

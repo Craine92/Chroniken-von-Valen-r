@@ -143,11 +143,11 @@ test("field order follows the 14 / 6 / 14 / 6 widescreen route", () => {
   assert.ok(tokenSteps.every((distance) => distance < 170));
 });
 
-test("two to four player tokens receive distinct bounded positions on one field", () => {
-  for (const count of [2, 3, 4]) {
+test("two to six player tokens receive distinct bounded positions on one field", () => {
+  for (const count of [2, 3, 4, 5, 6]) {
     const positions = Array.from({ length: count }, (_, index) => getTokenFormationOffset(count, index));
     assert.equal(new Set(positions.map(({ x, y }) => `${x}:${y}`)).size, count);
-    assert.ok(positions.every(({ x, y }) => Math.abs(x) <= 24 && Math.abs(y) <= 20));
+    assert.ok(positions.every(({ x, y }) => Math.abs(x) <= (count >= 5 ? 46 : 24) && Math.abs(y) <= 20));
   }
 });
 
@@ -164,7 +164,7 @@ test("fixed token slots rotate toward the inner board edge", () => {
 
 test("token pointers run from the base edge to the actual occupied field edge", () => {
   for (const tileIndex of Array.from({ length: 40 }, (_, index) => index)) {
-    for (const count of [1, 2, 3, 4]) {
+    for (const count of [1, 2, 3, 4, 5, 6]) {
       for (let index = 0; index < count; index += 1) {
         const slot = getTokenSlotOffset(tileIndex, count, index);
         const pointer = getTokenPointerGeometry(tileIndex, count, index);
@@ -185,7 +185,7 @@ test("token pointers run from the base edge to the actual occupied field edge", 
 
 test("multiple occupants fan out to distinct points on every field edge without changing slots", () => {
   for (const tileIndex of [0, 5, 13, 16, 20, 25, 33, 36]) {
-    for (const count of [2, 3, 4]) {
+    for (const count of [2, 3, 4, 5, 6]) {
       const fieldPoints = Array.from({ length: count }, (_, index) => {
         const slot = getTokenSlotOffset(tileIndex, count, index);
         const pointer = getTokenPointerGeometry(tileIndex, count, index);
@@ -214,10 +214,18 @@ test("calibrated inner anchors preserve all field bounds and point inward on eve
 });
 
 test("pointer end points remain on the field edge with TV scaling and geometry-derived building clearance",()=>{
-  for(const visualScale of [1.1,1.16])for(const tileIndex of [0,8,13,16,20,24,33,37])for(const count of [1,2,3,4])for(let index=0;index<count;index++){
+  for(const visualScale of [1.1,1.16,1.23])for(const tileIndex of [0,8,13,16,20,24,33,37])for(const count of [1,2,3,4,5,6])for(let index=0;index<count;index++){
     const slot=getTokenSlotOffset(tileIndex,count,index,true),pointer=getTokenPointerGeometry(tileIndex,count,index,visualScale,true),field=getTilePlacement(tileIndex);
     const x=slot.x+pointer.tip.x,y=slot.y+TOKEN_VISUAL_CONFIG.pointer.settledTokenYOffset+pointer.tip.y;
     assert.ok(Math.abs(x)<=field.width/2+.001&&Math.abs(y)<=field.height/2+.001);
     assert.ok(Math.abs(Math.abs(x)-field.width/2)<.001||Math.abs(Math.abs(y)-field.height/2)<.001);
+  }
+});
+
+test("five and six occupants have unique slots with building clearance on every side and corner",()=>{
+  for(const tileIndex of [0,8,13,16,20,24,33,37])for(const count of [5,6])for(const built of [false,true]){
+    const slots=Array.from({length:count},(_,index)=>getTokenSlotOffset(tileIndex,count,index,built));
+    assert.equal(new Set(slots.map(slot=>`${slot.x}:${slot.y}`)).size,count);
+    for(let i=0;i<count;i++)for(let j=i+1;j<count;j++)assert.ok(Math.hypot(slots[i]!.x-slots[j]!.x,slots[i]!.y-slots[j]!.y)>85);
   }
 });

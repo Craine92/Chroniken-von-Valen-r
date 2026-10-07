@@ -68,11 +68,13 @@ const FORMATIONS = {
   1: [{ x: 0, y: 0 }],
   2: [{ x: -23, y: 0 }, { x: 23, y: 0 }],
   3: [{ x: 0, y: -20 }, { x: -24, y: 19 }, { x: 24, y: 19 }],
-  4: [{ x: -23, y: -19 }, { x: 23, y: -19 }, { x: -23, y: 19 }, { x: 23, y: 19 }]
+  4: [{ x: -23, y: -19 }, { x: 23, y: -19 }, { x: -23, y: 19 }, { x: 23, y: 19 }],
+  5: [{x:-46,y:-19},{x:0,y:-19},{x:46,y:-19},{x:-23,y:19},{x:23,y:19}],
+  6: [{x:-46,y:-19},{x:0,y:-19},{x:46,y:-19},{x:-46,y:19},{x:0,y:19},{x:46,y:19}]
 } as const;
 
 export function getTokenFormationOffset(count: number, index: number) {
-  const formation = FORMATIONS[Math.min(4, Math.max(1, count)) as keyof typeof FORMATIONS];
+  const formation = FORMATIONS[Math.min(6, Math.max(1, count)) as keyof typeof FORMATIONS];
   return formation[index] ?? { x: 0, y: 0 };
 }
 
@@ -94,27 +96,35 @@ export function getTokenSlotOffset(tileIndex: number, count: number, index: numb
   const place = getTilePlacement(normalized);
   const unit = Math.min(place.width, place.height);
   const anchor = getTileInnerAnchor(normalized,"token",occupiedByBuilding);
+  if (count >= 5 && anchor.y) anchor.y += Math.sign(anchor.y) * unit * .35;
+  if (count >= 5 && place.side === "corner") {
+    const edge = getInnerEdgeOffset(normalized,0);
+    anchor.x = edge.x + Math.sign(edge.x) * unit * .31;
+  }
   const formationUnit = Math.min(unit,BOARD_CELL_SIZE);
-  const columnGap = formationUnit * .92;
-  const rowGap = formationUnit * 1.4;
+  const columnGap = formationUnit * (count >= 5 && place.side !== "top" && place.side !== "bottom" ? .78 : .92);
+  const rowGap = formationUnit * (count >= 5 ? 1.75 : 1.4);
+  const columns = count >= 5 ? 3 : 2;
   if (place.side === "corner") {
     const sx = normalized === 0 || normalized === 33 ? -1 : 1;
     const sy = normalized === 0 || normalized === 13 ? -1 : 1;
-    const slots = [{ x: 0, y: 0 }, { x: columnGap, y: 0 }, { x: 0, y: rowGap }, { x: columnGap, y: rowGap }];
-    const slot = slots[index] ?? slots[0]!;
+    const slot = {x:(index % columns)*columnGap,y:Math.floor(index / columns)*rowGap};
     return { x: anchor.x+sx*slot.x, y: anchor.y+sy*slot.y };
   }
   const horizontal = place.side === "bottom" || place.side === "top";
   if(horizontal){
+    if (count >= 5) return {x:(index % columns - 1)*columnGap,y:anchor.y+Math.sign(anchor.y)*(Math.floor(index / columns)+(occupiedByBuilding ? 1 : 0))*rowGap};
     const tangent = occupiedByBuilding ? unit*.64 : columnGap/2;
     const column = count<=1 ? occupiedByBuilding ? (place.x>0 ? -tangent : tangent) : 0 : index%2 ? tangent : -tangent;
     const row = count<=2 ? 0 : index>=2 ? rowGap : 0;
     return {x:column,y:anchor.y+Math.sign(anchor.y)*row};
   }
-  const column = count<=1 ? 0 : index%2 ? columnGap : 0;
-  const row = count<=2 ? 0 : index>=2 ? rowGap/2 : -rowGap/2;
-  const minY = -BOARD_INNER_HALF_HEIGHT + unit*.92 + (count>2 ? rowGap/2 : 0);
-  const maxY = BOARD_INNER_HALF_HEIGHT - unit*.44 - (count>2 ? rowGap/2 : 0);
+  // On upright side fields, rotate the six-seat formation to two columns and three rows.
+  const column = count<=1 ? 0 : (index % 2)*columnGap;
+  const row = count >= 5 ? (Math.floor(index/2)-1)*rowGap : count<=2 ? 0 : index>=2 ? rowGap/2 : -rowGap/2;
+  const halfRows = count >= 5 ? rowGap : count>2 ? rowGap/2 : 0;
+  const minY = -BOARD_INNER_HALF_HEIGHT + unit*.92 + halfRows;
+  const maxY = BOARD_INNER_HALF_HEIGHT - unit*(count >= 5 ? .8 : .44) - halfRows;
   const centerY = Math.max(minY,Math.min(maxY,place.y));
   return {x:anchor.x+Math.sign(anchor.x)*column,y:centerY-place.y+row};
 }

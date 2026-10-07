@@ -1,3 +1,4 @@
+import { startReadyGame } from "./test-fixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_CORNER_TILE_INDICES, BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, NORMAL_STARTING_GOLD, SOCKET_EVENTS, validateBoardTiles, type GameState } from "@valenor/shared";
@@ -19,7 +20,7 @@ function roomWithHuman() {
 
 test("chronicle snapshots stay isolated and blessed passage is paid before drawing a card", () => {
   const { manager, roomCode, human } = roomWithHuman();
-  manager.addComputer(roomCode, "host-1"); manager.startGame(roomCode, "host-1");
+  manager.addComputer(roomCode, "host-1"); startReadyGame(manager,roomCode, "host-1");
   const live = (manager as unknown as { rooms: Map<string, { gameState: GameState }> }).rooms.get(roomCode)!.gameState;
   live.currentRound = 4; live.currentPlayerId = human.player.id;
   live.activeChronicleEvent = { ...CHRONICLE_EVENTS[2]!, startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 1 };
@@ -65,7 +66,7 @@ test("a human color request swaps the NPC color without duplicates in a full lob
     if(npc) assert.equal(room.players.find(player=>player.id===npc.id)!.color,previous.players[0]!.color);
   }
   const room = manager.updatePlayerColor(roomCode,human.player.id,"blue","socket-1");
-  const started = manager.startGame(roomCode,"host-1");
+  const started = startReadyGame(manager,roomCode,"host-1");
   assert.deepEqual(started.players.map(player=>player.color),room.players.map(player=>player.color));
   assert.throws(()=>manager.updatePlayerColor(roomCode,human.player.id,"red","socket-1"),/Spielbeginn/);
 });
@@ -85,7 +86,7 @@ test("lobby color changes validate player, socket, type, connection and runtime 
 test("allows one human and one computer to start", () => {
   const { manager, roomCode } = roomWithHuman();
   manager.addComputer(roomCode, "host-1");
-  const state = manager.startGame(roomCode, "host-1");
+  const state = startReadyGame(manager,roomCode, "host-1");
   assert.equal(state.players.length, 2);
   assert.equal(state.status, "playing");
   assert.equal(state.turnPhase, "determiningOrder");
@@ -99,7 +100,7 @@ test("allows one human and one computer to start", () => {
 
 test("the separate tavern die consumes one random value, keeps the normal roll intact and rejects replays",()=>{
   let rolls=0;const manager=new RoomManager(new DiceService({rollDie:()=>{rolls++;return 6;}}),undefined,undefined,()=>0);
-  const {room}=manager.createRoom('host');const human=manager.joinRoom(room.code,'Myrra','human');manager.addComputer(room.code,'host');manager.startGame(room.code,'host');
+  const {room}=manager.createRoom('host');const human=manager.joinRoom(room.code,'Myrra','human');manager.addComputer(room.code,'host');startReadyGame(manager,room.code,'host');
   const live=(manager as unknown as {rooms:Map<string,{gameState:GameState}>}).rooms.get(room.code)!.gameState;
   live.currentPlayerId=human.player.id;live.turnPhase='landed';live.turnNumber=1;live.players[0]!.position=20;live.players[0]!.activeQuests=[];live.players[0]!.relics=['runestone'];live.weltenwegPot=400;
   live.turnContext={rollSequence:4,consecutiveDoubles:1,pendingExtraRoll:true};live.lastDiceRoll={die1:1,die2:1,total:2,isDouble:true};
@@ -118,7 +119,7 @@ test("allows one human and three computers to start", () => {
   manager.addComputer(roomCode, "host-1");
   manager.addComputer(roomCode, "host-1");
   manager.addComputer(roomCode, "host-1");
-  const state = manager.startGame(roomCode, "host-1");
+  const state = startReadyGame(manager,roomCode, "host-1");
   assert.equal(state.players.length, 4);
   assert.equal(state.status, "playing");
   assert.equal(state.turnPhase, "determiningOrder");
@@ -128,11 +129,13 @@ test("allows one human and three computers to start", () => {
 
 test("does not allow one human to start alone", () => {
   const { manager, roomCode } = roomWithHuman();
-  assert.throws(() => manager.startGame(roomCode, "host-1"), /Mindestens zwei/);
+  assert.throws(() => startReadyGame(manager,roomCode, "host-1"), /Mindestens zwei/);
 });
 
-test("rejects a fifth participant", () => {
+test("rejects a seventh participant", () => {
   const { manager, roomCode } = roomWithHuman();
+  manager.addComputer(roomCode, "host-1");
+  manager.addComputer(roomCode, "host-1");
   manager.addComputer(roomCode, "host-1");
   manager.addComputer(roomCode, "host-1");
   manager.addComputer(roomCode, "host-1");
@@ -189,7 +192,7 @@ test("rejects an invalid quick duration", () => {
 test("game start creates state at position zero with central starting gold", () => {
   const { manager, roomCode } = roomWithHuman();
   manager.addComputer(roomCode, "host-1");
-  const state = manager.startGame(roomCode, "host-1");
+  const state = startReadyGame(manager,roomCode, "host-1");
   assert.equal(state.roomId, roomCode);
   assert.equal(state.status, "playing");
   assert.equal(state.currentRound, 1);
@@ -200,7 +203,7 @@ test("game start creates state at position zero with central starting gold", () 
 test("reconnects a human during a running game without losing state", () => {
   const { manager, roomCode, human } = roomWithHuman();
   manager.addComputer(roomCode, "host-1");
-  manager.startGame(roomCode, "host-1");
+  startReadyGame(manager,roomCode, "host-1");
   manager.disconnectPlayer(roomCode, human.player.id);
   const rejoined = manager.joinRoom(roomCode, "Philipp", "socket-new", human.playerToken);
   assert.equal(rejoined.reconnected, true);
@@ -211,7 +214,7 @@ test("reconnects a human during a running game without losing state", () => {
 test("reconnect preserves mortgages, trades, payment and bankruptcy spectator state", () => {
   const { manager, roomCode, human } = roomWithHuman();
   manager.addComputer(roomCode, "host-1");
-  manager.startGame(roomCode, "host-1");
+  startReadyGame(manager,roomCode, "host-1");
   const internal = manager as unknown as { rooms: Map<string, { gameState?: GameState }> };
   const state = internal.rooms.get(roomCode)!.gameState!;
   state.propertyOwnerships.push({ tileIndex: 1, ownerId: human.player.id, mortgaged: true, buildingLevel: 0 });
@@ -230,7 +233,7 @@ test("reconnect preserves mortgages, trades, payment and bankruptcy spectator st
 test("reconnect preserves dungeon decisions and a pending third-attempt movement", () => {
   const { manager, roomCode, human } = roomWithHuman();
   manager.addComputer(roomCode, "host-1");
-  manager.startGame(roomCode, "host-1");
+  startReadyGame(manager,roomCode, "host-1");
   const internal = manager as unknown as { rooms: Map<string, { gameState?: GameState }> };
   const state = internal.rooms.get(roomCode)!.gameState!;
   state.turnOrder = [human.player.id, state.players[1]!.id];
@@ -254,7 +257,7 @@ test("reconnect preserves dungeon decisions and a pending third-attempt movement
 test("new chronicle returns finished room to lobby and next start resets every system", () => {
   const { manager, roomCode } = roomWithHuman();
   manager.addComputer(roomCode, "host-1");
-  manager.startGame(roomCode, "host-1");
+  startReadyGame(manager,roomCode, "host-1");
   const internal = manager as unknown as { rooms: Map<string, { gameState?: GameState; phase: "lobby" | "starting" | "playing" | "finished" }> };
   const room = internal.rooms.get(roomCode)!;
   room.gameState!.status = "finished";
@@ -267,7 +270,7 @@ test("new chronicle returns finished room to lobby and next start resets every s
   const lobby = manager.newChronicle(roomCode, "host-1");
   assert.equal(lobby.phase, "lobby");
   assert.equal(lobby.gameState, undefined);
-  const restarted = manager.startGame(roomCode, "host-1");
+  const restarted = startReadyGame(manager,roomCode, "host-1");
   assert.deepEqual(restarted.propertyOwnerships, []);
   assert.deepEqual(restarted.trades, []);
   assert.deepEqual(restarted.buildingBank, { settlementUnitsAvailable: 32, grandStructuresAvailable: 12 });
@@ -283,7 +286,7 @@ test("quick game clock starts after order, pauses for a human and produces an id
   const first = manager.joinRoom(room.code, "Philipp", "socket-p");
   const second = manager.joinRoom(room.code, "Justine", "socket-j");
   manager.updateConfig(room.code, { mode: "quick", quickGameDurationMinutes: 60 }, "host-quick");
-  manager.startGame(room.code, "host-quick");
+  startReadyGame(manager,room.code, "host-quick");
   assert.equal(manager.rollForOrder(room.code, first.player.id, "human").quickGameClock, undefined);
   let state = manager.rollForOrder(room.code, second.player.id, "human");
   assert.equal(state.quickGameClock?.startedAt, 10_000);
@@ -324,7 +327,7 @@ test("quick game finishes after the final active turn when turn-order index zero
   manager.addComputer(room.code, "host-final-round");
   manager.addComputer(room.code, "host-final-round");
   manager.updateConfig(room.code, { mode: "quick", quickGameDurationMinutes: 60 }, "host-final-round");
-  manager.startGame(room.code, "host-final-round");
+  startReadyGame(manager,room.code, "host-final-round");
 
   const internal = manager as unknown as { rooms: Map<string, { gameState?: GameState }> };
   const live = internal.rooms.get(room.code)!.gameState!;

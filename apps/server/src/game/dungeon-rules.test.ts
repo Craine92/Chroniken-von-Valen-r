@@ -27,8 +27,8 @@ function state(position = 0): GameState {
     status: "playing",
     config: { mode: "chronicles" },
     players: [
-      { id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected", gold: 1_500, position, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
-      { id: "p2", name: "Justine", type: "human", color: "green", connectionState: "connected", gold: 1_500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
+      { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1_500, position, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
+      { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: 1_500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
     ],
     turnOrder: ["p1", "p2"],
     orderRolls: [],

@@ -7,7 +7,7 @@ import { activateRelic } from "./chronicle-event-service";
 function game(): GameState {
   return {
     roomId:"VAL-RELIC-TRADE",status:"playing",config:{mode:"chronicles"},
-    players:["p1","p2"].map(id=>({id,name:id,type:"human",color:"violet",connectionState:"connected",gold:1500,position:0,isBankrupt:false,dungeon:{inDungeon:false,failedAttempts:0},relics:[],armedRelics:[]})),
+    players:["p1","p2"].map(id=>({id,name:id,type:"human",color:"violet",characterId: "elvenSpellweaver" as const, connectionState:"connected",gold:1500,position:0,isBankrupt:false,dungeon:{inDungeon:false,failedAttempts:0},relics:[],armedRelics:[]})),
     turnOrder:["p1","p2"],orderRolls:[],orderContenders:[],orderRollTargetCount:1,currentPlayerId:"p1",currentTurnIndex:0,currentRound:1,turnNumber:1,turnPhase:"waitingForRoll",
     turnContext:{consecutiveDoubles:0,pendingExtraRoll:false,rollSequence:0},propertyOwnerships:[],buildingBank:{settlementUnitsAvailable:32,grandStructuresAvailable:12},economyLog:[],trades:[],startedAt:1
   };

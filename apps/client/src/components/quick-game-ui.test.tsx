@@ -18,8 +18,8 @@ function finishedGame(): GameState {
   return {
     roomId: "VAL-UI", status: "finished", config: { mode: "quick", quickGameDurationMinutes: 60 },
     players: [
-      { id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected", gold: 500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
-      { id: "p2", name: "Justine", type: "human", color: "green", connectionState: "connected", gold: 500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
+      { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
+      { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: 500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
     ],
     turnOrder: ["p1", "p2"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 4, turnNumber: 7, turnPhase: "turnTransition",

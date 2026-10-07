@@ -7,6 +7,8 @@ import { CHARACTER_ASSETS, DRAGON_ANIMATION, FIELD_BASE_ASSETS, flattenAssetMani
 import { ANIMATED_REALM_DECORATIONS, REALM_DECORATIONS } from "./realm-decoration-config";
 import { BOARD_EFFECT_DECORATIONS } from "./board-effect-config";
 import { BOARD_DEPTHS } from "../layers/board-depths";
+import { PLAYER_CHARACTERS } from "@valenor/shared";
+import { getCharacterAsset } from "./asset-manifest";
 
 test("asset manifest exposes unique local slots and never hotlinks runtime art", () => {
   const assets = flattenAssetManifest();
@@ -21,7 +23,7 @@ test("only reviewed core art is preloaded and pending slots retain procedural fa
   const assets = flattenAssetManifest();
   const ready = getPreloadAssets();
   const pending = assets.filter((asset) => asset.availability === "slot");
-  assert.equal(ready.length, 36);
+  assert.equal(ready.length, 40);
   assert.ok(ready.every((asset) => asset.availability === "ready" && asset.fallback === "procedural"));
   assert.ok(pending.length > 0);
   assert.ok(pending.every((asset) => asset.fallback === "procedural"));
@@ -71,20 +73,26 @@ test("both deck frames are existing PNGs with their actual dimensions", () => {
   }
 });
 
-test("every culture has five building levels and four character replacements", () => {
+test("every culture has five building levels and eight character choices", () => {
   for (const region of ["elves", "humans", "orcs", "steppe"] as const) {
     for (const level of [1, 2, 3, 4, 5] as const) assert.ok(getBuildingAsset(region, level));
   }
-  assert.equal(CHARACTER_ASSETS.length, 4);
+  assert.equal(CHARACTER_ASSETS.length, 8);
   assert.deepEqual(CHARACTER_ASSETS.map((asset) => asset.path), [
     "/assets/characters/elven-spellweaver.png",
     "/assets/characters/human-knight.png",
     "/assets/characters/orc-warlord.png",
-    "/assets/characters/steppe-scout-shaman.png"
+    "/assets/characters/steppe-scout-shaman.png",
+    "/assets/characters/Dwarf.png", "/assets/characters/Tauren.png", "/assets/characters/Troll.png", "/assets/characters/nightelv.png"
   ]);
   assert.equal(getBuildingAsset("elves", 1), getBuildingAsset("elves", 4));
   assert.notEqual(getBuildingAsset("elves", 4), getBuildingAsset("elves", 5));
   assert.equal(Object.keys(SPECIAL_TILE_ASSETS).length, 12);
+  for(const character of PLAYER_CHARACTERS){
+    const asset=getCharacterAsset(character.id);
+    assert.equal(existsSync(new URL(`../../../public${asset.path}`,import.meta.url)),true,character.id);
+    assert.ok(CHARACTER_ASSETS.includes(asset));
+  }
 });
 
 test("realm decoration placement is data-driven for every realm and atlas animation slots exist", () => {

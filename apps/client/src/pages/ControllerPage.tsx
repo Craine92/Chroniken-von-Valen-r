@@ -11,6 +11,8 @@ import {
   type GameState,
   type GameRoom,
   type PlayerColor,
+  type PlayerCharacterId,
+  type RoomMutationResult,
   type TavernChoice,
   type TavernState,
   type CreateTradeOfferRequest,
@@ -33,6 +35,8 @@ import { createValenorSocket } from "../lib/socket";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
 import { MobileLiveEvents } from "../components/MobileLiveEvents";
 import { PlayerColorPicker } from "../components/PlayerColorPicker";
+import { PlayerCharacterPicker } from "../components/PlayerCharacterPicker";
+import { PlayerPortrait } from "../components/PlayerPortrait";
 
 function normalizeRoomCode(value: string): string {
   const lettersAndNumbers = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -244,6 +248,14 @@ export function ControllerPage() {
       if (playerRef.current && nameRef.current) join(nameRef.current, true);
     };
     const handleDisconnect = () => setConnected(false);
+    const handleRemoved = (message: string) => {
+      const code = roomRef.current.trim().toUpperCase();
+      localStorage.removeItem(`valenor:player-token:${code}`);
+      playerRef.current = undefined;
+      setPlayer(undefined); setRoom(undefined); setGameState(undefined);
+      setColorPending(false); setSignalSent(false); setJoining(false);
+      setSelectedPropertyGroupId(undefined); setControllerTab("action"); setError(message);
+    };
     const handleRoomUpdate = (updatedRoom: GameRoom) => {
       setRoom(updatedRoom);
       const updatedPlayer = updatedRoom.players.find(candidate => candidate.id === playerRef.current?.id);
@@ -259,6 +271,7 @@ export function ControllerPage() {
     socket.on(SOCKET_EVENTS.gameStart, setGameState);
     socket.on(SOCKET_EVENTS.gameState, setGameState);
     socket.on(SOCKET_EVENTS.roomUpdate, handleRoomUpdate);
+    socket.on(SOCKET_EVENTS.roomRemoved, handleRemoved);
     socket.connect();
 
     return () => {
@@ -280,19 +293,28 @@ export function ControllerPage() {
     join(cleanedName);
   };
 
-  const chooseColor = (color: PlayerColor) => {
-    setColorPending(true);
-    setError("");
-    socket.emit(SOCKET_EVENTS.playerUpdateColor, color, result => {
+  const finishLobbyUpdate = (result: RoomMutationResult) => {
       setColorPending(false);
       if (!result.ok || !result.room) {
-        setError(result.message ?? "Die Farbe konnte nicht geändert werden.");
+        setError(result.message ?? "Die Lobby-Auswahl konnte nicht geändert werden.");
         return;
       }
       setRoom(result.room);
       const updated = result.room.players.find(candidate => candidate.id === playerRef.current?.id);
       if (updated) { playerRef.current = updated; setPlayer(updated); }
-    });
+  };
+  const chooseColor = (color: PlayerColor) => {
+    setColorPending(true); setError("");
+    socket.emit(SOCKET_EVENTS.playerUpdateColor, color, finishLobbyUpdate);
+  };
+  const chooseCharacter = (characterId: PlayerCharacterId) => {
+    setColorPending(true); setError("");
+    socket.emit(SOCKET_EVENTS.playerUpdateCharacter, characterId, finishLobbyUpdate);
+  };
+  const toggleReady = () => {
+    if (!player) return;
+    setColorPending(true); setError("");
+    socket.emit(SOCKET_EVENTS.playerUpdateReady, !player.ready, finishLobbyUpdate);
   };
 
   const sendMagicSignal = () => {
@@ -507,12 +529,12 @@ export function ControllerPage() {
         <section className="controller-card controller-card--started">
           <BrandMark compact />
           <header className={`controller-player-bar controller-player-bar--${player.color}`}>
-            <span aria-hidden="true">{["♞", "➶", "✧", "⚒"][gameState.players.findIndex((entry) => entry.id === player.id)] ?? "✦"}</span>
+            <PlayerPortrait characterId={activePlayer.characterId} />
             <div><strong>{activePlayer.name}</strong><small>RUNDE {gameState.currentRound} · {activePlayer.dungeon.inDungeon ? "IM KERKER" : gameState.currentPlayerId === player.id ? "AM ZUG" : "BEREIT"}</small></div>
             <b><i className="valenor-coin" aria-hidden="true">V</i>{activePlayer.gold.toLocaleString("de-DE")}</b>
           </header>
           <div className={`player-orb player-orb--${player.color}`} aria-hidden="true">
-            <span>{player.name.charAt(0).toUpperCase()}</span>
+            <PlayerPortrait characterId={activePlayer.characterId} />
           </div>
           <div className="controller-card__intro">
             <p className="eyebrow">Das Runentor ist geöffnet</p>
@@ -640,7 +662,7 @@ export function ControllerPage() {
       <section className="controller-card controller-card--connected">
         <BrandMark compact />
         <div className={`player-orb player-orb--${player.color}`} aria-hidden="true">
-          <span>{player.name.charAt(0).toUpperCase()}</span>
+          <PlayerPortrait characterId={player.characterId} />
         </div>
         <div className="controller-card__intro">
           <p className="eyebrow">Gefährte verbunden</p>
@@ -650,6 +672,8 @@ export function ControllerPage() {
         <ConnectionBadge connected={connected} />
 
         {room?.phase === "lobby" && <PlayerColorPicker players={room.players} playerId={player.id} connected={connected} pending={colorPending} onSelect={chooseColor} />}
+        {room?.phase === "lobby" && <><PlayerCharacterPicker players={room.players} playerId={player.id} connected={connected} pending={colorPending} onSelect={chooseCharacter} />
+          <button className="lobby-ready" type="button" disabled={!connected || colorPending} aria-pressed={player.ready} onClick={toggleReady}>{player.ready ? "✓ BEREIT" : "BEREIT"}</button></>}
         <div className="controller-divider"><span>✦</span></div>
         <button
           className={`magic-button magic-button--${player.color} ${signalSent ? "is-casting" : ""}`}

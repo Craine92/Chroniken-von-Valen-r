@@ -6,7 +6,7 @@ import { BOARD_TILES, type GamePlayerState, type PropertyOwnership } from "@vale
 import { PropertyCard } from "./PropertyCard";
 
 const owner: GamePlayerState = {
-  id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected",
+  id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected",
   gold: 1_400, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }
 };
 

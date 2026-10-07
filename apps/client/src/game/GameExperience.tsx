@@ -18,7 +18,7 @@ export const DOUBLE_BANNER_DURATION_MS = 2_200;
 export const CHRONICLE_NOTICE_DURATION_MS = 3_000;
 export const TAVERN_NOTICE_DURATION_MS = 4_000;
 
-export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE }: { gameState: GameState; onNewChronicle?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined }) {
+export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE }: { gameState: GameState; onNewChronicle?: () => void; onReturnToLobby?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined }) {
   const [introVisible, setIntroVisible] = useState(true);
   const [buildingNoticeId, setBuildingNoticeId] = useState<string>();
   const [tradeNoticeId, setTradeNoticeId] = useState<string>();
@@ -211,6 +211,7 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
           </aside>
         )}
       </section>
+      {onReturnToLobby && <button type="button" className="return-to-lobby" title="Zur Lobby" aria-label="Zur Lobby" onClick={onReturnToLobby}>↻</button>}
       {gameState.status === "finished" && (
         <section className="victory-overlay">
           <GameResultPanel gameState={gameState} onNewChronicle={onNewChronicle} />

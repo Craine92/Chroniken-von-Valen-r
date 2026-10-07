@@ -4,11 +4,15 @@ import {
   BUILDING_BANK_CAPACITY,
   STARTING_GOLD,
   PLAYER_COLORS,
+  PLAYER_CHARACTERS,
+  MIN_PLAYERS,
+  MAX_PLAYERS,
   type GameConfig,
   type GameRoom,
   type GameState,
   type Player,
   type PlayerColor,
+  type PlayerCharacterId,
   type PlayerType,
   type AuctionBidIncrement,
   type CardDeckType
@@ -131,6 +135,8 @@ export class RoomManager {
       name: this.cleanName(name),
       type: "human",
       color,
+      characterId: this.findFreeCharacter(room),
+      ready: false,
       connectionState: "connected",
       joinedAt: Date.now()
     };
@@ -157,6 +163,8 @@ export class RoomManager {
       name,
       type: "computer",
       color: this.findFreeColor(room),
+      characterId: this.findFreeCharacter(room),
+      ready: true,
       connectionState: "connected",
       joinedAt: Date.now()
     });
@@ -172,6 +180,14 @@ export class RoomManager {
     return this.toPublicRoom(room);
   }
 
+  removePlayer(roomCode: string, playerId: string, hostSocketId: string): GameRoom {
+    const room = this.requireHostRoom(roomCode, hostSocketId);
+    if (room.phase !== "lobby") throw new Error("Spieler können nur in der Lobby entfernt werden.");
+    if (!room.players.some(player => player.id === playerId)) throw new Error("Dieser Spieler wurde nicht gefunden.");
+    room.players = room.players.filter(player => player.id !== playerId);
+    return this.toPublicRoom(room);
+  }
+
   updatePlayerColor(roomCode: string, playerId: string, color: PlayerColor, socketId: string): GameRoom {
     const room = this.requireRoom(roomCode);
     if (room.phase !== "lobby") throw new Error("Die Spielerfarbe kann nur vor Spielbeginn geändert werden.");
@@ -184,8 +200,36 @@ export class RoomManager {
     if (occupant?.type === "human") throw new Error(`Diese Farbe ist bereits von ${occupant.name} belegt.`);
     // Swapping with the requesting human preserves uniqueness even in a full lobby.
     if (occupant) occupant.color = player.color;
+    if (player.color !== color) player.ready = false;
     player.color = color;
     return this.toPublicRoom(room);
+  }
+
+  updatePlayerCharacter(roomCode: string, playerId: string, characterId: PlayerCharacterId, socketId: string): GameRoom {
+    const room = this.requireRoom(roomCode);
+    const player = this.requireLobbyHuman(room, playerId, socketId);
+    if (!PLAYER_CHARACTERS.some(character => character.id === characterId)) throw new Error("Diese Figur ist ungültig.");
+    const occupant = room.players.find(candidate => candidate.id !== playerId && candidate.characterId === characterId);
+    if (occupant?.type === "human") throw new Error(`Diese Figur wurde bereits von ${occupant.name} gewählt.`);
+    if (occupant) occupant.characterId = player.characterId;
+    if (player.characterId !== characterId) player.ready = false;
+    player.characterId = characterId;
+    return this.toPublicRoom(room);
+  }
+
+  updatePlayerReady(roomCode: string, playerId: string, ready: boolean, socketId: string): GameRoom {
+    const room = this.requireRoom(roomCode);
+    const player = this.requireLobbyHuman(room, playerId, socketId);
+    if (typeof ready !== "boolean") throw new Error("Dieser Bereitstatus ist ungültig.");
+    player.ready = ready;
+    return this.toPublicRoom(room);
+  }
+
+  private requireLobbyHuman(room: InternalRoom, playerId: string, socketId: string): InternalPlayer {
+    if (room.phase !== "lobby") throw new Error("Diese Auswahl kann nur in der Lobby geändert werden.");
+    const player = room.players.find(candidate => candidate.id === playerId);
+    if (!player || player.type !== "human" || player.socketId !== socketId || player.connectionState !== "connected") throw new Error("Nur verbundene Menschen dürfen ihre eigene Auswahl ändern.");
+    return player;
   }
 
   updateConfig(roomCode: string, config: GameConfig, hostSocketId: string): GameRoom {
@@ -200,6 +244,7 @@ export class RoomManager {
     const player = room?.players.find((candidate) => candidate.id === playerId && candidate.type === "human");
     if (!room || !player) return undefined;
     player.connectionState = "disconnected";
+    if (room.phase === "lobby") player.ready = false;
     delete player.socketId;
     this.syncConnectionState(room, playerId, "disconnected");
     return this.toPublicPlayer(player);
@@ -217,11 +262,13 @@ export class RoomManager {
   startGame(roomCode: string, hostSocketId: string): GameState {
     const room = this.requireHostRoom(roomCode, hostSocketId);
     if (room.phase !== "lobby") throw new Error("Dieses Abenteuer hat bereits begonnen.");
-    if (room.players.length < 2) throw new Error("Mindestens zwei Gefährten werden benötigt.");
+    if (room.players.length < MIN_PLAYERS) throw new Error("Mindestens zwei Gefährten werden benötigt.");
+    if (room.players.length > MAX_PLAYERS) throw new Error("Maximal sechs Gefährten sind erlaubt.");
     const connectedHumans = room.players.filter(
       (player) => player.type === "human" && player.connectionState === "connected"
     );
     if (connectedHumans.length < 1) throw new Error("Mindestens ein menschlicher Gefährte muss verbunden sein.");
+    if (connectedHumans.some(player => !player.ready)) throw new Error("Alle verbundenen Menschen müssen bereit sein.");
 
     const gameState: GameState = {
       roomId: room.code,
@@ -502,9 +549,17 @@ export class RoomManager {
   newChronicle(roomCode: string, hostSocketId: string): GameRoom {
     const room = this.requireHostRoom(roomCode, hostSocketId);
     if (room.gameState?.status !== "finished") throw new Error("Die laufende Chronik ist noch nicht entschieden.");
+    return this.returnToLobby(roomCode, hostSocketId);
+  }
+
+  returnToLobby(roomCode: string, hostSocketId: string): GameRoom {
+    const room = this.requireHostRoom(roomCode, hostSocketId);
+    if (!["playing", "finished"].includes(room.phase)) throw new Error("Es läuft keine Partie.");
+    if (room.gameState) this.quickClock.stop(room.gameState);
     room.phase = "lobby";
     delete room.gameState;
     delete room.cardRuntime;
+    room.players.forEach(player => { player.ready = player.type === "computer"; });
     return this.toPublicRoom(room);
   }
 
@@ -591,7 +646,7 @@ export class RoomManager {
   }
 
   private ensureFreeSlot(room: InternalRoom) {
-    if (room.players.length >= PLAYER_COLORS.length) {
+    if (room.players.length >= MAX_PLAYERS) {
       throw new Error("Dieser Spielraum ist bereits vollständig besetzt.");
     }
   }
@@ -602,6 +657,12 @@ export class RoomManager {
     );
     if (!color) throw new Error("Für diesen Spielraum ist keine Spielerfarbe mehr frei.");
     return color;
+  }
+
+  private findFreeCharacter(room: InternalRoom): PlayerCharacterId {
+    const character = PLAYER_CHARACTERS.find(candidate => !room.players.some(player => player.characterId === candidate.id));
+    if (!character) throw new Error("Keine Figur ist mehr frei.");
+    return character.id;
   }
 
   private getInternalPlayer(roomCode: string, playerId: string): InternalPlayer | undefined {
@@ -667,8 +728,8 @@ export class RoomManager {
   }
 
   private toPublicPlayer(player: InternalPlayer): Player {
-    const { id, name, type, color, connectionState, joinedAt } = player;
-    return { id, name, type, color, connectionState, joinedAt };
+    const { id, name, type, color, characterId, ready, connectionState, joinedAt } = player;
+    return { id, name, type, color, characterId, ready, connectionState, joinedAt };
   }
 
   private cloneGameState(gameState: GameState): GameState {

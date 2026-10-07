@@ -1,3 +1,4 @@
+import { startReadyGame } from "../test-fixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_TILES, QUEST_DEFINITIONS, getPropertyGroupTiles, type GameState, type QuestId } from "@valenor/shared";
@@ -12,7 +13,7 @@ function game(id: QuestId, tileIndex = 1): GameState {
   const fillers = (Object.keys(QUEST_DEFINITIONS) as QuestId[]).filter(candidate => candidate !== id).slice(-2);
   return {
     roomId: "VAL-QUEST", status: "playing", config: { mode: "chronicles" },
-    players: ["p1","p2"].map(playerId => ({ id: playerId, name: playerId, type: "human", color: "violet", connectionState: "connected", gold: 1500, position: tileIndex,
+    players: ["p1","p2"].map(playerId => ({ id: playerId, name: playerId, type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1500, position: tileIndex,
       isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, relics: [], armedRelics: [],
       activeQuests: [id, ...fillers].map(questId => ({ id: questId, assignedAtTurn: 1 })) })),
     turnOrder: ["p1","p2"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1, currentPlayerId: "p1", currentTurnIndex: 0,
@@ -25,7 +26,7 @@ const rewards = (state: GameState, id: QuestId) => state.economyLog.filter(entry
 
 test("game start assigns exactly three distinct quests to every player and isolates snapshots", () => {
   const manager = new RoomManager(), { room } = manager.createRoom("host"); manager.joinRoom(room.code,"Human","s1"); manager.addComputer(room.code,"host");
-  const snapshot = manager.startGame(room.code,"host");
+  const snapshot = startReadyGame(manager,room.code,"host");
   for (const player of snapshot.players) { assert.equal(player.activeQuests!.length,3); assert.equal(new Set(player.activeQuests!.map(quest => quest.id)).size,3); assert.ok(player.activeQuests!.every(quest => quest.assignedAtTurn === 0)); }
   snapshot.players[0]!.activeQuests![0]!.assignedAtTurn = 99; snapshot.players[0]!.activeQuests!.length = 0;
   snapshot.players[0]!.processedQuestEventIds!.push("client-only");

@@ -33,7 +33,9 @@ const SIDE_FAN_FACTORS = {
   1: [0],
   2: [-.7, .7],
   3: [-1, 1, 0],
-  4: [-1, 1, -.35, .35]
+  4: [-1, 1, -.35, .35],
+  5: [-1, -.65, -.3, .3, .65],
+  6: [-1, -.65, -.3, .3, .65, 1]
 } as const;
 
 function getCornerTip(tileIndex: number, count: number, index: number, center: { x: number; y: number }, width: number, height: number) {
@@ -42,6 +44,9 @@ function getCornerTip(tileIndex: number, count: number, index: number, center: {
   const sy = normalized === 0 || normalized === 13 ? -1 : 1;
   const corner = { x: center.x + sx * width / 2, y: center.y + sy * height / 2 };
   const spacing = TOKEN_VISUAL_CONFIG.pointer.edgeFanSpacing;
+  if (count >= 5) return index < 3
+    ? {x:corner.x-sx*spacing*(.5+index*.7),y:corner.y}
+    : {x:corner.x,y:corner.y-sy*spacing*(.5+(index-3)*.7)};
   if (count <= 1) return corner;
   if (count === 2) return index === 0
     ? { x: corner.x - sx * spacing * .7, y: corner.y }
@@ -61,7 +66,9 @@ export function getTokenPointerGeometry(tileIndex: number, count: number, index:
   const place = getTilePlacement(tileIndex);
   const renderedOffset = { x: offset.x, y: offset.y + TOKEN_VISUAL_CONFIG.pointer.settledTokenYOffset };
   const center = { x: -renderedOffset.x, y: -renderedOffset.y };
-  const factors = SIDE_FAN_FACTORS[Math.min(4, Math.max(1, count)) as keyof typeof SIDE_FAN_FACTORS];
+  const factors = count >= 5 && ["top", "bottom"].includes(place.side)
+    ? [-1, 0, 1, -.65, .15, .65]
+    : SIDE_FAN_FACTORS[Math.min(6, Math.max(1, count)) as keyof typeof SIDE_FAN_FACTORS];
   const fan = (factors[index] ?? 0) * TOKEN_VISUAL_CONFIG.pointer.edgeFanSpacing;
   const tip = place.side === "corner"
     ? getCornerTip(tileIndex, count, index, center, place.width, place.height)

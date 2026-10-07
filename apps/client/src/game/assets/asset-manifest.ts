@@ -1,4 +1,4 @@
-import { BOARD_TILES, type BuildingLevel, type RegionType, type RelicId } from "@valenor/shared";
+import { BOARD_TILES, PLAYER_CHARACTERS, type PlayerCharacterId, type BuildingLevel, type RegionType, type RelicId } from "@valenor/shared";
 
 export type AssetAvailability = "slot" | "ready";
 
@@ -134,7 +134,11 @@ export const VALENOR_ASSETS = {
     elvenSpellweaver: imageSlot("character-elven-spellweaver", "/assets/characters/elven-spellweaver.png", 542, 724, "ready"),
     humanKnight: imageSlot("character-human-knight", "/assets/characters/human-knight.png", 543, 711, "ready"),
     orcWarlord: imageSlot("character-orc-warlord", "/assets/characters/orc-warlord.png", 543, 713, "ready"),
-    steppeScoutShaman: imageSlot("character-steppe-scout-shaman", "/assets/characters/steppe-scout-shaman.png", 543, 714, "ready")
+    steppeScoutShaman: imageSlot("character-steppe-scout-shaman", "/assets/characters/steppe-scout-shaman.png", 543, 714, "ready"),
+    dwarf: imageSlot("character-dwarf", "/assets/characters/Dwarf.png", 543, 714, "ready"),
+    tauren: imageSlot("character-tauren", "/assets/characters/Tauren.png", 543, 714, "ready"),
+    troll: imageSlot("character-troll", "/assets/characters/Troll.png", 543, 714, "ready"),
+    nightElf: imageSlot("character-night-elf", "/assets/characters/nightelv.png", 543, 714, "ready")
   },
   cards: {
     adventureFrame: imageSlot("card-adventure-frame", "/assets/cards/CardAbenteuer.png", 1058, 1487, "ready"),
@@ -205,12 +209,10 @@ export function getBuildingAsset(region: RegionType, level: BuildingLevel): Imag
   return level === 5 ? set.grandStructure : set.settlement;
 }
 
-export const CHARACTER_ASSETS = [
-  VALENOR_ASSETS.characters.elvenSpellweaver,
-  VALENOR_ASSETS.characters.humanKnight,
-  VALENOR_ASSETS.characters.orcWarlord,
-  VALENOR_ASSETS.characters.steppeScoutShaman
-] as const;
+export const CHARACTER_ASSETS = PLAYER_CHARACTERS.map(character => VALENOR_ASSETS.characters[character.id]);
+export function getCharacterAsset(characterId: PlayerCharacterId): ImageAssetDefinition {
+  return VALENOR_ASSETS.characters[characterId] ?? VALENOR_ASSETS.characters.humanKnight;
+}
 
 export const SPECIAL_TILE_ASSETS: Readonly<Partial<Record<number, ImageAssetDefinition>>> = {
   0: VALENOR_ASSETS.special.runegate,

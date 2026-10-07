@@ -1,3 +1,4 @@
+import { startReadyGame } from "../test-fixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, GO_TO_DUNGEON_TILE_INDEX, RELIC_DEFINITIONS,
@@ -12,7 +13,7 @@ import { RoomManager } from "../room-manager";
 function game(index = 1): GameState {
   return {
     roomId: "VAL-DRAGON", status: "playing", config: { mode: "chronicles" },
-    players: ["p1","p2"].map(id => ({ id, name: id, type: "human", color: "violet", connectionState: "connected",
+    players: ["p1","p2"].map(id => ({ id, name: id, type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected",
       gold: 1500, position: index, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, relics: [] })),
     turnOrder: ["p1","p2"], orderRolls: [{ playerId: "p1", rolls: [] }, { playerId: "p2", rolls: [] }], orderContenders: ["p1","p2"], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 1, turnNumber: 1, turnPhase: "landed",
@@ -269,7 +270,7 @@ test("runestone never affects start-order rolls or dungeon rolls", () => {
 test("a feather received from the dragon after passing start applies to the next passage, and snapshots isolate relics", () => {
   const manager = new RoomManager(undefined, undefined, undefined, () => 2);
   const { room } = manager.createRoom("host"); const human = manager.joinRoom(room.code, "p1", "socket");
-  manager.addComputer(room.code, "host"); manager.startGame(room.code, "host");
+  manager.addComputer(room.code, "host"); startReadyGame(manager,room.code, "host");
   const live = (manager as unknown as { rooms: Map<string, { gameState: GameState }> }).rooms.get(room.code)!.gameState;
   live.currentPlayerId = human.player.id; live.turnPhase = "landed";
   live.players[0]!.relics = ["runestone"]; live.wanderingDragon!.tileIndex = 1;

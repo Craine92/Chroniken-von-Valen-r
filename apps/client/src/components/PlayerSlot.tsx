@@ -1,17 +1,16 @@
-import type { Player } from "@valenor/shared";
+import { PLAYER_CHARACTERS, type Player } from "@valenor/shared";
 import { PLAYER_COLOR_LABELS } from "../lib/player-colors";
-const ARCHETYPES = ["Runenritter", "Waldläuferin", "Runenmagier", "Schildkriegerin"];
-const ARCHETYPE_SIGILS = ["♞", "➶", "✧", "⚒"];
+import { PlayerPortrait } from "./PlayerPortrait";
 
 interface PlayerSlotProps {
   player: Player | undefined;
   index: number;
   onAddComputer: () => void;
-  onRemoveComputer: (playerId: string) => void;
+  onRemovePlayer: (playerId: string) => void;
   disabled?: boolean;
 }
 
-export function PlayerSlot({ player, index, onAddComputer, onRemoveComputer, disabled }: PlayerSlotProps) {
+export function PlayerSlot({ player, index, onAddComputer, onRemovePlayer, disabled }: PlayerSlotProps) {
   if (!player) {
     return (
       <article className="player-slot player-slot--empty">
@@ -31,24 +30,23 @@ export function PlayerSlot({ player, index, onAddComputer, onRemoveComputer, dis
   return (
     <article className={`player-slot player-slot--${player.color} ${disconnected ? "is-disconnected" : ""}`}>
       <span className="player-slot__number">0{index + 1}</span>
-      <div className="player-slot__sigil" aria-hidden="true">{ARCHETYPE_SIGILS[index]}</div>
+      <PlayerPortrait characterId={player.characterId} />
       <div className="player-slot__identity">
         <h3>{player.name}</h3>
-        <p>{ARCHETYPES[index]} · {player.type === "computer" ? "Computer" : "Mensch"} · {PLAYER_COLOR_LABELS[player.color]}</p>
+        <p>{PLAYER_CHARACTERS.find(character => character.id === player.characterId)?.name} · {player.type === "computer" ? "Computer" : "Mensch"} · {PLAYER_COLOR_LABELS[player.color]}</p>
+        <span className="player-slot__state">{disconnected ? "Getrennt" : player.ready ? "✓ Bereit" : "Noch nicht bereit"}</span>
       </div>
-      {player.type === "computer" ? (
+      {(
         <button
           className="slot-remove"
           type="button"
           aria-label={`${player.name} entfernen`}
-          title="Computer entfernen"
-          onClick={() => onRemoveComputer(player.id)}
+          title={player.type === "computer" ? "Computer entfernen" : "Spieler entfernen"}
+          onClick={() => onRemovePlayer(player.id)}
           disabled={disabled}
         >
           ×
         </button>
-      ) : (
-        <span className="player-slot__state">{disconnected ? "Getrennt" : "Bereit"}</span>
       )}
     </article>
   );

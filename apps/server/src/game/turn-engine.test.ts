@@ -1,3 +1,4 @@
+import { startReadyGame } from "../test-fixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DiceService, type RandomSource } from "./dice-service";
@@ -30,7 +31,7 @@ test("start order is sorted by descending two-dice total", () => {
   const { room } = manager.createRoom("host");
   const low = manager.joinRoom(room.code, "Low", "s1");
   const high = manager.joinRoom(room.code, "High", "s2");
-  manager.startGame(room.code, "host");
+  startReadyGame(manager,room.code, "host");
   manager.rollForOrder(room.code, low.player.id, "human");
   const state = manager.rollForOrder(room.code, high.player.id, "human");
   assert.deepEqual(state.turnOrder, [high.player.id, low.player.id]);
@@ -43,7 +44,7 @@ test("start order ties reroll until they are resolved", () => {
   const { room } = manager.createRoom("host");
   const first = manager.joinRoom(room.code, "First", "s1");
   const second = manager.joinRoom(room.code, "Second", "s2");
-  manager.startGame(room.code, "host");
+  startReadyGame(manager,room.code, "host");
   manager.rollForOrder(room.code, first.player.id, "human");
   const tied = manager.rollForOrder(room.code, second.player.id, "human");
   assert.equal(tied.turnPhase, "determiningOrder");
@@ -58,7 +59,7 @@ test("invalid roll attempts leave game state unchanged", () => {
   const { room } = manager.createRoom("host");
   const first = manager.joinRoom(room.code, "First", "s1");
   const second = manager.joinRoom(room.code, "Second", "s2");
-  manager.startGame(room.code, "host");
+  startReadyGame(manager,room.code, "host");
   manager.rollForOrder(room.code, first.player.id, "human");
   manager.rollForOrder(room.code, second.player.id, "human");
   const before = manager.getGameState(room.code)!;
@@ -71,7 +72,7 @@ test("invalid roll attempts leave game state unchanged", () => {
 test("movement wraps over Runentor without adding gold", () => {
   const state: GameState = {
     roomId: "VAL-TEST", status: "playing", config: { mode: "chronicles" },
-    players: [{ id: "p1", name: "First", type: "human", color: "violet", connectionState: "connected", gold: 1500, position: 37, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }],
+    players: [{ id: "p1", name: "First", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1500, position: 37, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }],
     turnOrder: ["p1"], orderRolls: [{ playerId: "p1", rolls: [] }], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 1, turnNumber: 1, turnPhase: "waitingForRoll",
     turnContext: { consecutiveDoubles: 0, pendingExtraRoll: false, rollSequence: 0 },
@@ -90,7 +91,7 @@ test("ending the last turn advances the round", () => {
   const { room } = manager.createRoom("host");
   const first = manager.joinRoom(room.code, "First", "s1");
   const second = manager.joinRoom(room.code, "Second", "s2");
-  manager.startGame(room.code, "host");
+  startReadyGame(manager,room.code, "host");
   manager.rollForOrder(room.code, first.player.id, "human");
   manager.rollForOrder(room.code, second.player.id, "human");
   for (const player of [first, second]) {

@@ -2110,3 +2110,30 @@ body {
   .game-sidebar .game-hud__status { padding:.65rem .7rem; }
   .game-sidebar .economy-log { margin-top:auto; flex:0 0 auto; }
 }
+
+:root { --orange:#ed8a3c; --cyan:#41d9d2; }
+.player-theme--violet { --player-accent:var(--violet); }
+.player-theme--green { --player-accent:var(--green); }
+.player-theme--red { --player-accent:var(--red); }
+.player-theme--blue { --player-accent:var(--blue); }
+.player-theme--orange { --player-accent:var(--orange); }
+.player-theme--cyan { --player-accent:var(--cyan); }
+.player-slot--orange,.hud-player--orange,.order-player--orange,.controller-player-bar--orange,.property-group__owner--orange,.magic-toast--orange { color:var(--orange); }
+.player-slot--cyan,.hud-player--cyan,.order-player--cyan,.controller-player-bar--cyan,.property-group__owner--cyan,.magic-toast--cyan { color:var(--cyan); }
+.player-orb--orange,.magic-button--orange { color:var(--orange); border-color:var(--orange); }
+.player-orb--cyan,.magic-button--cyan { color:var(--cyan); border-color:var(--cyan); }
+.player-slot > .hud-player__portrait { width:64px; height:78px; flex-shrink:0; }
+.player-slot > .hud-player__portrait img { width:100%; height:100%; object-fit:contain; }
+.player-slot .player-slot__state { position:static; display:block; margin-top:.3rem; font-size:.75rem; }
+.player-slot::after { pointer-events:none; }
+.return-to-lobby { position:fixed; z-index:90; right:5rem; bottom:1rem; width:44px; height:44px; border:1px solid #b99a59; border-radius:6px; background:#211b16ed; color:#f1d99d; font-size:1.65rem; cursor:pointer; }
+.return-to-lobby:focus-visible { outline:2px solid #ffe4a1; outline-offset:3px; }
+@media (min-width:721px) {
+  .player-grid--setup { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .player-grid--setup .player-slot { grid-template-columns:64px minmax(0,1fr); gap:.6rem; min-width:0; }
+  .player-grid--setup .player-slot__identity { min-width:0; overflow-wrap:anywhere; }
+  .player-grid--setup .slot-action { max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+  .game-sidebar .game-hud--compact .hud-player { min-height:56px; padding:.25rem .45rem; grid-template-columns:36px minmax(0,1fr); }
+  .game-sidebar .game-hud--compact .hud-player__portrait { width:34px; height:41px; }
+  .game-sidebar .game-hud--compact .game-hud__players { gap:.3rem; }
+}

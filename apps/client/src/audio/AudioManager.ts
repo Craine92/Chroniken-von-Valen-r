@@ -116,7 +116,7 @@ export class AudioManager {
   setGameActive(active: boolean): void {
     this.gameActive = active;
     if (!active) {
-      this.stopMusic();
+      this.pauseMusic();
       return;
     }
     if (this.unlocked && this.outputRole === "board") void this.startMusic();
@@ -190,14 +190,17 @@ export class AudioManager {
     }).catch(() => undefined);
   }
 
-  stopMusic(): void {
+  resetMusic(): void {
     this.pauseMusic();
+    if (this.duckRestoreTimer !== undefined) window.clearTimeout(this.duckRestoreTimer);
+    this.duckRestoreTimer = undefined;
+    this.musicDuckMultiplier = 1;
     if (!this.music) return;
     try { this.music.currentTime = 0; } catch { /* Metadata may not be loaded yet. */ }
   }
 
   dispose(): void {
-    this.stopMusic();
+    this.resetMusic();
     if (typeof window !== "undefined" && this.unlockHandler) {
       window.removeEventListener("pointerdown", this.unlockHandler, true);
       window.removeEventListener("click", this.unlockHandler, true);
@@ -271,7 +274,9 @@ export class AudioManager {
     }
   }
 
-  private pauseMusic(): void {
+  pauseMusic(): void {
+    if (this.musicFadeTimer !== undefined) window.clearInterval(this.musicFadeTimer);
+    this.musicFadeTimer = undefined;
     this.music?.pause();
   }
 

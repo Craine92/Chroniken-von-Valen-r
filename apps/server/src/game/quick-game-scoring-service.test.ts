@@ -7,8 +7,8 @@ function game(): GameState {
   return {
     roomId: "VAL-SCORE", status: "playing", config: { mode: "quick", quickGameDurationMinutes: 60 },
     players: [
-      { id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected", gold: 100, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [{ cardId: "held", deck: "fate" }] },
-      { id: "p2", name: "Justine", type: "human", color: "green", connectionState: "connected", gold: 100, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [] }
+      { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 100, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [{ cardId: "held", deck: "fate" }] },
+      { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: 100, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [] }
     ],
     turnOrder: ["p1", "p2"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 3, turnNumber: 5, turnPhase: "waitingForRoll",

@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, getBloodMoonDefinition, getRegionalChronicleDefinition, type GameState, type RegionType } from "@valenor/shared";
+import { BOARD_TILES, CHRONICLE_EVENTS, PLAYER_COLORS, PLAYER_CHARACTERS, DUNGEON_TILE_INDEX, getBloodMoonDefinition, getRegionalChronicleDefinition, type GameState, type RegionType } from "@valenor/shared";
 import { DOUBLE_BANNER_DURATION_MS, GameExperience } from "./GameExperience";
 import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
 import { GameHud } from "./GameHud";
 import { getCurrentBoardContext } from "./board-context";
 import { getBoardScreenLayout, getCardPresentationKey } from "./board-presentation";
 
-function startedGameState(playerCount: 2 | 4): GameState {
+function startedGameState(playerCount: 2 | 3 | 4 | 5 | 6): GameState {
   return {
     roomId: "VAL-TEST",
     status: "playing",
@@ -18,8 +18,8 @@ function startedGameState(playerCount: 2 | 4): GameState {
       id: `p${index + 1}`,
       name: index === 0 ? "Mensch" : `Computer ${index}`,
       type: index === 0 ? "human" as const : "computer" as const,
-      color: (["violet", "green", "red", "blue"] as const)[index]!,
-      connectionState: "connected" as const,
+      color: PLAYER_COLORS[index]!,
+      characterId: PLAYER_CHARACTERS[index]!.id, connectionState: "connected" as const,
       gold: 1500,
       position: 0,
       isBankrupt: false,
@@ -143,7 +143,7 @@ test("regional HUD shows concrete targets and uses compact labels for three or f
   assert.doesNotMatch(renderToStaticMarkup(<GameHud gameState={state} />),/active-chronicle__regions/);
 });
 
-for (const playerCount of [2, 4] as const) {
+for (const playerCount of [2, 3, 4, 5, 6] as const) {
   test(`a started ${playerCount}-player state renders the game view instead of the lobby`, () => {
     const markup = renderToStaticMarkup(<GameExperience gameState={startedGameState(playerCount)} />);
     assert.match(markup, /data-testid="valenor-game-view"/);

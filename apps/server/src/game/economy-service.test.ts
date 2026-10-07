@@ -10,8 +10,8 @@ function stateOn(tileIndex: number, gold: number = STARTING_GOLD): GameState {
   return {
     roomId: "VAL-ECON", status: "playing", config: { mode: "chronicles" },
     players: [
-      { id: "p1", name: "Aela", type: "human", color: "violet", connectionState: "connected", gold, position: tileIndex, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
-      { id: "p2", name: "Brom", type: "human", color: "green", connectionState: "connected", gold: STARTING_GOLD, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
+      { id: "p1", name: "Aela", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold, position: tileIndex, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
+      { id: "p2", name: "Brom", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: STARTING_GOLD, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
     ],
     turnOrder: ["p1", "p2"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 1, turnNumber: 1, turnPhase: "landed",

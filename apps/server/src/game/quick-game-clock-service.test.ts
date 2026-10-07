@@ -7,7 +7,7 @@ function game(mode: "quick" | "chronicles" = "quick"): GameState {
   return {
     roomId: "VAL-TIME", status: "playing",
     config: mode === "quick" ? { mode, quickGameDurationMinutes: 60 } : { mode },
-    players: ["p1", "p2"].map((id, index) => ({ id, name: id, type: "human" as const, color: index ? "green" as const : "violet" as const, connectionState: "connected" as const, gold: 1500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } })),
+    players: ["p1", "p2"].map((id, index) => ({ id, name: id, type: "human" as const, color: index ? "green" as const : "violet" as const, characterId: "humanKnight" as const, connectionState: "connected" as const, gold: 1500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } })),
     turnOrder: ["p1", "p2"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 1, turnNumber: 1, turnPhase: "waitingForRoll",
     turnContext: { consecutiveDoubles: 0, pendingExtraRoll: false, rollSequence: 0 }, propertyOwnerships: [],

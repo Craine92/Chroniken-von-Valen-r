@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   SOCKET_EVENTS,
+  MIN_PLAYERS,
+  MAX_PLAYERS,
   type CreateRoomRequest,
   type GameConfig,
   type GameRoom,
@@ -36,6 +38,7 @@ export function HostPage() {
   const [propertyGroupFocus, setPropertyGroupFocus] = useState<PropertyGroupFocusSignal>();
   const signalTimer = useRef<number | undefined>(undefined);
   const propertyGroupFocusTimer = useRef<number | undefined>(undefined);
+  const lastRoomPhase = useRef<GameRoom["phase"] | undefined>(undefined);
 
   useEffect(() => {
     if (error) audioManager.play("UI_ERROR");
@@ -58,7 +61,8 @@ export function HostPage() {
         localStorage.setItem(HOST_ROOM_KEY, result.room.code);
         localStorage.setItem(HOST_TOKEN_KEY, result.hostToken);
         setRoom(result.room);
-        if (result.room.gameState) setGameState(result.room.gameState);
+        lastRoomPhase.current = result.room.phase;
+        setGameState(result.room.gameState);
         setControllerUrl(result.controllerUrl);
         setError("");
       });
@@ -79,7 +83,13 @@ export function HostPage() {
     socket.on("disconnect", () => setConnected(false));
     socket.on(SOCKET_EVENTS.roomUpdate, (nextRoom) => {
       setRoom(nextRoom);
-      if (nextRoom.gameState) setGameState(nextRoom.gameState);
+      if (nextRoom.phase === "lobby" && lastRoomPhase.current && lastRoomPhase.current !== "lobby") {
+        audioManager.resetMusic();
+        window.clearTimeout(propertyGroupFocusTimer.current);
+        setPropertyGroupFocus(undefined);
+      }
+      lastRoomPhase.current = nextRoom.phase;
+      setGameState(nextRoom.gameState);
     });
     socket.on(SOCKET_EVENTS.gameStart, setGameState);
     socket.on(SOCKET_EVENTS.gameState, setGameState);
@@ -109,7 +119,7 @@ export function HostPage() {
 
     if (action === "add") socket.emit(SOCKET_EVENTS.roomAddComputer, done);
     if (action === "remove" && typeof value === "string") {
-      socket.emit(SOCKET_EVENTS.roomRemoveComputer, value, done);
+      socket.emit(SOCKET_EVENTS.roomRemovePlayer, value, done);
     }
     if (action === "config" && typeof value === "object") {
       socket.emit(SOCKET_EVENTS.roomUpdateConfig, value, done);
@@ -136,13 +146,27 @@ export function HostPage() {
       }
       setRoom(result.room);
       setGameState(undefined);
+      audioManager.resetMusic();
+    });
+  };
+
+  const returnToLobby = () => {
+    if (!window.confirm("Partie beenden und zur Lobby zurückkehren?\nDer aktuelle Spielstand geht verloren.")) return;
+    socket.emit(SOCKET_EVENTS.gameReturnToLobby, result => {
+      if (!result.ok || !result.room) {
+        setError(result.message ?? "Rückkehr zur Lobby fehlgeschlagen.");
+        return;
+      }
+      audioManager.resetMusic();
+      setRoom(result.room); setGameState(undefined);
     });
   };
 
   if (gameState) {
     return (
       <Suspense fallback={<main className="board-page"><div className="game-loading">Das Runentor öffnet sich …</div></main>}>
-        <GameExperience gameState={gameState} onNewChronicle={startNewChronicle} focusedPropertyGroupId={propertyGroupFocus?.groupId} focusedPropertyGroupPlayerId={propertyGroupFocus?.playerId} />
+        <GameExperience gameState={gameState} onNewChronicle={startNewChronicle} onReturnToLobby={returnToLobby} focusedPropertyGroupId={propertyGroupFocus?.groupId} focusedPropertyGroupPlayerId={propertyGroupFocus?.playerId} />
+        {error && <div className="error-toast" role="alert">{error}</div>}
       </Suspense>
     );
   }
@@ -151,8 +175,9 @@ export function HostPage() {
   const connectedHumans = players.filter(
     (player) => player.type === "human" && player.connectionState === "connected"
   ).length;
-  const canStart = players.length >= 2 && connectedHumans >= 1 && players.length <= 4;
-  const slots = Array.from({ length: 4 }, (_, index) => players[index]);
+  const humansReady = players.filter(player => player.type === "human" && player.connectionState === "connected").every(player => player.ready);
+  const canStart = players.length >= MIN_PLAYERS && connectedHumans >= 1 && players.length <= MAX_PLAYERS && humansReady;
+  const slots = Array.from({ length: MAX_PLAYERS }, (_, index) => players[index]);
 
   return (
     <main className="host-page host-page--setup">
@@ -193,7 +218,7 @@ export function HostPage() {
         <section className="party-panel party-panel--setup">
           <div className="party-panel__topline">
             <div><p className="eyebrow">Eure Gemeinschaft</p><h2>Gefährten</h2></div>
-            <span className="player-count"><strong>{players.length}</strong> / 4 Teilnehmer</span>
+            <span className="player-count"><strong>{players.length}</strong> / {MAX_PLAYERS} Spieler</span>
           </div>
           <div className="player-grid player-grid--setup">
             {slots.map((player, index) => (
@@ -202,7 +227,7 @@ export function HostPage() {
                 player={player}
                 index={index}
                 onAddComputer={() => mutateRoom("add")}
-                onRemoveComputer={(playerId) => mutateRoom("remove", playerId)}
+                onRemovePlayer={(playerId) => mutateRoom("remove", playerId)}
                 disabled={busy || !connected}
               />
             ))}
@@ -222,7 +247,7 @@ export function HostPage() {
           <section className="start-panel">
             <div>
               <p className="eyebrow">Das Tor erwartet euch</p>
-              <p>{canStart ? "Die Gemeinschaft ist bereit." : "Mindestens zwei Teilnehmer und ein Mensch werden benötigt."}</p>
+              <p>{canStart ? "Die Gemeinschaft ist bereit." : !humansReady ? "Alle verbundenen Menschen müssen bereit sein." : "Mindestens zwei Teilnehmer und ein Mensch werden benötigt."}</p>
             </div>
             <button
               className="primary-button primary-button--wide"

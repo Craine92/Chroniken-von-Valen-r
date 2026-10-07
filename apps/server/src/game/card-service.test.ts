@@ -7,6 +7,8 @@ import {
   DUNGEON_TILE_INDEX,
   FATE_CARDS,
   getCardDefinition,
+  PLAYER_COLORS,
+  PLAYER_CHARACTERS,
   describeCardEffects,
   type DiceRoll,
   type GameState
@@ -22,9 +24,9 @@ function state(deck: "adventure" | "fate" = "adventure", gold = 1_500): GameStat
   return {
     roomId: "VAL-TEST", status: "playing", config: { mode: "chronicles" },
     players: [
-      { id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected", gold, position: tileIndex, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [] },
-      { id: "p2", name: "Justine", type: "human", color: "green", connectionState: "connected", gold: 1_500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [] },
-      { id: "p3", name: "Aelor", type: "computer", color: "red", connectionState: "connected", gold: 1_500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [] }
+      { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold, position: tileIndex, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [] },
+      { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: 1_500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [] },
+      { id: "p3", name: "Aelor", type: "computer", color: "red", characterId: "orcWarlord" as const, connectionState: "connected", gold: 1_500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }, heldCards: [] }
     ],
     turnOrder: ["p1", "p2", "p3"], orderRolls: [], orderContenders: [], orderRollTargetCount: 1,
     currentPlayerId: "p1", currentTurnIndex: 0, currentRound: 1, turnNumber: 1, turnPhase: "awaitingCardDraw",
@@ -118,6 +120,16 @@ test("an unaffordable bank card pauses in paymentRequired and resumes after sett
   cards.continueAfterPayment(game, runtime);
   assert.equal(game.turnPhase, "cardAcknowledgement");
   assert.equal(game.players[0]!.gold, 0);
+});
+
+test("pay-each and receive-from-each include all five other players in a six-player party",()=>{
+  for(const [id,first,others] of [["adv_016",1375,1525],["adv_018",1600,1480]] as const){
+    const cards=new CardService(new SequenceCardShuffleSource([0])),runtime=cards.createRuntime(),game=state();
+    game.players=Array.from({length:6},(_,index)=>({...game.players[0]!,id:`p${index+1}`,color:PLAYER_COLORS[index]!,characterId:PLAYER_CHARACTERS[index]!.id,gold:1500}));
+    game.turnOrder=game.players.map(player=>player.id);
+    putFirst(runtime,"adventure",id);cards.draw(game,runtime,"p1","human");
+    assert.deepEqual(game.players.map(player=>player.gold),[first,others,others,others,others,others]);
+  }
 });
 
 test("pay-each and receive-from-each use deterministic serial turn order", () => {

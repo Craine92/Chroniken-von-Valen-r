@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BOARD_TILES, getBloodMoonDefinition, type GameState, type Player } from "@valenor/shared";
 import { MobileLiveEvents } from "../components/MobileLiveEvents";
 import { PlayerColorPicker } from "../components/PlayerColorPicker";
+import { PlayerCharacterPicker } from "../components/PlayerCharacterPicker";
+import { PlayerPortrait } from "../components/PlayerPortrait";
 import {
   BANKRUPTCY_CONFIRMATION,
   BankruptcySpectator,
@@ -33,7 +35,7 @@ const roomPlayer: Player = {
   name: "Philipp",
   type: "human",
   color: "violet",
-  connectionState: "connected",
+  characterId: "elvenSpellweaver" as const, ready: false, connectionState: "connected",
   joinedAt: 1
 };
 
@@ -43,8 +45,8 @@ function spectatorState(): GameState {
     status: "playing",
     config: { mode: "chronicles" },
     players: [
-      { id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected", gold: 0, position: 8, isBankrupt: true, dungeon: { inDungeon: false, failedAttempts: 0 } },
-      { id: "p2", name: "Justine", type: "human", color: "green", connectionState: "connected", gold: 2_100, position: 12, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
+      { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 0, position: 8, isBankrupt: true, dungeon: { inDungeon: false, failedAttempts: 0 } },
+      { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: 2_100, position: 12, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
     ],
     turnOrder: ["p1", "p2"],
     orderRolls: [],
@@ -87,11 +89,21 @@ test("mobile live events show shared context, active NPC, dice, globals and only
 test("lobby color picker marks the current color, blocks human colors and offers NPC colors", () => {
   const players: Player[] = [roomPlayer,{...roomPlayer,id:"p2",name:"Myrra",color:"red"},{...roomPlayer,id:"p3",name:"Brom",type:"computer",color:"blue"}];
   const markup = renderToStaticMarkup(<PlayerColorPicker players={players} playerId="p1" connected pending={false} onSelect={()=>undefined} />);
-  assert.match(markup,/DEINE FARBE/); assert.equal([...markup.matchAll(/<button /g)].length,4);
+  assert.match(markup,/DEINE FARBE/); assert.equal([...markup.matchAll(/<button /g)].length,6);
   assert.match(markup,/color-swatch--violet" aria-pressed="true"/);
   assert.match(markup,/color-swatch--red"[^>]*disabled=""/); assert.match(markup,/Belegt von Myrra/);
   assert.doesNotMatch(markup.match(/<button[^>]*color-swatch--blue"[^>]*>/)![0],/disabled/);
-  assert.equal([...renderToStaticMarkup(<PlayerColorPicker players={players} playerId="p1" connected={false} pending={false} onSelect={()=>undefined} />).matchAll(/disabled=""/g)].length,4);
+  assert.equal([...renderToStaticMarkup(<PlayerColorPicker players={players} playerId="p1" connected={false} pending={false} onSelect={()=>undefined} />).matchAll(/disabled=""/g)].length,6);
+});
+
+test("character choices use identity assets, block other humans and allow claiming an NPC character",()=>{
+  const players:Player[]=[{...roomPlayer,characterId:"nightElf"},{...roomPlayer,id:"p2",name:"Myrra",characterId:"dwarf"},{...roomPlayer,id:"p3",type:"computer",characterId:"tauren"}];
+  const markup=renderToStaticMarkup(<PlayerCharacterPicker players={players} playerId="p1" connected pending={false} onSelect={()=>undefined} />);
+  assert.equal([...markup.matchAll(/<button /g)].length,8);assert.match(markup,/Belegt von Myrra/);
+  const blocked=[...markup.matchAll(/<button[^>]*disabled=""[^>]*>.*?<\/button>/g)];assert.equal(blocked.length,1);assert.match(blocked[0]![0],/Dwarf.png/);
+  assert.match(markup,/<button[^>]*aria-pressed="true"[^>]*>.*?nightelv.png/);
+  assert.match(renderToStaticMarkup(<PlayerPortrait characterId="troll" />),/Troll.png/);
+  assert.match(renderToStaticMarkup(<PlayerPortrait characterId="humanKnight" />),/human-knight.png/);
 });
 
 test("paymentRequired explains mortgage resolution and offers bankruptcy", () => {

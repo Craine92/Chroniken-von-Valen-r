@@ -43,6 +43,7 @@ function scheduleGameAction(roomCode: string, key: string, delay: number, action
   if (gameTimers.has(timerKey)) return;
   const timer = setTimeout(() => {
     gameTimers.delete(timerKey);
+    if (rooms.getRoom(roomCode)?.phase !== "playing") return;
     action();
   }, delay);
   timer.unref();
@@ -57,6 +58,7 @@ function clearRoomGameTimers(roomCode: string) {
     gameTimers.delete(key);
   }
   for (const key of aiTradeOfferRounds.keys()) if (key.startsWith(prefix)) aiTradeOfferRounds.delete(key);
+  for (const key of aiBuildingCounts.keys()) if (key.startsWith(prefix)) aiBuildingCounts.delete(key);
 }
 
 function isTradePhase(state: NonNullable<ReturnType<RoomManager["getGameState"]>>) {
@@ -512,6 +514,44 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on(SOCKET_EVENTS.playerUpdateCharacter, (characterId, callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keinem Spieler verbunden.");
+      const room = rooms.updatePlayerCharacter(roomCode, playerId, characterId, socket.id);
+      io.to(roomCode).emit(SOCKET_EVENTS.roomUpdate, room);
+      callback({ ok:true, room });
+    } catch(error) { callback({ok:false,message:error instanceof Error ? error.message : "Figur konnte nicht geändert werden."}); }
+  });
+
+  socket.on(SOCKET_EVENTS.playerUpdateReady, (ready, callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keinem Spieler verbunden.");
+      const room = rooms.updatePlayerReady(roomCode, playerId, ready, socket.id);
+      io.to(roomCode).emit(SOCKET_EVENTS.roomUpdate, room);
+      callback({ok:true,room});
+    } catch(error) { callback({ok:false,message:error instanceof Error ? error.message : "Bereitstatus konnte nicht geändert werden."}); }
+  });
+
+  socket.on(SOCKET_EVENTS.roomRemovePlayer, (playerId, callback) => {
+    try {
+      const {roomCode,role} = socket.data;
+      if (!roomCode || role !== "host") throw new Error("Nur der Host darf Spieler entfernen.");
+      const room = rooms.removePlayer(roomCode, playerId, socket.id);
+      const timerKey = `${roomCode}:${playerId}`;
+      clearTimeout(removalTimers.get(timerKey)); removalTimers.delete(timerKey);
+      for (const controller of io.sockets.sockets.values()) {
+        if (controller.data.role !== "player" || controller.data.roomCode !== roomCode || controller.data.playerId !== playerId) continue;
+        controller.emit(SOCKET_EVENTS.roomRemoved, "Du wurdest aus der Lobby entfernt.");
+        void controller.leave(roomCode);
+        delete controller.data.role; delete controller.data.roomCode; delete controller.data.playerId;
+      }
+      io.to(roomCode).emit(SOCKET_EVENTS.roomUpdate,room);
+      callback({ok:true,room});
+    } catch(error) { callback({ok:false,message:error instanceof Error ? error.message : "Spieler konnte nicht entfernt werden."}); }
+  });
+
   socket.on(SOCKET_EVENTS.roomAddComputer, (callback) => {
     try {
       const roomCode = socket.data.roomCode;
@@ -836,6 +876,17 @@ io.on("connection", (socket) => {
       orchestrateGame(roomCode, state);
       callback({ ok: true, gameState: state });
     } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Bankrott konnte nicht erklärt werden." }); }
+  });
+
+  socket.on(SOCKET_EVENTS.gameReturnToLobby, (callback) => {
+    try {
+      const {roomCode,role} = socket.data;
+      if (!roomCode || role !== "host") throw new Error("Nur der Host kann zur Lobby zurückkehren.");
+      const room = rooms.returnToLobby(roomCode, socket.id);
+      clearRoomGameTimers(roomCode);
+      io.to(roomCode).emit(SOCKET_EVENTS.roomUpdate,room);
+      callback({ok:true,room});
+    } catch(error) { callback({ok:false,message:error instanceof Error ? error.message : "Rückkehr zur Lobby fehlgeschlagen."}); }
   });
 
   socket.on(SOCKET_EVENTS.gameNewChronicle, (callback) => {

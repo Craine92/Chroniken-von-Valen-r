@@ -35,6 +35,33 @@ function environment(t: TestContext, missing = false) {
 }
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 
+test("board music reuses one element and resumes its position across lifecycle pauses, toggles and mute",async(t)=>{
+  environment(t);
+  const previous=Object.getOwnPropertyDescriptor(globalThis,"Audio");
+  const tracks: Array<{currentTime:number;paused:boolean;plays:number;loop:boolean}> = [];
+  class Track {
+    currentTime=0;paused=true;plays=0;loop=false;preload="";volume=1;
+    constructor(_path:string){tracks.push(this);}
+    addEventListener(){}
+    play(){this.paused=false;this.plays++;return Promise.resolve();}
+    pause(){this.paused=true;}
+  }
+  Object.defineProperty(globalThis,"Audio",{configurable:true,value:Track});
+  Object.assign(window,{setInterval,clearInterval,setTimeout,clearTimeout});
+  t.after(()=>previous?Object.defineProperty(globalThis,"Audio",previous):Reflect.deleteProperty(globalThis,"Audio"));
+  const manager=new AudioManager();manager.setGameActive(true);await manager.unlock();await flush();
+  assert.equal(tracks.length,1);const track=tracks[0]!;assert.equal(track.loop,true);
+  track.currentTime=300;const plays=track.plays;manager.setGameActive(true);await flush();assert.equal(track.plays,plays);
+  manager.setGameActive(false);assert.equal(track.currentTime,300);assert.equal(track.paused,true);
+  manager.setGameActive(true);await flush();assert.equal(track.currentTime,300);assert.equal(tracks.length,1);
+  manager.updateSettings({musicEnabled:false});assert.equal(track.paused,true);
+  manager.updateSettings({musicEnabled:true});await flush();assert.equal(track.currentTime,300);
+  manager.updateSettings({masterMuted:true});assert.equal(track.paused,true);
+  manager.updateSettings({masterMuted:false});await flush();assert.equal(track.currentTime,300);
+  manager.setOutputRole("controller");assert.equal(track.paused,true);manager.setGameActive(true);await flush();assert.equal(tracks.length,1);assert.equal(track.paused,true);
+  manager.resetMusic();assert.equal(track.currentTime,0);manager.dispose();
+});
+
 test("controller role never requests or starts audio while TV cues remain available", async (t) => {
   const env = environment(t), manager = new AudioManager();
   manager.setOutputRole("controller");

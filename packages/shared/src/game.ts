@@ -1,5 +1,20 @@
-export const PLAYER_COLORS = ["violet", "green", "red", "blue"] as const;
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 6;
+export const PLAYER_COLORS = ["violet", "green", "red", "blue", "orange", "cyan"] as const;
 export type PlayerColor = (typeof PLAYER_COLORS)[number];
+
+export const PLAYER_COLOR_VALUES: Record<PlayerColor, number> = {
+  violet: 0xa16deb, green: 0x5ec58a, red: 0xdc5f67, blue: 0x5f9ddd, orange: 0xed8a3c, cyan: 0x41d9d2
+};
+export const PLAYER_CHARACTERS = [
+  { id: "elvenSpellweaver", name: "Elfen-Zauberwirker" },
+  { id: "humanKnight", name: "Ritter" },
+  { id: "orcWarlord", name: "Ork-Kriegsherr" },
+  { id: "steppeScoutShaman", name: "Steppen-Schamane" },
+  { id: "dwarf", name: "Zwerg" }, { id: "tauren", name: "Tauren" },
+  { id: "troll", name: "Troll" }, { id: "nightElf", name: "Nachtelf" }
+] as const;
+export type PlayerCharacterId = (typeof PLAYER_CHARACTERS)[number]["id"];
 
 export type PlayerType = "human" | "computer";
 export type ConnectionState = "connected" | "disconnected";
@@ -284,6 +299,8 @@ export interface Player {
   name: string;
   type: PlayerType;
   color: PlayerColor;
+  characterId: PlayerCharacterId;
+  ready: boolean;
   connectionState: ConnectionState;
   joinedAt: number;
 }
@@ -293,6 +310,7 @@ export interface GamePlayerState {
   name: string;
   type: PlayerType;
   color: PlayerColor;
+  characterId: PlayerCharacterId;
   connectionState: ConnectionState;
   gold: number;
   position: number;

@@ -4,7 +4,7 @@ import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEI
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { PropertyGroupLayer } from "../layers/PropertyGroupLayer";
 import { BoardArtLayer } from "../layers/BoardArtLayer";
-import { CHARACTER_ASSETS, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
+import { getCharacterAsset, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
 import { fitImage } from "../assets/asset-runtime";
 import { BOARD_DEPTHS } from "../layers/board-depths";
 import { DEFAULT_GRAPHICS_QUALITY, VISUAL_QUALITY, prefersReducedMotion } from "../visual-config";
@@ -20,12 +20,7 @@ function getMovementSignature(state: GameState): string {
   return movement ? `${movement.sequence ?? state.turnContext.rollSequence}-${movement.kind}-${movement.from}-${movement.to}` : "";
 }
 
-const PLAYER_COLORS = {
-  violet: 0xa16deb,
-  green: 0x5ec58a,
-  red: 0xdc5f67,
-  blue: 0x5f9ddd
-} as const;
+import { PLAYER_COLOR_VALUES as PLAYER_COLORS, PLAYER_CHARACTERS } from "@valenor/shared";
 
 const REGION_TRAIL: Record<RegionType, number> = {
   elves: 0xbd8cff,
@@ -547,8 +542,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       const baseLower = this.add.ellipse(0, 13, 44, 12, 0x050507, .92);
       const baseOuter = this.add.ellipse(0, 10, TOKEN_VISUAL_CONFIG.base.outerWidth, TOKEN_VISUAL_CONFIG.base.outerHeight, 0x15151a, 1).setStrokeStyle(4, color, 1);
       const baseInner = this.add.ellipse(0, 7, TOKEN_VISUAL_CONFIG.base.innerWidth, TOKEN_VISUAL_CONFIG.base.innerHeight, color, .94).setStrokeStyle(2, 0xffedbd, .9);
-      const baseRune = this.add.text(0, 5, ["ᚱ", "ᛉ", "ᚨ", "ᛏ"][index] ?? "✦", { color: "#fff1c7", fontSize: "9px", fontFamily: "Georgia,serif" }).setOrigin(.5);
-      const miniatureAsset = CHARACTER_ASSETS[index];
+      const baseRune = this.add.text(0, 5, "ᚱ", { color: "#fff1c7", fontSize: "9px", fontFamily: "Georgia,serif" }).setOrigin(.5);
+      const miniatureAsset = getCharacterAsset(player.characterId);
       const miniatureVisual = this.add.container(0, 0).setName("token-character");
       if (miniatureAsset && this.artLayer?.hasAsset(miniatureAsset)) {
         const outline = fitImage(
@@ -566,7 +561,7 @@ export class ValenorBoardScene extends Phaser.Scene {
         miniatureVisual.add([outline, miniature]);
       } else {
         const silhouette = this.add.ellipse(0, -15, 36, 55, 0x050507, .46);
-        miniatureVisual.add([silhouette, this.createMiniature(index, color).setScale(TOKEN_VISUAL_CONFIG.miniatureScale)]);
+        miniatureVisual.add([silhouette, this.createMiniature(PLAYER_CHARACTERS.findIndex(character=>character.id===player.characterId), color).setScale(TOKEN_VISUAL_CONFIG.miniatureScale)]);
       }
       const activeRing = this.add.container(0, 7).setVisible(false);
       activeRing.add([
@@ -634,7 +629,9 @@ export class ValenorBoardScene extends Phaser.Scene {
       const startX = Math.max(48, direction > 0 ? maxX - ownX + 48 : ownX - minX + 48);
       (player.relics ?? []).slice(0, MAX_RELICS).forEach((id, index) => {
         const size = this.relicBadgeSize;
-        const badge = this.add.container(direction * (startX + index * (size + 5)), -30).setName(`relic-${id}`);
+        const crowded = sameTile.length >= 5;
+        const badge = this.add.container(crowded ? (index - (Math.min(MAX_RELICS, (player.relics ?? []).length) - 1) / 2) * (size + 4) : direction * (startX + index * (size + 5)),
+          crowded ? getTokenLabelOffset(player.position).y + 22 : -30).setName(`relic-${id}`);
         const shadow = this.add.circle(1, 3, size / 2 + 2, 0x000000, .5);
         const armed = isRelicArmed(player, id);
         if (armed) badge.add(this.add.circle(0, 0, size / 2 + 5, 0xeabc5c, .16).setStrokeStyle(2, 0xf5d17c, .9));
@@ -731,7 +728,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const slot=this.getTokenOffset(player.position,occupants.length,occupants.findIndex(candidate=>candidate.id === player.id));
       const field=getTileWorldPosition(player.position);
       const character=visual.getByName("token-character") as Phaser.GameObjects.Container;
-      for(const object of [character,this.tokenNameLabels.get(player.id)])if(object){
+      for(const object of [character,this.tokenNameLabels.get(player.id),this.tokenRelics.get(player.id)])if(object){
         const box=object.getBounds();box.x+=field.x+slot.x-token.x;box.y+=field.y+slot.y-5-token.y;
         blockers.push(box);
       }

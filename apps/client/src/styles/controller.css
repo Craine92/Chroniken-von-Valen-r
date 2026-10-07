@@ -245,3 +245,22 @@ body:has(.controller-page) .audio-settings__toggles { grid-template-columns: 1fr
 .controller-page .color-swatch[aria-pressed="true"] { border-color:var(--swatch-color); background:#35283b; }
 .controller-page .color-swatch:disabled { opacity:.55; cursor:default; }
 .controller-page .color-swatch:focus-visible { outline:2px solid #ffe4a1; outline-offset:3px; }
+
+.controller-page .color-swatch--orange { --swatch-color:var(--orange); }
+.controller-page .color-swatch--cyan { --swatch-color:var(--cyan); }
+.controller-page .player-character-picker { display:grid; gap:.65rem; margin:1.2rem 0; text-align:left; }
+.controller-page .player-character-picker h2 { margin:0; color:#e9ca85; font-size:.9rem; letter-spacing:.07em; }
+.controller-page .player-character-picker > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+.controller-page .character-choice { display:grid; justify-items:center; gap:.25rem; min-width:0; padding:.6rem; background:#1d1721; color:#f2e6ce; border:2px solid #6d5c45; border-radius:5px; cursor:pointer; overflow-wrap:anywhere; }
+.controller-page .character-choice img { width:100%; height:110px; object-fit:contain; }
+.controller-page .character-choice strong { font-size:.8rem; line-height:1.3; }
+.controller-page .character-choice small { color:#d6c7b1; font-size:.7rem; line-height:1.35; }
+.controller-page .character-choice[aria-pressed="true"] { border-color:#e9ca85; box-shadow:inset 0 -4px var(--player-accent,#a16deb); }
+.controller-page .character-choice:disabled { opacity:.5; cursor:default; }
+.controller-page .lobby-ready { min-height:50px; width:100%; margin:.6rem 0; background:#3a2b20; color:#f5e2ae; border:2px solid #c8a563; border-radius:5px; font-size:1rem; font-weight:800; cursor:pointer; }
+.controller-page .lobby-ready[aria-pressed="true"] { background:#214136; border-color:#72d7a0; }
+.controller-page .lobby-ready:disabled { opacity:.55; }
+.controller-page .controller-player-bar .hud-player__portrait { width:38px; height:44px; }
+.controller-page .controller-player-bar .hud-player__portrait img { width:100%; height:100%; object-fit:contain; }
+.controller-page .player-orb .hud-player__portrait { width:100%; height:100%; }
+.controller-page .player-orb .hud-player__portrait img { width:100%; height:100%; object-fit:contain; }

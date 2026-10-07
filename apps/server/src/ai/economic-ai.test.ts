@@ -7,7 +7,7 @@ import { EconomicAi, AI_RELIC_TRADE_VALUES, AI_DUNGEON_CARD_TRADE_VALUE } from "
 const ai=new EconomicAi(),trades=new TradeService();
 function game(): GameState {
   return {roomId:'NPC-TRADE',status:'playing',config:{mode:'chronicles'},
-    players:['human','npc','other'].map((id,index)=>({id,name:id,type:index===1?'computer':'human',color:'violet',connectionState:index===1?'disconnected':'connected',gold:1500,position:0,isBankrupt:false,dungeon:{inDungeon:false,failedAttempts:0},heldCards:[],relics:[],armedRelics:[]})),
+    players:['human','npc','other'].map((id,index)=>({id,name:id,type:index===1?'computer':'human',color:'violet',characterId: "elvenSpellweaver" as const, connectionState:index===1?'disconnected':'connected',gold:1500,position:0,isBankrupt:false,dungeon:{inDungeon:false,failedAttempts:0},heldCards:[],relics:[],armedRelics:[]})),
     turnOrder:['human','npc','other'],orderRolls:[],orderContenders:[],orderRollTargetCount:1,currentPlayerId:'human',currentTurnIndex:0,currentRound:4,turnNumber:10,turnPhase:'waitingForRoll',
     turnContext:{consecutiveDoubles:0,pendingExtraRoll:false,rollSequence:0},propertyOwnerships:[],buildingBank:{settlementUnitsAvailable:32,grandStructuresAvailable:12},economyLog:[],trades:[],startedAt:1};
 }

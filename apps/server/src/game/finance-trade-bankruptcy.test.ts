@@ -31,7 +31,7 @@ function game(playerCount = 3): GameState {
     roomId: "VAL-FIN", status: "playing", config: { mode: "chronicles" },
     players: ids.map((id, index) => ({
       id, name: ["Philipp", "Justine", "Aelor", "Myrra"][index]!, type: "human" as const,
-      color: (["violet", "green", "red", "blue"] as const)[index]!, connectionState: "connected" as const,
+      color: (["violet", "green", "red", "blue"] as const)[index]!, characterId: "humanKnight" as const, connectionState: "connected" as const,
       gold: 1_500, position: 0, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 }
     })),
     turnOrder: ids, orderRolls: [], orderContenders: [], orderRollTargetCount: 1,

@@ -9,10 +9,10 @@ import type { BoardPresentationMode } from "../game/board-presentation";
 import { MobileTradeNotice, MobileTurnNotice } from "./ControllerPage";
 
 const PLAYERS: GamePlayerState[] = [
-  { id: "p1", name: "Philipp", type: "human", color: "violet", connectionState: "connected", gold: 1_725, position: 7, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
-  { id: "p2", name: "Justine", type: "human", color: "green", connectionState: "connected", gold: 1_430, position: 18, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
-  { id: "p3", name: "Ragna", type: "computer", color: "red", connectionState: "connected", gold: 1_210, position: 27, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
-  { id: "p4", name: "Eldric", type: "computer", color: "blue", connectionState: "connected", gold: 1_580, position: 35, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
+  { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1_725, position: 7, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
+  { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight" as const, connectionState: "connected", gold: 1_430, position: 18, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
+  { id: "p3", name: "Ragna", type: "computer", color: "red", characterId: "orcWarlord" as const, connectionState: "connected", gold: 1_210, position: 27, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
+  { id: "p4", name: "Eldric", type: "computer", color: "blue", characterId: "steppeScoutShaman" as const, connectionState: "connected", gold: 1_580, position: 35, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } }
 ];
 
 function ownership(tileIndex: number, ownerId: string, buildingLevel: BuildingLevel = 0): PropertyOwnership {

@@ -7,6 +7,11 @@ import { getBoardVisualScale } from "../board-presentation";
 import { getPropertyGroupVisual, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, getTileVariant } from "./board-tile-theme";
 import { getTokenPointerGeometry, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
 
+test("the active player's position line is dominant while the other lines stay subdued",()=>{
+  assert.ok(TOKEN_VISUAL_CONFIG.pointer.activeAlpha>=.9 && TOKEN_VISUAL_CONFIG.pointer.activeAlpha<=1);
+  assert.ok(TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha>=.25 && TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha<=.35);
+});
+
 test("all forty fields receive a complete data-driven visual definition", () => {
   assert.equal(BOARD_TILES.length, 40);
   BOARD_TILES.forEach((tile) => {

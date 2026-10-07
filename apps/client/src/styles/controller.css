@@ -1,4 +1,13 @@
 /* Smartphone companion UI. Every rule is scoped to the controller route. */
+.controller-page .controller-tavern { display:grid; gap:.65rem; padding:1rem; border:1px solid #b99a59; background:linear-gradient(145deg,#332419,#110d12); text-align:center; }
+.controller-page .controller-tavern small { color:#e4c785; font-size:13px; font-weight:800; letter-spacing:.07em; }
+.controller-page .controller-tavern h2 { margin:0; color:#ffe7b4; font:700 24px/1.2 Georgia,serif; }
+.controller-page .controller-tavern > strong { color:#ffe09c; font-size:28px; }
+.controller-page .controller-tavern p { margin:0; color:#e3d4c1; font-size:16px; line-height:1.4; }
+.controller-page .controller-tavern button { width:100%; min-height:48px; padding:.8rem; white-space:normal; font-size:15px; font-weight:800; border:1px solid #b69a62; border-radius:.4rem; cursor:pointer; }
+.controller-page .controller-tavern button:disabled { opacity:.5; cursor:default; }
+.controller-page .controller-tavern button.controller-tavern__risk { color:#ffe4bf; background:linear-gradient(145deg,#6a2830,#301520); border-color:#bd7b64; }
+.controller-page .controller-tavern p.controller-tavern__odds { font-size:14px; color:#d8c6ad; }
 .controller-page .property-group__entry { min-width:0; border:1px solid rgba(216,185,104,.2); border-radius:.4rem; overflow:hidden; }
 .controller-page .property-group__entry .property-group__member { border:0; }
 .controller-page .controller-property-level { display:flex; align-items:center; gap:.5rem; margin-top:.5rem; }

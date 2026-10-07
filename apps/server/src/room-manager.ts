@@ -13,6 +13,7 @@ import {
   type CardDeckType
 } from "@valenor/shared";
 import type { RelicId } from "@valenor/shared";
+import type { TavernChoice } from "@valenor/shared";
 import { DiceService } from "./game/dice-service";
 import { EconomyService } from "./game/economy-service";
 import { BuildingService } from "./game/building-service";
@@ -59,6 +60,7 @@ export class RoomManager {
 
   private readonly turns: TurnEngine;
   private readonly economy = new EconomyService();
+  private readonly tavernDice: DiceService;
   private readonly buildings = new BuildingService();
   private readonly mortgages = new MortgageService();
   private readonly trades = new TradeService();
@@ -68,6 +70,7 @@ export class RoomManager {
   private readonly quickScoring = new QuickGameScoringService();
 
   constructor(dice?: DiceService, cardShuffleSource?: CardShuffleSource, timeSource?: TimeSource, private readonly chooseWorldIndex: (count: number) => number = randomInt) {
+    this.tavernDice = dice ?? new DiceService();
     this.turns = new TurnEngine(dice, chooseWorldIndex);
     this.cards = new CardService(cardShuffleSource, dice);
     this.quickClock = new QuickGameClockService(timeSource);
@@ -262,6 +265,7 @@ export class RoomManager {
       for (const id of player.relics ?? []) if (id !== "runestone" && !player.armedRelics?.includes(id)) activateRelic(state, playerId, id);
     }
     this.turns.rollTurn(state, playerId, actorType);
+    delete state.tavern;
     return this.cloneGameState(state);
   }
 
@@ -359,6 +363,20 @@ export class RoomManager {
   completeDungeonTransfer(roomCode: string): GameState {
     const state = this.requireGameState(roomCode);
     this.turns.completeDungeonTransfer(state);
+    return this.cloneGameState(state);
+  }
+
+  chooseTavern(roomCode: string, playerId: string, actorType: PlayerType, choice: TavernChoice): GameState {
+    const state = this.requireGameState(roomCode);
+    if (state.players.find(player => player.id === playerId)?.type !== actorType) throw new Error("Diese Tavernenentscheidung steht dir nicht zu.");
+    this.economy.chooseTavern(state, playerId, choice);
+    return this.cloneGameState(state);
+  }
+
+  resolveTavernGamble(roomCode: string): GameState {
+    const state = this.requireGameState(roomCode);
+    if (state.turnPhase !== "tavernRolling" || state.tavern?.status !== "rolling") throw new Error("Es wird gerade kein Tavernenwürfel geworfen.");
+    this.economy.resolveTavernGamble(state, () => this.tavernDice.rollSingleDie());
     return this.cloneGameState(state);
   }
 
@@ -483,6 +501,7 @@ export class RoomManager {
     const state = this.requireGameState(roomCode);
     if (state.status === "finished") return this.cloneGameState(state);
     this.turns.beginNextTurn(state);
+    delete state.tavern;
     return this.cloneGameState(state);
   }
 
@@ -646,6 +665,7 @@ export class RoomManager {
         ...(player.activeQuests ? { activeQuests: player.activeQuests.map(quest => ({ ...quest })) } : {}),
         ...(player.processedQuestEventIds ? { processedQuestEventIds: [...player.processedQuestEventIds] } : {}) })),
       ...(gameState.wanderingDragon ? { wanderingDragon: { ...gameState.wanderingDragon } } : {}),
+      ...(gameState.tavern ? { tavern: { ...gameState.tavern } } : {}),
       turnContext: {
         ...gameState.turnContext,
         ...(gameState.turnContext.pendingDungeonMovement ? { pendingDungeonMovement: { ...gameState.turnContext.pendingDungeonMovement } } : {})

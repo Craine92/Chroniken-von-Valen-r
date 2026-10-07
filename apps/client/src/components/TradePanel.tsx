@@ -55,7 +55,8 @@ export function TradePanel({ state, playerId, connected, onCreate, onDecision }:
   onCreate: (request: CreateTradeOfferRequest) => void;
   onDecision: (action: "accept" | "reject" | "cancel", tradeId: string) => void;
 }) {
-  const targets = state.players.filter(player => player.id !== playerId && player.type === "human" && !player.isBankrupt);
+  const targets = state.players.filter(player => player.id !== playerId && !player.isBankrupt);
+  const playerLabel = (id: string) => { const player = state.players.find(player => player.id === id); return `${player?.name ?? ""}${player?.type === "computer" ? " · NPC" : ""}`; };
   const [recipientId, setRecipientId] = useState(targets[0]?.id ?? "");
   const [offerGold, setOfferGold] = useState("");
   const [requestGold, setRequestGold] = useState("");
@@ -105,7 +106,7 @@ export function TradePanel({ state, playerId, connected, onCreate, onDecision }:
   const request = { gold: Number(requestGold) || 0, propertyTileIndices: requested, cardIds: requestedCards, relicIds: availableRelics(recipientId, requestedRelics) };
   const disabledReason = !safe ? "Handel ist in dieser Spielphase nicht möglich." : !connected ? "Keine Verbindung zum Spielserver." : undefined;
   const renderOffer = (trade: TradeOffer, incoming: boolean) => <article className={`trade-card${incoming ? " trade-card--received" : ""}`} key={trade.id}>
-    <strong>{incoming ? `HANDELSANGEBOT VON ${state.players.find(player => player.id === trade.proposerId)?.name.toUpperCase()}` : `An ${state.players.find(player => player.id === trade.recipientId)?.name}`}</strong>
+    <strong>{incoming ? `HANDELSANGEBOT VON ${playerLabel(trade.proposerId).toUpperCase()}` : `An ${playerLabel(trade.recipientId)}`}</strong>
     {trade.counterToTradeId && <small>{incoming ? "Gegenangebot zu vorherigem Handel" : "Gegenangebot gesendet"}</small>}
     <div className="trade-side"><h4>Du gibst</h4><Assets state={state} assets={incoming ? trade.request : trade.offer} /></div>
     <div className="trade-side"><h4>Du erhältst</h4><Assets state={state} assets={incoming ? trade.offer : trade.request} /></div>
@@ -117,10 +118,10 @@ export function TradePanel({ state, playerId, connected, onCreate, onDecision }:
     {received.length > 0 && <div className="trade-section"><h3>Erhaltene Angebote</h3>{received.map(trade => renderOffer(trade, true))}</div>}
     {sent.length > 0 && <div className="trade-section"><h3>Gesendete Angebote</h3>{sent.map(trade => renderOffer(trade, false))}</div>}
     {targets.length > 0 ? <details className="trade-create" ref={editor}>
-      <summary>{counterToTradeId ? `GEGENANGEBOT AN ${recipient?.name.toUpperCase() ?? ""}` : "Handel anbieten"}</summary>
+      <summary>{counterToTradeId ? `GEGENANGEBOT AN ${playerLabel(recipientId).toUpperCase()}` : "Handel anbieten"}</summary>
       {counterToTradeId && <p>Passe das ursprüngliche Angebot an.</p>}
       {disabledReason && <p className="controller-disabled-reason">{disabledReason}</p>}
-      <label>Handelspartner<select value={recipientId} disabled={Boolean(counterToTradeId)} onChange={event => { setRecipientId(event.target.value); setRequested([]); setRequestedCards([]); setRequestedRelics([]); }}>{targets.map(player => <option value={player.id} key={player.id}>{player.name}</option>)}</select></label>
+      <label>Handelspartner<select value={recipientId} disabled={Boolean(counterToTradeId)} onChange={event => { setRecipientId(event.target.value); setRequested([]); setRequestedCards([]); setRequestedRelics([]); }}>{targets.map(player => <option value={player.id} key={player.id}>{playerLabel(player.id)}</option>)}</select></label>
       <section className="trade-side"><h3>Du gibst</h3><label>Gold<input type="number" aria-label="Du gibst Gold" inputMode="numeric" min="0" step="1" placeholder="0" value={offerGold} onChange={event => setOfferGold(normalizeGold(event.target.value))} /></label><PropertyOptions state={state} properties={ownProperties} selected={offered} onToggle={index => toggle(offered, index, setOffered)} />{ownCards.map(held => <label className="trade-held-option" key={held.cardId}><input type="checkbox" checked={offeredCards.includes(held.cardId)} onChange={() => toggle(offeredCards, held.cardId, setOfferedCards)} />▤ {getCardDefinition(held.cardId).title}</label>)}<RelicOptions state={state} ownerId={playerId} selected={offer.relicIds} onToggle={id => toggle(offeredRelics, id, setOfferedRelics)} /></section>
       <section className="trade-side"><h3>Du erhältst</h3><label>Gold<input type="number" aria-label="Du erhältst Gold" inputMode="numeric" min="0" step="1" placeholder="0" value={requestGold} onChange={event => setRequestGold(normalizeGold(event.target.value))} /></label><PropertyOptions state={state} properties={recipientProperties} selected={requested} onToggle={index => toggle(requested, index, setRequested)} />{recipientCards.map(held => <label className="trade-held-option" key={held.cardId}><input type="checkbox" checked={requestedCards.includes(held.cardId)} onChange={() => toggle(requestedCards, held.cardId, setRequestedCards)} />▤ {getCardDefinition(held.cardId).title}</label>)}<RelicOptions state={state} ownerId={recipientId} selected={request.relicIds} onToggle={id => toggle(requestedRelics, id, setRequestedRelics)} /></section>
       <div className="trade-summary" aria-live="polite"><h3>Dein Angebot im Überblick</h3><div className="trade-side"><h4>Du gibst</h4><Assets state={state} assets={offer} /></div><div className="trade-side"><h4>Du erhältst</h4><Assets state={state} assets={request} /></div></div>

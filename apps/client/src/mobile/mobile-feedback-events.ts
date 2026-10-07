@@ -79,9 +79,11 @@ export class MobileFeedbackEventTracker {
         const relic = entry.relicId ? RELIC_DEFINITIONS[entry.relicId] : undefined;
         add({ id: `economy:${entry.id}`, type: "coin", title: entry.kind === "dragon" ? "DER WANDERNDE DRACHE" : relic?.name.toUpperCase() ?? "RELIKT VERWENDET",
           message: entry.kind === "dragon" && relic ? `${relic.name}: ${relic.shortDescription}` : entry.message, icon: relic?.symbol ?? "✦" });
-      } else if (entry.kind === "tavern" && entry.amount !== undefined && entry.amount > 0) {
+      } else if (entry.kind === "tavern" && entry.amount !== undefined) {
+        const result = state.tavern?.playerId === playerId && state.tavern.status === "resolved" ? state.tavern : undefined;
         add({ id: `economy:${entry.id}`, type: "coin", title: "TAVERNE AM WELTENWEG",
-          message: `Glück beim Knobeln! +${entry.amount} Gold`, icon: "V" });
+          message: entry.amount > 0 ? `${result?.choice === "gamble" ? "DOPPELT!" : "Pott gesichert!"} +${entry.amount} Gold` : `VERZOCKT! Der Pott bleibt bei ${result?.pot ?? state.weltenwegPot ?? 0} Gold.`,
+          hapticPattern: entry.amount > 0 ? [40,60,80] : 40, icon: entry.amount > 0 ? "V" : "⚂" });
       } else if (entry.kind === "rent" && entry.playerIds.length === 2 && entry.amount !== undefined) {
         // EconomyService records payer first, recipient second, after settlement.
         const [payer, recipient] = entry.playerIds;

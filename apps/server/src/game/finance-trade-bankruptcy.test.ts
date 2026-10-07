@@ -167,14 +167,14 @@ test("stale trades are cancelled at acceptance without a partial transfer", () =
   assert.equal(state.players[1]!.gold, 1_500);
 });
 
-test("trade rejects built groups, computer targets, foreign assets and paymentRequired", () => {
+test("trade rejects built groups, foreign assets and paymentRequired while allowing computer targets", () => {
   const state = game();
   own(state, "p1", [[1, 1], 3]);
   assert.throws(() => trades.create(state, "p1", { recipientId: "p2", offer: { gold: 0, propertyTileIndices: [1] }, request: { gold: 1, propertyTileIndices: [] } }), /alle Bauwerke/);
   state.propertyOwnerships[0]!.buildingLevel = 0;
   assert.throws(() => trades.create(state, "p1", { recipientId: "p2", offer: { gold: 0, propertyTileIndices: [11] }, request: { gold: 1, propertyTileIndices: [] } }), /gehört nicht/);
   state.players[1]!.type = "computer";
-  assert.throws(() => trades.create(state, "p1", { recipientId: "p2", offer: { gold: 1, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [] } }), /nur zwischen Menschen/);
+  assert.equal(trades.create(state, "p1", { recipientId: "p2", offer: { gold: 1, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [] } }).status, "pending");
   state.players[1]!.type = "human";
   state.turnPhase = "paymentRequired";
   state.pendingPayment = { payerId: "p1", amount: 10, reason: "Miete", creditorType: "player", payeeId: "p2" };

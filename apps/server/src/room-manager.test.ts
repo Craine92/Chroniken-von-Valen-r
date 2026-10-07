@@ -55,6 +55,22 @@ test("allows one human and one computer to start", () => {
   assert.equal(state.pendingPayment, undefined);
 });
 
+test("the separate tavern die consumes one random value, keeps the normal roll intact and rejects replays",()=>{
+  let rolls=0;const manager=new RoomManager(new DiceService({rollDie:()=>{rolls++;return 6;}}),undefined,undefined,()=>0);
+  const {room}=manager.createRoom('host');const human=manager.joinRoom(room.code,'Myrra','human');manager.addComputer(room.code,'host');manager.startGame(room.code,'host');
+  const live=(manager as unknown as {rooms:Map<string,{gameState:GameState}>}).rooms.get(room.code)!.gameState;
+  live.currentPlayerId=human.player.id;live.turnPhase='landed';live.turnNumber=1;live.players[0]!.position=20;live.players[0]!.activeQuests=[];live.players[0]!.relics=['runestone'];live.weltenwegPot=400;
+  live.turnContext={rollSequence:4,consecutiveDoubles:1,pendingExtraRoll:true};live.lastDiceRoll={die1:1,die2:1,total:2,isDouble:true};
+  live.lastMovement={kind:'normal',sequence:4,playerId:human.player.id,from:18,to:20,path:[19,20],passedStart:false,landedTile:BOARD_TILES[20]!};
+  manager.resolveLanding(room.code);const normal=structuredClone(live.lastDiceRoll),context=structuredClone(live.turnContext);
+  assert.throws(()=>manager.rollTurn(room.code,human.player.id,'human'));assert.throws(()=>manager.decideRuneStone(room.code,human.player.id,'human',true));assert.equal(rolls,0);
+  assert.throws(()=>manager.chooseTavern(room.code,human.player.id,'computer','gamble'));
+  const snapshot=manager.chooseTavern(room.code,human.player.id,'human','gamble');snapshot.tavern!.pot=900;assert.equal(manager.getGameState(room.code)!.tavern!.pot,400);
+  live.players[0]!.connectionState='disconnected';assert.throws(()=>manager.resolveTavernGamble(room.code));assert.equal(rolls,0);live.players[0]!.connectionState='connected';
+  const result=manager.resolveTavernGamble(room.code);assert.equal(rolls,1);assert.equal(result.players[0]!.gold,2300);assert.equal(result.tavern!.payout,800);assert.deepEqual(result.lastDiceRoll,normal);assert.deepEqual(result.turnContext,context);
+  assert.throws(()=>manager.resolveTavernGamble(room.code));assert.equal(rolls,1);
+});
+
 test("allows one human and three computers to start", () => {
   const { manager, roomCode } = roomWithHuman();
   manager.addComputer(roomCode, "host-1");

@@ -9,6 +9,8 @@ import {
   RELIC_DEFINITIONS,
   SOCKET_EVENTS,
   type GameState,
+  type TavernChoice,
+  type TavernState,
   type CreateTradeOfferRequest,
   type JoinRoomRequest,
   type Player,
@@ -36,6 +38,19 @@ function normalizeRoomCode(value: string): string {
 }
 
 export const BANKRUPTCY_CONFIRMATION = "Wirklich aufgeben? Dein Besitz wird übertragen und du scheidest aus der Chronik aus.";
+
+export function TavernDecisionPanel({ tavern, connected, onChoose }: { tavern: TavernState; connected: boolean; onChoose: (choice: TavernChoice) => void }) {
+  return <section className={`controller-tavern controller-tavern--${tavern.status}`} aria-live="polite">
+    <small>TAVERNE AM WELTENWEG</small>
+    {tavern.status === "decision" ? <><h2>Der Weltenweg-Pott</h2><p>Im Pott liegen</p><strong>{tavern.pot} GOLD</strong><p>Sicher mitnehmen oder alles aufs Spiel setzen?</p>
+      <button type="button" className="controller-primary-action" disabled={!connected} onClick={() => onChoose("take")}>{tavern.pot} GOLD NEHMEN</button>
+      <button type="button" className="controller-tavern__risk" disabled={!connected} onClick={() => onChoose("gamble")}>🎲 DOPPELT ODER NIX</button>
+      <p className="controller-tavern__odds">1–3: kein Gewinn · 4–6: doppelter Pott</p></>
+      : tavern.status === "rolling" ? <><h2>Doppelt oder Nix!</h2><span className="tavern-die tavern-die--rolling" aria-label="Tavernenwürfel rollt">⚄</span><p>{tavern.pot} Gold stehen auf dem Spiel.</p></>
+        : <><h2>{tavern.choice === "take" ? "Pott gesichert!" : tavern.payout ? "DOPPELT!" : "VERZOCKT!"}</h2>{tavern.die && <span className="tavern-die" aria-label={`Tavernenwürfel ${tavern.die}`}>{["","⚀","⚁","⚂","⚃","⚄","⚅"][tavern.die]}</span>}
+          <strong>{tavern.payout ? `+${tavern.payout} GOLD` : `${tavern.pot} GOLD`}</strong>{!tavern.payout && <p>Der Pott bleibt bei {tavern.pot} Gold.</p>}</>}
+  </section>;
+}
 
 export function confirmBankruptcy(confirmAction: (message: string) => boolean = window.confirm): boolean {
   return confirmAction(BANKRUPTCY_CONFIRMATION);
@@ -162,6 +177,9 @@ export function ControllerPage() {
   const [selectedPropertyGroupId, setSelectedPropertyGroupId] = useState<PropertyGroupId>();
   const [controllerTab, setControllerTab] = useState("action");
   useEffect(() => {
+    if (gameState?.turnPhase === "tavernDecision" && gameState.tavern?.playerId === player?.id) setControllerTab("action");
+  }, [gameState?.turnPhase, gameState?.tavern?.id, player?.id]);
+  useEffect(() => {
     const updateTab = () => {
       const tab = window.location.hash.replace("#controller-", "");
       setControllerTab(["action", "property", "trade", "journal"].includes(tab) ? tab : "action");
@@ -276,6 +294,14 @@ export function ControllerPage() {
         return;
       }
       setGameState(result.gameState);
+    });
+  };
+
+  const chooseTavern = (choice: TavernChoice) => {
+    setError("");
+    socket.emit(SOCKET_EVENTS.gameChooseTavern, choice, result => {
+      if (!result.ok || !result.gameState) setError(result.message ?? "Diese Tavernenentscheidung ist gerade nicht möglich.");
+      else setGameState(result.gameState);
     });
   };
 
@@ -499,6 +525,7 @@ export function ControllerPage() {
                   <span aria-hidden="true">⚄ ⚄</span> Würfeln
                 </button>
               )}
+              {isCurrent && gameState.tavern?.playerId === player.id && gameState.tavern.turnNumber === gameState.turnNumber && ["tavernDecision", "tavernRolling", "waitingForEndTurn"].includes(gameState.turnPhase) && <TavernDecisionPanel tavern={gameState.tavern} connected={connected} onChoose={chooseTavern} />}
               {isCurrent && gameState.turnPhase === "awaitingCardDraw" && (landed?.type === "adventure" || landed?.type === "fate") && (
                 <section className={`card-draw-prompt card-draw-prompt--${landed.type}`}>
                   <small>{landed.type === "adventure" ? "ABENTEUER" : "SCHICKSAL"}</small>

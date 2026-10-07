@@ -15,7 +15,7 @@ export const TOKEN_VISUAL_CONFIG = {
     outlineWidth: 4,
     lineWidth: 2,
     activeAlpha: .96,
-    inactiveAlpha: .52
+    inactiveAlpha: .3
   },
   activeAuraRadius: 34,
   activeRingRadius: 30

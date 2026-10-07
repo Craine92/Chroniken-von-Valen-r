@@ -14,7 +14,7 @@ const GameCanvas = lazy(() =>
 
 export const DOUBLE_BANNER_DURATION_MS = 2_200;
 export const CHRONICLE_NOTICE_DURATION_MS = 3_000;
-export const TAVERN_NOTICE_DURATION_MS = 2_800;
+export const TAVERN_NOTICE_DURATION_MS = 4_000;
 
 export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE }: { gameState: GameState; onNewChronicle?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined }) {
   const [introVisible, setIntroVisible] = useState(true);
@@ -23,7 +23,7 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
   const [tavernNoticeId, setTavernNoticeId] = useState<string>();
   const [dragonNoticeId, setDragonNoticeId] = useState<string>();
   const dragonEncounter = gameState.economyLog.filter(entry => entry.kind === "dragon").at(-1);
-  const tavernWin = gameState.economyLog.filter((entry) => entry.kind === "tavern" && (entry.amount ?? 0) > 0).at(-1);
+  const tavern = gameState.status === "playing" && ["tavernDecision","tavernRolling","waitingForEndTurn"].includes(gameState.turnPhase) && gameState.tavern?.turnNumber === gameState.turnNumber && gameState.tavern.playerId === gameState.currentPlayerId ? gameState.tavern : undefined;
   const [chronicleNoticeKey, setChronicleNoticeKey] = useState<string>();
   const chronicle = gameState.status === "playing" ? getActiveChronicleEvent(gameState) : undefined;
   const chronicleKey = chronicle ? `${chronicle.id}:${chronicle.startedAtRound}` : undefined;
@@ -83,11 +83,12 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
   }, [chronicleKey]);
 
   useEffect(() => {
-    if (!tavernWin || Date.now() - tavernWin.createdAt > TAVERN_NOTICE_DURATION_MS) return;
-    setTavernNoticeId(tavernWin.id);
-    const timer = window.setTimeout(() => setTavernNoticeId(undefined), TAVERN_NOTICE_DURATION_MS);
+    setTavernNoticeId(undefined);
+    if (!tavern || tavern.status !== "resolved" || Date.now() - (tavern.resolvedAt ?? 0) > TAVERN_NOTICE_DURATION_MS) return;
+    setTavernNoticeId(tavern.id);
+    const timer = window.setTimeout(() => setTavernNoticeId(undefined), Math.max(0, TAVERN_NOTICE_DURATION_MS - (Date.now() - tavern.resolvedAt!)));
     return () => window.clearTimeout(timer);
-  }, [tavernWin?.id]);
+  }, [tavern?.id, tavern?.status, tavern?.resolvedAt]);
 
   useEffect(() => {
     if (!dragonEncounter || Date.now() - dragonEncounter.createdAt > 3_000) return;
@@ -108,8 +109,8 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
   const buildingTile = buildingAction ? BOARD_TILES[buildingAction.tileIndex] : undefined;
   const tradeAction = tradeNoticeId === gameState.lastTradeAction?.id ? gameState.lastTradeAction : undefined;
   const chronicleNotice = chronicleKey === chronicleNoticeKey ? chronicle : undefined;
-  const tavernNotice = gameState.status === "playing" && tavernWin?.id === tavernNoticeId ? tavernWin : undefined;
-  const tavernWinner = tavernNotice ? gameState.players.find((player) => player.id === tavernNotice.playerIds[0]) : undefined;
+  const tavernNotice = tavern && (tavern.status !== "resolved" || tavern.id === tavernNoticeId) ? tavern : undefined;
+  const tavernWinner = tavernNotice ? gameState.players.find((player) => player.id === tavernNotice.playerId) : undefined;
   const dragonNotice = dragonEncounter?.id === dragonNoticeId ? dragonEncounter : undefined;
   const dragonPlayer = dragonNotice ? gameState.players.find(player => player.id === dragonNotice.playerIds[0]) : undefined;
   const dragonRelic = dragonNotice?.relicId ? RELIC_DEFINITIONS[dragonNotice.relicId] : undefined;
@@ -164,9 +165,11 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
           </aside>}
           {tavernNotice && <aside className="building-notice tavern-notice" role="status">
             <small>TAVERNE AM WELTENWEG</small>
-            <strong>GLÜCK BEIM KNOBELN!</strong>
-            <span>{tavernWinner?.name ?? "Ein Gefährte"} gewinnt den Pott</span>
-            <b>{tavernNotice.amount} GOLD</b>
+            <strong>{tavernNotice.status === "decision" ? "DER WELTENWEG-POTT" : tavernNotice.status === "rolling" ? "DOPPELT ODER NIX!" : tavernNotice.choice === "take" ? "POTT GESICHERT!" : tavernNotice.payout ? "DAS GLÜCK IST MIT DIR!" : "VERZOCKT!"}</strong>
+            <span>{tavernWinner?.name ?? "Ein Gefährte"}{tavernNotice.status === "decision" ? " entscheidet: sicher nehmen oder riskieren?" : tavernNotice.status === "rolling" ? ` setzt ${tavernNotice.pot} Gold aufs Spiel.` : tavernNotice.payout ? " gewinnt den Pott." : ": Das Gold bleibt im Pott."}</span>
+            {tavernNotice.choice === "gamble" && <i className={`tavern-die${tavernNotice.status === "rolling" ? " tavern-die--rolling" : ""}`} aria-label={tavernNotice.die ? `Tavernenwürfel ${tavernNotice.die}` : "Tavernenwürfel rollt"}>{["⚄","⚀","⚁","⚂","⚃","⚄","⚅"][tavernNotice.die ?? 0]}</i>}
+            <b>{tavernNotice.status === "resolved" && tavernNotice.payout ? `+${tavernNotice.payout}` : tavernNotice.pot} GOLD</b>
+            {tavernNotice.status === "resolved" && !tavernNotice.payout && <small>BLEIBEN IM POTT</small>}
           </aside>}
           {dragonNotice && <aside className="building-notice dragon-notice" role="status">
             <small>DER WANDERNDE DRACHE</small>

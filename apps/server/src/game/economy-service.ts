@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import {
   AUCTION_BID_INCREMENTS,
   BOARD_TILES,
@@ -11,6 +11,7 @@ import {
   type AuctionBidIncrement,
   type BoardTile,
   type GamePlayerState,
+  type TavernChoice,
   type GameState
 } from "@valenor/shared";
 import { startNextBankruptcyAuction } from "./bankruptcy-service";
@@ -18,6 +19,10 @@ import { consumeArmedRelic } from "./chronicle-event-service";
 import { completeQuests, ownershipQuestTypes } from "./quest-service";
 
 const MAX_LOG_ENTRIES = 12;
+
+export function chooseNpcTavernAction(gold: number, choose: () => number = () => randomInt(2)): TavernChoice {
+  return gold < 500 || choose() === 0 ? "take" : "gamble";
+}
 
 export class EconomyService {
   resolveLanding(state: GameState): void {
@@ -68,13 +73,53 @@ export class EconomyService {
     }
 
     if (tile.type === "rest" && state.lastMovement.kind === "normal" && (state.weltenwegPot ?? 0) > 0) {
-      const prize = state.weltenwegPot!;
-      player.gold += prize;
-      state.weltenwegPot = 0;
-      const entry = this.log(state, "tavern", `${player.name} gewinnt beim Knobeln in der Taverne und erhält ${prize} Gold aus dem Weltenweg-Pott!`, [player.id], prize);
-      completeQuests(state, player.id, entry.id, ["tavernWin"]);
+      state.tavern = { id: randomUUID(), playerId: player.id, turnNumber: state.turnNumber, movementSequence,
+        pot: state.weltenwegPot!, status: "decision", startedAt: Date.now() };
+      state.turnPhase = "tavernDecision";
+      return;
     }
 
+    state.turnPhase = "waitingForEndTurn";
+  }
+
+  chooseTavern(state: GameState, playerId: string, choice: TavernChoice): void {
+    const tavern = this.requireTavern(state, "tavernDecision");
+    if (tavern.playerId !== playerId || (choice !== "take" && choice !== "gamble")) throw new Error("Diese Tavernenentscheidung ist nicht erlaubt.");
+    tavern.choice = choice;
+    if (choice === "take") this.finishTavern(state, tavern.pot);
+    else { tavern.status = "rolling"; tavern.startedAt = Date.now(); state.turnPhase = "tavernRolling"; }
+  }
+
+  resolveTavernGamble(state: GameState, rollDie: () => number): void {
+    const tavern = this.requireTavern(state, "tavernRolling");
+    const die = rollDie();
+    if (!Number.isInteger(die) || die < 1 || die > 6) throw new Error("Der Tavernenwürfel ist ungültig.");
+    tavern.die = die;
+    this.finishTavern(state, die >= 4 ? tavern.pot * 2 : 0);
+  }
+
+  private requireTavern(state: GameState, phase: "tavernDecision" | "tavernRolling") {
+    const tavern = state.tavern;
+    const player = state.players.find(entry => entry.id === tavern?.playerId);
+    if (state.status !== "playing" || state.turnPhase !== phase || !tavern || tavern.status !== (phase === "tavernDecision" ? "decision" : "rolling")
+      || !player || player.isBankrupt || (player.type === "human" && player.connectionState !== "connected") || state.currentPlayerId !== tavern.playerId
+      || state.turnNumber !== tavern.turnNumber || player.position !== 20 || state.lastMovement?.to !== 20
+      || (state.lastMovement.sequence ?? state.turnContext.rollSequence) !== tavern.movementSequence || state.weltenwegPot !== tavern.pot) {
+      throw new Error("Die Tavernenentscheidung ist nicht mehr offen.");
+    }
+    return tavern;
+  }
+
+  private finishTavern(state: GameState, payout: number): void {
+    const tavern = state.tavern!, player = this.requirePlayer(state, tavern.playerId);
+    player.gold += payout;
+    if (payout > 0) state.weltenwegPot = 0;
+    tavern.payout = payout; tavern.status = "resolved"; tavern.resolvedAt = Date.now();
+    const message = tavern.choice === "take" ? `${player.name} nimmt ${payout} Gold aus dem Weltenweg-Pott.`
+      : payout > 0 ? `${player.name} gewinnt Doppelt oder Nix mit einer ${tavern.die} und erhält ${payout} Gold!`
+        : `${player.name} verzockt sich mit einer ${tavern.die}. ${tavern.pot} Gold bleiben im Weltenweg-Pott.`;
+    const entry = this.log(state, "tavern", message, [player.id], payout);
+    if (payout > 0) completeQuests(state, player.id, entry.id, ["tavernWin"]);
     state.turnPhase = "waitingForEndTurn";
   }
 

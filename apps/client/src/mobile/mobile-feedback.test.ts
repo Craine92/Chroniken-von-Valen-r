@@ -69,11 +69,21 @@ test("only the tavern winner receives one existing coin toast, without audio or 
   next.economyLog.push({ id: "tavern-win", kind: "tavern", message: "Myrra gewinnt beim Knobeln.", playerIds: ["p1"], amount: 500, createdAt: 2 });
   const events = own.update(next, "p1");
   assert.equal(events.length, 1); assert.equal(events[0]?.type, "coin");
-  assert.equal(events[0]?.message, "Glück beim Knobeln! +500 Gold");
+  assert.equal(events[0]?.message, "Pott gesichert! +500 Gold");
   assert.equal("sound" in events[0]!, false);
   assert.deepEqual(own.update(structuredClone(next), "p1"), []);
   assert.deepEqual(other.update(next, "p2"), []);
   assert.deepEqual(new MobileFeedbackEventTracker().update(next, "p1"), []);
+});
+
+test("tavern gamble results use short existing haptics without audio and losses keep the pot visible",()=>{
+  for(const payout of [0,800]){
+    const before=state(),tracker=new MobileFeedbackEventTracker();tracker.update(before,'p1');const next=structuredClone(before);
+    next.tavern={id:'tavern',playerId:'p1',turnNumber:1,movementSequence:1,pot:400,status:'resolved',choice:'gamble',die:payout?4:1,payout,startedAt:1,resolvedAt:2};next.weltenwegPot=payout?0:400;
+    next.economyLog.push({id:'outcome',kind:'tavern',message:'Tavernenergebnis',playerIds:['p1'],amount:payout,createdAt:2});
+    const events=tracker.update(next,'p1');assert.equal(events.length,1);assert.match(events[0]!.message,payout?/DOPPELT! \+800 Gold/:/VERZOCKT! Der Pott bleibt bei 400 Gold/);
+    assert.ok(events[0]!.hapticPattern);assert.equal('sound' in events[0]!,false);assert.deepEqual(tracker.update(structuredClone(next),'p1'),[]);
+  }
 });
 function clock() {
   let now = 0, sequence = 0;

@@ -119,3 +119,15 @@ test("counter template mirrors every asset and remains editable without changing
   template.request.propertyTileIndices.push(3); template.request.cardIds!.splice(0); template.request.relicIds!.splice(0);
   assert.equal(JSON.stringify(original),before); assert.equal(original.status,'pending');
 });
+
+test("computer partners and their inventories use the existing offer and counter editor with NPC labels", () => {
+  const game=state();game.players[1]!.type='computer';game.players[1]!.connectionState='disconnected';
+  game.players[1]!.heldCards=[{cardId:'fate_024',deck:'fate'}];game.players[1]!.relics=['golden-feather'];
+  const render=()=>renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={()=>undefined} onDecision={()=>undefined} />);
+  const markup=render();
+  assert.match(markup,/<option value="p2"[^>]*>Justine · NPC<\/option>/);
+  assert.match(markup,/HANDELSANGEBOT VON JUSTINE · NPC/);assert.match(markup,/Goldene Feder/);assert.match(markup,/Gunst der Mondseherin/);
+  assert.match(markup,/>Annehmen<\/button>/);assert.match(markup,/>Gegenangebot<\/button>/);assert.match(markup,/>Ablehnen<\/button>/);
+  game.trades[0]!.counterToTradeId='previous';assert.match(render(),/Gegenangebot zu vorherigem Handel/);
+  game.players[1]!.isBankrupt=true;assert.doesNotMatch(render(),/<option value="p2"/);
+});

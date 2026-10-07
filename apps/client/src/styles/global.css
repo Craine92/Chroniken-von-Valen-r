@@ -1956,3 +1956,23 @@ body {
 .card-reveal--asset.card-reveal--fallback { background:linear-gradient(145deg,#f5e8c4,#dcc499); border:2px solid #aa884b; border-radius:12px; }
 .board-card-event .card-reveal.card-reveal--asset { width:min(520px,calc((100vh - 7rem) * .7115),calc(100% - 3rem)); min-height:0; max-height:none; overflow:visible; box-shadow:none; }
 .controller-card-event .card-reveal.card-reveal--asset { min-height:0; padding:0; }
+
+.tavern-die { display:block; color:#f5dea4; font:normal 5rem/1.1 Georgia,serif; margin:.6rem auto; text-shadow:0 3px 14px #000; }
+.tavern-die--rolling { animation:tavernRoll .24s ease-in-out infinite alternate; }
+@keyframes tavernRoll { from { transform:rotate(-14deg) translateY(-3px); } to { transform:rotate(14deg) translateY(3px); } }
+@media (prefers-reduced-motion:reduce) { .tavern-die--rolling { animation:none; } }
+@media (min-width:721px) {
+  .game-sidebar .game-hud { display:flex; flex-direction:column; gap:.5rem; padding:.7rem .65rem 0; }
+  .game-sidebar .game-hud__status { position:relative; inset:auto; flex-shrink:0; }
+  .game-sidebar .quick-clock { position:relative; inset:auto; flex-shrink:0; }
+  .game-sidebar .game-hud__players,.game-sidebar:has(.quick-clock) .game-hud__players { position:relative; inset:auto; width:100%; flex:0 1 auto; min-height:0; max-height:none; }
+  .game-sidebar .game-hud__context { display:grid; align-content:center; flex:1 0 auto; gap:.35rem; min-height:150px; padding:.7rem; background:linear-gradient(145deg,#292017,#100d10); border:1px solid #8d7447; border-left:3px solid #d8b968; overflow-wrap:anywhere; }
+  .game-hud__context > small { color:#d8b968; font-size:12px; font-weight:800; letter-spacing:.08em; }
+  .game-hud__context > span { color:#d9c9aa; font-size:13px; font-weight:700; line-height:1.4; }
+  .game-hud__context > strong { color:#fff0cc; font:700 21px/1.2 Georgia,serif; }
+  .game-hud__context p { margin:0; color:#e5dbc9; font-size:14px; line-height:1.4; }
+  .game-hud__context-gold { display:grid; gap:.15rem; margin-top:.25rem; }
+  .game-hud__context-gold small { color:#d8b968; font-size:12px; font-weight:700; }
+  .game-hud__context-gold b { color:#ffe4a0; font-size:24px; line-height:1.25; }
+}
+@media (max-width:720px) { .game-hud__context { display:none; } }

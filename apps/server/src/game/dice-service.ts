@@ -14,6 +14,12 @@ export class CryptoRandomSource implements RandomSource {
 export class DiceService {
   constructor(private readonly random: RandomSource = new CryptoRandomSource()) {}
 
+  rollSingleDie(): number {
+    const die = this.random.rollDie();
+    if (!Number.isInteger(die) || die < 1 || die > 6) throw new Error("Die Würfelquelle lieferte einen ungültigen Wert.");
+    return die;
+  }
+
   roll(): DiceRoll {
     const die1 = this.random.rollDie();
     const die2 = this.random.rollDie();

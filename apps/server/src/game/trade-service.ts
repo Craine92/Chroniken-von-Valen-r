@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { BOARD_TILES, MAX_RELICS, RELIC_DEFINITIONS, isRelicTradeBound, getCardDefinition, type GameState, type TradeAssets, type TradeOffer, type RelicId } from "@valenor/shared";
+import { BOARD_TILES, MAX_RELICS, RELIC_DEFINITIONS, isRelicTradeBound, getCardDefinition, getPropertyGroupTiles, type GameState, type TradeAssets, type TradeOffer, type RelicId } from "@valenor/shared";
 import { completeQuests, ownershipQuestTypes } from "./quest-service";
 
 export interface CreateTradeRequest {
@@ -10,8 +10,25 @@ export interface CreateTradeRequest {
 }
 
 const SAFE_PHASES = new Set(["waitingForRoll", "waitingForEndTurn"]);
+export const NPC_TRADE_GOLD_RESERVE = 200;
 
 export class TradeService {
+  wouldBreakCompleteGroup(state: GameState, ownerId: string, tileIndices: readonly number[]): boolean {
+    return tileIndices.some(index => {
+      const group = BOARD_TILES[index]?.propertyGroup;
+      return Boolean(group && getPropertyGroupTiles(group).every(tile => state.propertyOwnerships.some(entry => entry.tileIndex === tile.index && entry.ownerId === ownerId)));
+    });
+  }
+
+  isValid(state: GameState, trade: TradeOffer): boolean {
+    try {
+      this.requireSafePhase(state);
+      if (trade.status !== "pending") return false;
+      this.validate(state, trade);
+      return true;
+    } catch { return false; }
+  }
+
   create(state: GameState, proposerId: string, request: CreateTradeRequest): TradeOffer {
     this.requireSafePhase(state);
     const original = request.counterToTradeId === undefined ? undefined : this.requirePending(state, request.counterToTradeId);
@@ -32,7 +49,10 @@ export class TradeService {
     state.lastTradeAction = { id: randomUUID(), type: "created", proposerId, recipientId: offer.recipientId, createdAt: Date.now() };
     const proposer = state.players.find((player) => player.id === proposerId)!;
     const recipient = state.players.find((player) => player.id === offer.recipientId)!;
-    this.log(state, `${proposer.name} unterbreitet ${recipient.name} ein ${original ? "Gegenangebot" : "Handelsangebot"}.`, [proposerId, recipient.id]);
+    const message = proposer.type === "computer" && !original && offer.offer.gold > 0 && offer.request.propertyTileIndices.length === 1
+      ? `${proposer.name} bietet ${recipient.name} ${offer.offer.gold} Gold für ${BOARD_TILES[offer.request.propertyTileIndices[0]!]!.name}.`
+      : `${proposer.name} unterbreitet ${recipient.name} ein ${original ? "Gegenangebot" : "Handelsangebot"}.`;
+    this.log(state, message, [proposerId, recipient.id]);
     return offer;
   }
 
@@ -42,6 +62,12 @@ export class TradeService {
     if (trade.recipientId !== recipientId) throw new Error("Dieses Angebot ist nicht an dich gerichtet.");
     try {
       this.validate(state, trade);
+      for (const player of state.players.filter(player => player.type === "computer" && (player.id === trade.proposerId || player.id === trade.recipientId))) {
+        const incoming = player.id === trade.recipientId ? trade.offer : trade.request;
+        const outgoing = player.id === trade.recipientId ? trade.request : trade.offer;
+        if (player.gold + incoming.gold - outgoing.gold < NPC_TRADE_GOLD_RESERVE) throw new Error("Der Computer würde seine Goldreserve unterschreiten.");
+        if (this.wouldBreakCompleteGroup(state, player.id, outgoing.propertyTileIndices)) throw new Error("Der Computer würde eine vollständige eigene Baugruppe aufgeben.");
+      }
     } catch (error) {
       trade.status = "cancelled";
       throw new Error(`Dieses Angebot ist nicht mehr gültig. ${error instanceof Error ? error.message : ""}`.trim());
@@ -61,7 +87,7 @@ export class TradeService {
     recipient.relics = recipientRelics;
     trade.status = "accepted";
     state.lastTradeAction = { id: randomUUID(), type: "accepted", proposerId: proposer.id, recipientId: recipient.id, createdAt: Date.now() };
-    this.log(state, `${proposer.name} und ${recipient.name} schließen einen Handel.`, [proposer.id, recipient.id]);
+    this.log(state, recipient.type === "computer" ? `${recipient.name} nimmt das Handelsangebot von ${proposer.name} an.` : `${proposer.name} und ${recipient.name} schließen einen Handel.`, [proposer.id, recipient.id]);
     completeQuests(state, proposer.id, trade.id, ownershipQuestTypes(state, proposer.id, trade.request.propertyTileIndices));
     completeQuests(state, recipient.id, trade.id, ownershipQuestTypes(state, recipient.id, trade.offer.propertyTileIndices));
   }
@@ -70,6 +96,8 @@ export class TradeService {
     const trade = this.requirePending(state, tradeId);
     if (trade.recipientId !== recipientId) throw new Error("Dieses Angebot ist nicht an dich gerichtet.");
     trade.status = "rejected";
+    const recipient = state.players.find(player => player.id === recipientId);
+    if (recipient?.type === "computer") this.log(state, `${recipient.name} lehnt das Handelsangebot von ${state.players.find(player => player.id === trade.proposerId)!.name} ab.`, [trade.proposerId, recipientId]);
   }
 
   cancel(state: GameState, proposerId: string, tradeId: string): void {
@@ -82,9 +110,9 @@ export class TradeService {
     const proposer = state.players.find((player) => player.id === trade.proposerId);
     const recipient = state.players.find((player) => player.id === trade.recipientId);
     if (!proposer || !recipient || proposer.id === recipient.id) throw new Error("Die Handelspartner sind ungültig.");
-    if (proposer.type !== "human" || recipient.type !== "human") throw new Error("Handel ist derzeit nur zwischen Menschen möglich.");
+    if (proposer.type === "computer" && recipient.type === "computer") throw new Error("Computer handeln in diesem Schritt nur mit Menschen.");
     if (proposer.isBankrupt || recipient.isBankrupt) throw new Error("Ausgeschiedene Gefährten können nicht handeln.");
-    if (proposer.connectionState === "disconnected" || recipient.connectionState === "disconnected") throw new Error("Beide Handelspartner müssen verbunden sein.");
+    if ([proposer, recipient].some(player => player.type === "human" && player.connectionState !== "connected")) throw new Error("Menschliche Handelspartner müssen verbunden sein.");
     if (proposer.gold < trade.offer.gold || recipient.gold < trade.request.gold) throw new Error("Für dieses Angebot ist nicht genügend Gold vorhanden.");
     this.validateProperties(state, trade.offer.propertyTileIndices, proposer.id);
     this.validateProperties(state, trade.request.propertyTileIndices, recipient.id);

@@ -125,6 +125,7 @@ test("dragonfriend counts a full-inventory encounter exactly once without awardi
 test("fortunehunter counts only an actual nonzero tavern payout", () => {
   for (const pot of [0,300]) {
     const state = game("fortunehunter",20); state.weltenwegPot = pot; const economy = new EconomyService(); economy.resolveLanding(state);
+    assert.equal(rewards(state,"fortunehunter").length,0);if(pot)economy.chooseTavern(state,"p1","take");
     assert.equal(rewards(state,"fortunehunter").length,pot?1:0); assert.equal(state.players[0]!.gold,pot?2000:1500); assert.equal(state.weltenwegPot,0);
     state.turnPhase = "landed"; economy.resolveLanding(state); assert.equal(rewards(state,"fortunehunter").length,pot?1:0);
   }

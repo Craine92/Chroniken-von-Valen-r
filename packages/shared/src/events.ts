@@ -1,5 +1,5 @@
 import type { AuctionBidIncrement } from "./economy";
-import type { GameConfig, GameRoom, GameState, MagicSignal, Player, TradeAssets } from "./game";
+import type { GameConfig, GameRoom, GameState, MagicSignal, Player, TradeAssets, TavernChoice } from "./game";
 import type { PropertyGroupId } from "./property-groups";
 import type { RelicId } from "./relics";
 
@@ -30,6 +30,7 @@ export const SOCKET_EVENTS = {
   gameEndTurn: "game:endTurn",
   gameBuyProperty: "game:buyProperty",
   gameDeclineProperty: "game:declineProperty",
+  gameChooseTavern: "game:chooseTavern",
   propertyBuild: "property:build",
   propertySellBuilding: "property:sellBuilding",
   paymentSettle: "payment:settle",
@@ -125,6 +126,7 @@ export interface ClientToServerEvents {
   "game:endTurn": (callback: (result: GameActionResult) => void) => void;
   "game:buyProperty": (callback: (result: GameActionResult) => void) => void;
   "game:declineProperty": (callback: (result: GameActionResult) => void) => void;
+  "game:chooseTavern": (choice: TavernChoice, callback: (result: GameActionResult) => void) => void;
   "property:build": (tileIndex: number, callback: (result: GameActionResult) => void) => void;
   "property:sellBuilding": (tileIndex: number, callback: (result: GameActionResult) => void) => void;
   "payment:settle": (callback: (result: GameActionResult) => void) => void;

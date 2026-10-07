@@ -17,6 +17,7 @@ import {
 import { createControllerUrl, findLocalAddress } from "./network";
 import { RoomManager } from "./room-manager";
 import { AI_ECONOMY_CONFIG, EconomicAi } from "./ai/economic-ai";
+import { chooseNpcTavernAction } from "./game/economy-service";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS ?? 5 * 60 * 1000);
@@ -31,6 +32,7 @@ const economicAi = new EconomicAi();
 const removalTimers = new Map<string, NodeJS.Timeout>();
 const gameTimers = new Map<string, NodeJS.Timeout>();
 const aiBuildingCounts = new Map<string, number>();
+const aiTradeOfferRounds = new Map<string, number>();
 
 function publishGameState(roomCode: string, state: ReturnType<RoomManager["getGameState"]>) {
   if (state) io.to(roomCode).emit(SOCKET_EVENTS.gameState, state);
@@ -54,6 +56,16 @@ function clearRoomGameTimers(roomCode: string) {
     clearTimeout(timer);
     gameTimers.delete(key);
   }
+  for (const key of aiTradeOfferRounds.keys()) if (key.startsWith(prefix)) aiTradeOfferRounds.delete(key);
+}
+
+function isTradePhase(state: NonNullable<ReturnType<RoomManager["getGameState"]>>) {
+  return state.status === "playing" && ["waitingForRoll", "waitingForEndTurn"].includes(state.turnPhase) && !state.auction && !state.pendingPayment;
+}
+
+function oldestNpcTrade(state: NonNullable<ReturnType<RoomManager["getGameState"]>>) {
+  return state.trades.filter(trade => trade.status === "pending" && state.players.some(player => player.id === trade.recipientId && player.type === "computer" && !player.isBankrupt))
+    .sort((a, b) => a.createdAt - b.createdAt)[0];
 }
 
 function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomManager["getGameState"]>>) {
@@ -144,6 +156,21 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
   }
 
   if (state.turnPhase === "waitingForRoll" || state.turnPhase === "waitingForEndTurn") {
+    const trade = isTradePhase(state) ? oldestNpcTrade(state) : undefined;
+    if (trade) scheduleGameAction(roomCode, `computer-trade-${trade.id}`, randomInt(900, 1601), () => {
+      try {
+        const live = rooms.getGameState(roomCode);
+        if (!live || !isTradePhase(live)) return;
+        const pending = oldestNpcTrade(live);
+        if (!pending || pending.id !== trade.id) return;
+        const decision = economicAi.decideTradeResponse(live, pending.recipientId, pending);
+        const next = decision.type === "accept" ? rooms.acceptTrade(roomCode, pending.recipientId, pending.id)
+          : decision.type === "counter" ? rooms.createTrade(roomCode, pending.recipientId, decision.request)
+            : rooms.rejectTrade(roomCode, pending.recipientId, pending.id);
+        publishGameState(roomCode, next);
+        orchestrateGame(roomCode, next);
+      } catch { /* Ein neuerer Zustand hat diese Handelsentscheidung überholt. */ }
+    });
     for (const computer of state.players.filter((player) => player.type === "computer")) {
       const countKey = `${roomCode}:${state.turnNumber}:${state.turnPhase}:${computer.id}`;
       const count = aiBuildingCounts.get(countKey) ?? 0;
@@ -163,6 +190,31 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
   }
 
   const current = state.players.find((player) => player.id === state.currentPlayerId);
+  if (state.turnPhase === "tavernDecision" && current?.type === "computer" && state.tavern) {
+    const tavernId = state.tavern.id;
+    scheduleGameAction(roomCode, `computer-tavern-${tavernId}`, randomInt(900, 1401), () => {
+      try {
+        const live = rooms.getGameState(roomCode);
+        const player = live?.players.find(entry => entry.id === current.id);
+        if (!live || live.turnPhase !== "tavernDecision" || live.tavern?.id !== tavernId || !player || player.isBankrupt) return;
+        const next = rooms.chooseTavern(roomCode, player.id, "computer", chooseNpcTavernAction(player.gold));
+        publishGameState(roomCode, next); orchestrateGame(roomCode, next);
+      } catch { /* Eine neuere Partie hat die Tavernenentscheidung überholt. */ }
+    });
+    return;
+  }
+  if (state.turnPhase === "tavernRolling" && state.tavern) {
+    const tavernId = state.tavern.id;
+    scheduleGameAction(roomCode, `tavern-result-${tavernId}`, 1800, () => {
+      try {
+        const live = rooms.getGameState(roomCode);
+        if (!live || live.turnPhase !== "tavernRolling" || live.tavern?.id !== tavernId) return;
+        const next = rooms.resolveTavernGamble(roomCode);
+        publishGameState(roomCode, next); orchestrateGame(roomCode, next);
+      } catch { /* Die Entscheidung wartet gegebenenfalls auf eine Wiederverbindung. */ }
+    });
+    return;
+  }
   if (state.turnPhase === "dungeonDecision" && current?.type === "computer") {
     scheduleGameAction(roomCode, `computer-dungeon-${state.turnNumber}-${current.dungeon.failedAttempts}`, randomInt(700, 1_301), () => {
       try {
@@ -324,8 +376,19 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
   }
 
   if (state.turnPhase === "waitingForEndTurn" && current?.type === "computer") {
-    scheduleGameAction(roomCode, `computer-end-${state.turnNumber}`, randomInt(1_000, 1_601), () => {
+    scheduleGameAction(roomCode, `computer-end-${state.turnNumber}`, state.tavern?.status === "resolved" ? 4_000 : randomInt(1_000, 1_601), () => {
       try {
+        const live = rooms.getGameState(roomCode);
+        if (!live || !isTradePhase(live) || live.turnPhase !== "waitingForEndTurn" || live.currentPlayerId !== current.id || live.turnNumber !== state.turnNumber) return;
+        const tradeKey = `${roomCode}:${current.id}`;
+        const proposal = economicAi.findTradeProposal(live, current.id, aiTradeOfferRounds.get(tradeKey));
+        if (proposal) {
+          try {
+            const offered = rooms.createTrade(roomCode, current.id, proposal);
+            aiTradeOfferRounds.set(tradeKey, offered.currentRound);
+            publishGameState(roomCode, offered);
+          } catch { /* Ein ungültiges Initiativangebot hält das Zugende nicht auf. */ }
+        }
         const next = rooms.endTurn(roomCode, current.id, "computer");
         publishGameState(roomCode, next);
         orchestrateGame(roomCode, next);
@@ -375,6 +438,15 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 io.on("connection", (socket) => {
+  socket.on(SOCKET_EVENTS.gameChooseTavern, (choice, callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
+      const state = rooms.chooseTavern(roomCode, playerId, "human", choice);
+      publishGameState(roomCode, state); orchestrateGame(roomCode, state);
+      callback({ ok: true, gameState: state });
+    } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Tavernenentscheidung nicht möglich." }); }
+  });
   socket.on(SOCKET_EVENTS.roomCreate, (request, callback) => {
     if (request.roomCode && request.hostToken) {
       const room = rooms.reconnectHost(request.roomCode, request.hostToken, socket.id);
@@ -718,6 +790,7 @@ io.on("connection", (socket) => {
       if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
       const state = rooms.createTrade(roomCode, playerId, request);
       publishGameState(roomCode, state);
+      orchestrateGame(roomCode, state);
       callback({ ok: true, gameState: state });
     } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Handelsangebot konnte nicht erstellt werden." }); }
   });
@@ -730,8 +803,13 @@ io.on("connection", (socket) => {
         : action === "reject" ? rooms.rejectTrade(roomCode, playerId, tradeId)
           : rooms.cancelTrade(roomCode, playerId, tradeId);
       publishGameState(roomCode, state);
+      orchestrateGame(roomCode, state);
       callback({ ok: true, gameState: state });
-    } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Handelsaktion nicht möglich." }); }
+    } catch (error) {
+      const live = socket.data.roomCode ? rooms.getGameState(socket.data.roomCode) : undefined;
+      if (live && socket.data.roomCode) { publishGameState(socket.data.roomCode, live); orchestrateGame(socket.data.roomCode, live); }
+      callback({ ok: false, message: error instanceof Error ? error.message : "Handelsaktion nicht möglich." });
+    }
   };
   socket.on(SOCKET_EVENTS.tradeAccept, (tradeId, callback) => handleTradeDecision("accept", tradeId, callback));
   socket.on(SOCKET_EVENTS.tradeReject, (tradeId, callback) => handleTradeDecision("reject", tradeId, callback));

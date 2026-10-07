@@ -13,6 +13,8 @@ export type TurnPhase =
   | "moving"
   | "landed"
   | "propertyDecision"
+  | "tavernDecision"
+  | "tavernRolling"
   | "auction"
   | "rentResolution"
   | "taxResolution"
@@ -34,6 +36,21 @@ export interface DiceRoll {
   die2: number;
   total: number;
   isDouble: boolean;
+}
+
+export type TavernChoice = "take" | "gamble";
+export interface TavernState {
+  id: string;
+  playerId: string;
+  turnNumber: number;
+  movementSequence: number;
+  pot: number;
+  status: "decision" | "rolling" | "resolved";
+  choice?: TavernChoice;
+  die?: number;
+  payout?: number;
+  startedAt: number;
+  resolvedAt?: number;
 }
 
 export interface OrderRollState {
@@ -303,6 +320,7 @@ export interface GameState {
   activeChronicleEvent?: import("./chronicle-events").ActiveChronicleEvent;
   chronicleEventHistory?: import("./chronicle-events").ActiveChronicleEvent[];
   weltenwegPot?: number;
+  tavern?: TavernState;
   wanderingDragon?: { tileIndex: number; nextMoveRound: number; encounterSequence: number };
   lastDragonEncounterMovementSequence?: number;
   turnNumber: number;

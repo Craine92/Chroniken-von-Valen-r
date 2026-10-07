@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { BOARD_TILES, DUNGEON_TILE_INDEX, MAX_RELICS, RELIC_DEFINITIONS, isRelicArmed, type GameState, type PropertyGroupId, type RegionType } from "@valenor/shared";
+import { BOARD_TILES, getPropertyGroupTiles, DUNGEON_TILE_INDEX, MAX_RELICS, RELIC_DEFINITIONS, isRelicArmed, type GameState, type PropertyGroupId, type RegionType } from "@valenor/shared";
 import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, getBoardFitZoom, getInnerEdgeOffset, getTilePlacement, getTileWorldPosition, getTokenLabelOffset, getTokenSlotOffset } from "../board-layout";
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { PropertyGroupLayer } from "../layers/PropertyGroupLayer";
@@ -51,6 +51,8 @@ export class ValenorBoardScene extends Phaser.Scene {
   private lastDiceSignature = "";
   private lastMovementSignature = "";
   private highlight: Phaser.GameObjects.Container | undefined;
+  private landingTimer: Phaser.Time.TimerEvent | undefined;
+  private lastLandingSignature = "";
   private boardReady = false;
   private pendingState: GameState | undefined;
   private developmentLayer: PropertyDevelopmentLayer | undefined;
@@ -117,6 +119,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.game.canvas.dataset.boardPresentationMode = this.presentationMode;
     this.game.canvas.dataset.proceduralRealmFallbacks = String(4 - renderedRealmBackgrounds.size);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.clearLandingHighlight();
       this.boardReady = false;
       this.game.canvas.dataset.boardReady = "false";
       this.developmentLayer?.destroy();
@@ -176,13 +179,16 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.developmentLayer?.sync(next, true);
     const ownershipSignature = next.propertyOwnerships.map((entry) => `${entry.tileIndex}:${entry.ownerId}:${entry.mortgaged}`).join("|");
     if (ownershipSignature !== this.ownershipSignature) this.drawOwnershipMarkers();
-    if (next.turnPhase === "landed" || next.turnPhase === "waitingForEndTurn" || next.turnPhase === "turnTransition") {
+    if (next.lastMovement?.playerId === next.currentPlayerId && !["moving","cardMoving","rolling","dungeonRolling","dungeonTransfer","waitingForRoll","determiningOrder","turnTransition"].includes(next.turnPhase)) {
       this.arrangeTokens(true);
-      if (next.lastMovement) this.highlightTile(next.lastMovement.to);
+      if (next.lastMovement && movementSignature !== this.lastLandingSignature) {
+        this.lastLandingSignature = movementSignature;
+        const player = next.players.find(player => player.id === next.lastMovement!.playerId);
+        this.highlightTile(next.lastMovement.to, player ? PLAYER_COLORS[player.color] : 0xf1d89b);
+      }
     }
     if (next.turnPhase === "waitingForRoll" || next.turnPhase === "determiningOrder") {
-      this.highlight?.destroy();
-      this.highlight = undefined;
+      this.clearLandingHighlight();
       this.arrangeTokens(true);
     }
   }
@@ -401,24 +407,26 @@ export class ValenorBoardScene extends Phaser.Scene {
   }
 
   private drawCenterTitle() {
+    const logo = this.add.container(0,0).setName("board-center-logo").setScale(.82).setAlpha(.85).setDepth(BOARD_DEPTHS.decorations + 3);
     const seal = this.add.graphics().setDepth(BOARD_DEPTHS.decorations + 2);
     seal.fillStyle(0x08080b, .58).fillCircle(0, 12, 146);
     seal.lineStyle(3, 0x7f6537, .54).strokeCircle(0, 12, 142);
     seal.lineStyle(1, 0xe0c477, .36).strokeCircle(0, 12, 133);
-    this.add.text(0, -43, "CHRONIKEN", {
+    logo.add(seal);
+    logo.add(this.add.text(0, -43, "CHRONIKEN", {
       color: "#eadcb9", fontFamily: "Georgia, serif", fontSize: "31px", letterSpacing: 7,
       stroke: "#3b2c18", strokeThickness: 3, shadow: { color: "#d5a94e", blur: 10, fill: true }
-    }).setOrigin(0.5).setDepth(BOARD_DEPTHS.decorations + 3);
-    this.add.text(0, -3, "VON", {
+    }).setOrigin(0.5));
+    logo.add(this.add.text(0, -3, "VON", {
       color: "#a88e58", fontFamily: "Georgia, serif", fontSize: "13px", letterSpacing: 8
-    }).setOrigin(0.5).setDepth(BOARD_DEPTHS.decorations + 3);
-    this.add.text(0, 36, "VALENØR", {
+    }).setOrigin(0.5));
+    logo.add(this.add.text(0, 36, "VALENØR", {
       color: "#f1d89b", fontFamily: "Georgia, serif", fontSize: "38px", letterSpacing: 8,
       stroke: "#3b2c18", strokeThickness: 3, shadow: { color: "#e3b759", blur: 14, fill: true }
-    }).setOrigin(0.5).setDepth(BOARD_DEPTHS.decorations + 3);
-    this.add.text(0, 78, "VIER REICHE · EINE KRONE", {
+    }).setOrigin(0.5));
+    logo.add(this.add.text(0, 78, "VIER REICHE · EINE KRONE", {
       color: "#9b938a", fontFamily: "Arial, sans-serif", fontSize: "10px", letterSpacing: 4
-    }).setOrigin(0.5).setDepth(BOARD_DEPTHS.decorations + 3);
+    }).setOrigin(0.5));
 
     const compass = this.add.graphics();
     compass.lineStyle(1, 0xd7bb78, 0.32);
@@ -430,7 +438,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     compass.lineTo(-10, -92);
     compass.closePath();
     compass.strokePath();
-    compass.setDepth(BOARD_DEPTHS.decorations + 3);
+    logo.add(compass);
   }
 
   private drawCardDecks() {
@@ -663,7 +671,9 @@ export class ValenorBoardScene extends Phaser.Scene {
       const place = getTilePlacement(ownership.tileIndex);
       const marker = this.add.container(place.x, place.y).setScale(this.ownershipMarkerScale).setDepth(BOARD_DEPTHS.ownership);
       const ownershipFrame = this.add.rectangle(0, 0, place.width - 7, place.height - 7, 0x000000, 0)
-        .setStrokeStyle(4, PLAYER_COLORS[owner.color], .98);
+        .setName("ownership-frame").setStrokeStyle(5, PLAYER_COLORS[owner.color], 1);
+      const inner = place.side === "bottom" ? {x:0,y:-place.height/2+9,w:place.width-14,h:4} : place.side === "top" ? {x:0,y:place.height/2-9,w:place.width-14,h:4} : place.side === "left" ? {x:place.width/2-9,y:0,w:4,h:place.height-14} : {x:-place.width/2+9,y:0,w:4,h:place.height-14};
+      const strip = this.add.rectangle(inner.x,inner.y,inner.w,inner.h,PLAYER_COLORS[owner.color],.95).setName("ownership-strip");
       const badgeX = -place.width / 2 + 18;
       const badgeY = place.height / 2 - 17;
       const glow = this.add.circle(badgeX, badgeY, 14, PLAYER_COLORS[owner.color], .28);
@@ -671,12 +681,18 @@ export class ValenorBoardScene extends Phaser.Scene {
         .setStrokeStyle(3, PLAYER_COLORS[owner.color], 1);
       const initials = owner.name.trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "✦";
       const rune = this.add.text(badgeX, badgeY, initials, { color: "#fff3cf", fontFamily: "Arial,sans-serif", fontSize: "10px", fontStyle: "bold", stroke: "#080709", strokeThickness: 2 }).setOrigin(.5);
-      marker.add([ownershipFrame, glow, banner, rune]);
+      if(ownership.mortgaged)marker.add(this.add.rectangle(0,0,place.width-9,place.height-9,0x000000,.28).setName("mortgage-shade"));
+      marker.add([ownershipFrame, strip, glow, banner, rune]);
+      const group = BOARD_TILES[ownership.tileIndex]?.propertyGroup;
+      if(group && getPropertyGroupTiles(group).every(tile=>this.state.propertyOwnerships.some(entry=>entry.tileIndex===tile.index && entry.ownerId===owner.id))) {
+        const landscape=place.side === "left" || place.side === "right";
+        marker.add(this.add.text(badgeX+35,landscape?19:26,"♛",{color:"#f1d99d",fontSize:landscape?"10px":"16px",stroke:`#${PLAYER_COLORS[owner.color].toString(16).padStart(6,"0")}`,strokeThickness:2}).setOrigin(.5).setName("complete-group-crown"));
+      }
       if (ownership.mortgaged) {
         glow.setFillStyle(0x292a31, 0.65);
-        banner.setAlpha(.38);
-        rune.setAlpha(0.42);
-        marker.add(this.add.text(badgeX, badgeY - 17, "⛓", { color: "#c6c2b8", fontSize: "12px" }).setOrigin(0.5));
+        banner.setAlpha(.85);
+        rune.setAlpha(.9);
+        marker.add(this.add.text(badgeX-3, 24, "⛓", { color: "#eee3cc", fontSize: "14px",stroke:"#080709",strokeThickness:2 }).setOrigin(0.5).setName("mortgage-lock"));
       }
       this.ownershipMarkers.set(ownership.tileIndex, marker);
     });
@@ -921,16 +937,23 @@ export class ValenorBoardScene extends Phaser.Scene {
     return die;
   }
 
-  private highlightTile(index: number) {
-    this.highlight?.destroy();
+  private clearLandingHighlight() {
+    this.landingTimer?.remove(false); this.landingTimer=undefined;
+    if(this.highlight){this.tweens.killTweensOf(this.highlight.list);this.tweens.killTweensOf(this.highlight);this.highlight.destroy();this.highlight=undefined;}
+  }
+
+  private highlightTile(index: number, color: number) {
+    this.clearLandingHighlight();
     const layout = getBoardTileVisualLayout(index);
-    const group = this.add.container(layout.x, layout.y).setDepth(BOARD_DEPTHS.effects);
+    const group = this.add.container(layout.x, layout.y).setName("landing-highlight").setDepth(BOARD_DEPTHS.effects);
+    const glow = this.add.rectangle(0,0,layout.width-8,layout.height-8,color,.08).setStrokeStyle(10,color,.2);
     const outline = this.add.graphics();
-    outline.lineStyle(4, 0xf1d89b, 0.9);
+    outline.lineStyle(5, 0xf1d89b, 1);
     outline.strokeRoundedRect(-layout.width / 2 + 4, -layout.height / 2 + 4, layout.width - 8, layout.height - 8, layout.kind === "corner" ? 8 : 5);
-    group.add(outline);
-    if (!this.reducedMotion) this.tweens.add({ targets: outline, alpha: 0.35, duration: 700, yoyo: true, repeat: -1 });
+    group.add([glow,outline]);
+    if (!this.reducedMotion) this.tweens.add({ targets: [glow,outline], alpha: .6, duration: 400, yoyo: true, repeat: 2 });
     this.highlight = group;
+    this.landingTimer=this.time.delayedCall(2400,()=>this.clearLandingHighlight());
   }
 
   private focusActivePlayer(playerId: string | undefined) {

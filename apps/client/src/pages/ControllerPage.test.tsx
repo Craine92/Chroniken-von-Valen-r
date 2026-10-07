@@ -11,8 +11,20 @@ import {
   DungeonOutcomeNotice,
   MobileTradeNotice,
   MobileTurnNotice,
-  PaymentManagement
+  PaymentManagement,
+  TavernDecisionPanel
 } from "./ControllerPage";
+
+test("tavern decision exposes only the two server choices and readable independent outcomes",()=>{
+  const tavern={id:'tavern',playerId:'p1',turnNumber:1,movementSequence:1,pot:400,status:'decision' as const,startedAt:1};
+  const markup=renderToStaticMarkup(<TavernDecisionPanel tavern={tavern} connected onChoose={()=>undefined} />);
+  assert.match(markup,/400 GOLD NEHMEN/);assert.match(markup,/DOPPELT ODER NIX/);assert.match(markup,/1–3: kein Gewinn · 4–6: doppelter Pott/);
+  assert.match(renderToStaticMarkup(<TavernDecisionPanel tavern={tavern} connected={false} onChoose={()=>undefined} />),/disabled=""/);
+  for(const payout of [0,800]){
+    const outcome=renderToStaticMarkup(<TavernDecisionPanel tavern={{...tavern,status:'resolved',choice:'gamble',die:payout?4:1,payout}} connected onChoose={()=>undefined} />);
+    assert.match(outcome,payout?/DOPPELT!/:/VERZOCKT!/);assert.match(outcome,payout?/\+800 GOLD/:/Der Pott bleibt bei 400 Gold/);assert.doesNotMatch(outcome,/<button/);
+  }
+});
 
 const roomPlayer: Player = {
   id: "p1",

@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, getBloodMoonDefinition, getRegionalChronicleDefinition, type GameState, type RegionType } from "@valenor/shared";
 import { DOUBLE_BANNER_DURATION_MS, GameExperience } from "./GameExperience";
 import { hasTurnStatusContent, TurnStatus } from "./TurnStatus";
-import { GameHud } from "./GameHud";
+import { GameHud, getCurrentBoardContext } from "./GameHud";
 
 function startedGameState(playerCount: 2 | 4): GameState {
   return {
@@ -39,6 +39,28 @@ function startedGameState(playerCount: 2 | 4): GameState {
     startedAt: 1
   };
 }
+
+test("TV context uses actual ownership, building level, effective rent and free purchase price",()=>{
+  const state=startedGameState(2);state.currentPlayerId='p1';state.turnPhase='propertyDecision';state.lastMovement={kind:'normal',sequence:1,playerId:'p1',from:0,to:1,path:[1],passedStart:false,landedTile:BOARD_TILES[1]!};
+  let context=getCurrentBoardContext(state,1000);assert.equal(context.title,'Mondpfad');assert.equal(context.gold,60);assert.ok(context.lines.includes('FREI'));
+  state.propertyOwnerships=[{tileIndex:1,ownerId:'p2',buildingLevel:2,mortgaged:false}];state.turnPhase='waitingForEndTurn';context=getCurrentBoardContext(state,1000);
+  assert.ok(context.lines.includes('Besitz: Computer 1'));assert.ok(context.lines.some(line=>line.startsWith('Baustufe 2')));assert.equal(context.gold,30);assert.equal(context.goldLabel,'MIETE');
+  state.propertyOwnerships[0]!.mortgaged=true;assert.equal(getCurrentBoardContext(state,1000).gold,0);
+  state.turnPhase='waitingForRoll';assert.equal(getCurrentBoardContext(state,6000,false).kind,'neutral');
+});
+
+test("TV context prioritizes decisions and cards and expires transient events without stale turns",()=>{
+  const state=startedGameState(2);state.currentPlayerId='p1';state.turnPhase='tavernDecision';
+  state.tavern={id:'tavern',playerId:'p1',turnNumber:state.turnNumber,movementSequence:1,pot:400,status:'decision',startedAt:1};
+  state.activeCard={cardId:'fate_025',deck:'fate',playerId:'p1',status:'readyToAcknowledge'};assert.equal(getCurrentBoardContext(state,100000).kind,'tavern');
+  state.tavern.status='resolved';state.tavern.payout=0;state.tavern.choice='gamble';state.tavern.resolvedAt=1000;
+  state.turnPhase='waitingForEndTurn';
+  assert.equal(getCurrentBoardContext(state,2000).title,'VERZOCKT!');assert.equal(getCurrentBoardContext(state,6000).kind,'card');
+  assert.ok(getCurrentBoardContext(state,6000).lines[0]!.includes('175 Gold'));delete state.activeCard;delete state.tavern;
+  state.economyLog=[{id:'dragon',kind:'dragon',playerIds:['p1'],message:'Mensch begegnet dem Hüter der Relikte.',createdAt:1000}];
+  assert.equal(getCurrentBoardContext(state,2000).kind,'dragon');assert.equal(getCurrentBoardContext(state,6000,false).kind,'neutral');
+  state.currentPlayerId='p2';assert.equal(getCurrentBoardContext(state,2000,false).kind,'neutral');
+});
 
 test("the left HUD shows only a currently active chronicle and counts its remaining rounds", () => {
   const state = startedGameState(2); state.currentRound = 4;

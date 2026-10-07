@@ -18,6 +18,7 @@ export class BoardArtLayer {
   private readonly realmPoints = new Map<RegionType, Phaser.Types.Math.Vector2Like[]>();
   private readonly chronicleMarkers = new Map<RegionType, Phaser.GameObjects.Graphics>();
   private chronicleSignature = "";
+  private readonly realmLabels: Phaser.GameObjects.Text[] = [];
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -80,6 +81,10 @@ export class BoardArtLayer {
     ];
     placements.forEach(({ realm, asset, points }) => {
       this.realmPoints.set(realm, points);
+      const names={elves:"AMETHYSTWALD",humans:"KRONENWALD",orcs:"EISENÖDE",steppe:"SONNENSTEPPE"};
+      const x=(realm === "elves" || realm === "humans" ? -1 : 1)*edgeX*.62;
+      const y=(realm === "humans" || realm === "orcs" ? -1 : 1)*edgeY*.8;
+      this.realmLabels.push(this.scene.add.text(x,y,names[realm],{fontFamily:"Georgia,serif",fontSize:"28px",color:"#e2d2ac",letterSpacing:3,stroke:"#16130f",strokeThickness:4,shadow:{color:"#000000",blur:6,fill:true}}).setOrigin(.5).setAlpha(.85).setDepth(BOARD_DEPTHS.decorations+3).setName(`realm-label-${realm}`));
       const image = this.addMaskedRealmImage(asset, points);
       if (!image) return;
       rendered.add(realm);
@@ -94,6 +99,7 @@ export class BoardArtLayer {
   destroy(): void {
     this.clearChronicleMarkers();
     this.realmPoints.clear();
+    this.realmLabels.forEach(label=>label.destroy());this.realmLabels.length=0;
     this.maskSources.forEach((source) => source.destroy());
     this.maskSources.length = 0;
   }

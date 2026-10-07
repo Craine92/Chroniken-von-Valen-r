@@ -5,6 +5,8 @@ import {
   canSellBuilding,
   canMortgageProperty,
   getCardDefinition,
+  getEffectivePurchasePrice,
+  RELIC_DEFINITIONS,
   SOCKET_EVENTS,
   type GameState,
   type CreateTradeOfferRequest,
@@ -12,11 +14,13 @@ import {
   type Player,
   type PropertyGroupId
 } from "@valenor/shared";
+import type { RelicId } from "@valenor/shared";
 import { Ambience } from "../components/Ambience";
 import { BrandMark } from "../components/BrandMark";
 import { ConnectionBadge } from "../components/ConnectionBadge";
 import { PropertyCard } from "../components/PropertyCard";
 import { ControllerPossessions } from "../components/ControllerPossessions";
+import { ControllerQuestLog } from "../components/ControllerQuestLog";
 import { TradePanel } from "../components/TradePanel";
 import { CardReveal } from "../components/CardReveal";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
@@ -133,6 +137,15 @@ export function MobileTurnNotice({ currentName, own }: { currentName: string; ow
 
 export function MobileTradeNotice({ proposerName }: { proposerName: string }) {
   return <aside className="mobile-trade-notice" role="alert"><strong>HANDELSANGEBOT VON {proposerName.toUpperCase()}</strong><a href="#controller-trade">Ansehen</a></aside>;
+}
+
+export function RuneStoneDecisionPanel({ connected, onReroll, onKeep }: { connected: boolean; onReroll: () => void; onKeep: () => void }) {
+  return <section className="controller-rune-decision" aria-label="Runenstein-Entscheidung">
+    <strong>{RELIC_DEFINITIONS.runestone.name.toUpperCase()} VERWENDEN</strong>
+    <p>Der neue Wurf ersetzt diesen Wurf vollständig.</p>
+    <button className="controller-primary-action" type="button" disabled={!connected} onClick={onReroll}>Neu würfeln</button>
+    <button type="button" disabled={!connected} onClick={onKeep}>Wurf behalten</button>
+  </section>;
 }
 
 export function ControllerPage() {
@@ -255,7 +268,7 @@ export function ControllerPage() {
     });
   };
 
-  const performGameAction = (event: "game:rollOrder" | "game:rollDice" | "game:rollDungeon" | "game:payDungeonRelease" | "game:useDungeonCard" | "game:drawCard" | "game:acknowledgeCard" | "game:endTurn") => {
+  const performGameAction = (event: "game:rollOrder" | "game:rollDice" | "game:useRuneStone" | "game:keepRoll" | "game:rollDungeon" | "game:payDungeonRelease" | "game:useDungeonCard" | "game:drawCard" | "game:acknowledgeCard" | "game:endTurn") => {
     setError("");
     socket.emit(event, (result) => {
       if (!result.ok || !result.gameState) {
@@ -263,6 +276,14 @@ export function ControllerPage() {
         return;
       }
       setGameState(result.gameState);
+    });
+  };
+
+  const activateRelic = (id: RelicId) => {
+    setError("");
+    socket.emit(SOCKET_EVENTS.relicActivate, id, result => {
+      if (!result.ok || !result.gameState) setError(result.message ?? "Reliktaktivierung nicht erlaubt.");
+      else setGameState(result.gameState);
     });
   };
 
@@ -406,7 +427,8 @@ export function ControllerPage() {
     const canEnd = isCurrent && gameState.turnPhase === "waitingForEndTurn";
     const landed = gameState.lastMovement?.landedTile;
     const canDecide = isCurrent && gameState.turnPhase === "propertyDecision" && Boolean(landed?.economy);
-    const canBuy = canDecide && activePlayer.gold >= (landed?.economy?.purchasePrice ?? Infinity);
+    const purchasePrice = landed?.economy ? getEffectivePurchasePrice(gameState, landed) : Infinity;
+    const canBuy = canDecide && activePlayer.gold >= purchasePrice;
     const auction = gameState.auction;
     const auctionTile = auction ? BOARD_TILES[auction.tileIndex] : undefined;
     const withdrew = Boolean(auction?.withdrawnPlayerIds.includes(player.id));
@@ -495,6 +517,8 @@ export function ControllerPage() {
                 </section>
               )}
               {canRoll && gameState.lastTurnAction?.kind === "double" && gameState.lastTurnAction.playerId === player.id && <p className="double-copy"><strong>Pasch!</strong> Du darfst erneut würfeln.</p>}
+              {isCurrent && gameState.turnContext.awaitingRuneStoneDecision && <RuneStoneDecisionPanel connected={connected}
+                onReroll={() => performGameAction(SOCKET_EVENTS.gameUseRuneStone)} onKeep={() => performGameAction(SOCKET_EVENTS.gameKeepRoll)} />}
               {gameState.lastTurnAction && gameState.lastTurnAction.playerId === player.id && gameState.lastTurnAction.kind !== "double" && <DungeonOutcomeNotice action={gameState.lastTurnAction} />}
               {isCurrent && gameState.turnPhase === "dungeonRolling" && <p className="dungeon-fate-copy">Die Würfel entscheiden über deine Freiheit …</p>}
               {isCurrent && gameState.lastDiceRoll && !canRoll && (
@@ -511,16 +535,16 @@ export function ControllerPage() {
               )}
               {canDecide && landed && (
                 <div className="controller-economy">
-                  <PropertyCard tile={landed} compact />
+                  <PropertyCard tile={landed} state={gameState} compact />
                   <button className="turn-action-button" type="button" disabled={!connected || !canBuy} onClick={() => performPropertyAction(SOCKET_EVENTS.gameBuyProperty)}>
-                    Kaufen · {landed.economy!.purchasePrice} Gold
+                    Kaufen · {purchasePrice} Gold
                   </button>
                   <button className="economy-secondary" type="button" disabled={!connected} onClick={() => performPropertyAction(SOCKET_EVENTS.gameDeclineProperty)}>Ablehnen &amp; versteigern</button>
                 </div>
               )}
               {gameState.turnPhase === "auction" && auction && auctionTile && participates && (
                 <div className="controller-economy">
-                  <PropertyCard tile={auctionTile} compact />
+                  <PropertyCard tile={auctionTile} state={gameState} compact />
                   <p className="auction-bid">Aktuelles Gebot <strong>{auction.currentBid} Gold</strong></p>
                   {auctionPaused ? <p className="controller-hint">Auktion pausiert – ein Gefährte verbindet sich neu.</p> : withdrew ? <p className="controller-hint">Du bist aus der Auktion ausgestiegen.</p> : (
                     <>
@@ -535,9 +559,9 @@ export function ControllerPage() {
           )}
           {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} onDeclareBankruptcy={declareBankruptcy} />}
           </div>
-          <div hidden={controllerTab !== "property"}><ControllerPossessions state={gameState} playerId={player.id} connected={connected} selectedGroupId={selectedPropertyGroupId} onSelectGroup={selectPropertyGroup} onBuild={manageBuilding} onMortgage={manageMortgage} /></div>
+          <div hidden={controllerTab !== "property"}><ControllerPossessions state={gameState} playerId={player.id} connected={connected} selectedGroupId={selectedPropertyGroupId} onSelectGroup={selectPropertyGroup} onBuild={manageBuilding} onMortgage={manageMortgage} onActivateRelic={activateRelic} onUseRuneStone={() => performGameAction(SOCKET_EVENTS.gameUseRuneStone)} /></div>
           <div id="controller-trade" hidden={controllerTab !== "trade"}><TradePanel state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onDecision={decideTrade} /></div>
-          <section id="controller-journal" hidden={controllerTab !== "journal"}><h2>Journal</h2>{gameState.economyLog.at(-1) ? <p className="controller-log">{gameState.economyLog.at(-1)!.message}</p> : <p>Noch keine Einträge.</p>}</section>
+          <section id="controller-journal" hidden={controllerTab !== "journal"}><ControllerQuestLog state={gameState} playerId={player.id} /><h2>Journal</h2>{gameState.economyLog.at(-1) ? <p className="controller-log">{gameState.economyLog.at(-1)!.message}</p> : <p>Noch keine Einträge.</p>}</section>
           <nav className="controller-nav" aria-label="Controller-Bereiche">
             <a href="#controller-action" aria-current={controllerTab === "action" ? "page" : undefined}><span>✦</span>Aktion</a>
             <a href="#controller-property" aria-current={controllerTab === "property" ? "page" : undefined}><span>♜</span>Besitz</a>

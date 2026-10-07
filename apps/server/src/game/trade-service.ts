@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { BOARD_TILES, getCardDefinition, type GameState, type TradeAssets, type TradeOffer } from "@valenor/shared";
+import { BOARD_TILES, MAX_RELICS, RELIC_DEFINITIONS, isRelicTradeBound, getCardDefinition, type GameState, type TradeAssets, type TradeOffer, type RelicId } from "@valenor/shared";
+import { completeQuests, ownershipQuestTypes } from "./quest-service";
 
 export interface CreateTradeRequest {
   recipientId: string;
@@ -18,7 +19,7 @@ export class TradeService {
       status: "pending", createdAt: Date.now()
     };
     this.validate(state, offer);
-    if (offer.offer.gold === 0 && offer.request.gold === 0 && offer.offer.propertyTileIndices.length === 0 && offer.request.propertyTileIndices.length === 0 && !(offer.offer.cardIds?.length) && !(offer.request.cardIds?.length)) {
+    if (offer.offer.gold === 0 && offer.request.gold === 0 && offer.offer.propertyTileIndices.length === 0 && offer.request.propertyTileIndices.length === 0 && !(offer.offer.cardIds?.length) && !(offer.request.cardIds?.length) && !offer.offer.relicIds?.length && !offer.request.relicIds?.length) {
       throw new Error("Ein Handelsangebot muss mindestens einen Wert enthalten.");
     }
     state.trades.push(offer);
@@ -48,9 +49,15 @@ export class TradeService {
     trade.request.propertyTileIndices.forEach((tileIndex) => { state.propertyOwnerships.find((entry) => entry.tileIndex === tileIndex)!.ownerId = proposer.id; });
     this.transferCards(proposer, recipient, trade.offer.cardIds ?? []);
     this.transferCards(recipient, proposer, trade.request.cardIds ?? []);
+    const proposerRelics = this.finalRelics(proposer, trade.offer.relicIds ?? [], trade.request.relicIds ?? []);
+    const recipientRelics = this.finalRelics(recipient, trade.request.relicIds ?? [], trade.offer.relicIds ?? []);
+    proposer.relics = proposerRelics;
+    recipient.relics = recipientRelics;
     trade.status = "accepted";
     state.lastTradeAction = { id: randomUUID(), type: "accepted", proposerId: proposer.id, recipientId: recipient.id, createdAt: Date.now() };
     this.log(state, `${proposer.name} und ${recipient.name} schließen einen Handel.`, [proposer.id, recipient.id]);
+    completeQuests(state, proposer.id, trade.id, ownershipQuestTypes(state, proposer.id, trade.request.propertyTileIndices));
+    completeQuests(state, recipient.id, trade.id, ownershipQuestTypes(state, recipient.id, trade.offer.propertyTileIndices));
   }
 
   reject(state: GameState, recipientId: string, tradeId: string): void {
@@ -77,6 +84,8 @@ export class TradeService {
     this.validateProperties(state, trade.request.propertyTileIndices, recipient.id);
     this.validateCards(proposer, trade.offer.cardIds ?? []);
     this.validateCards(recipient, trade.request.cardIds ?? []);
+    this.validateRelics(state, proposer, trade.offer.relicIds ?? [], trade.request.relicIds ?? []);
+    this.validateRelics(state, recipient, trade.request.relicIds ?? [], trade.offer.relicIds ?? []);
   }
 
   private validateProperties(state: GameState, tileIndices: readonly number[], ownerId: string): void {
@@ -95,7 +104,23 @@ export class TradeService {
     if (!Number.isSafeInteger(assets.gold) || assets.gold < 0) throw new Error("Der Goldbetrag ist ungültig.");
     if (!Array.isArray(assets.propertyTileIndices) || assets.propertyTileIndices.some((index) => !Number.isInteger(index))) throw new Error("Die Besitzliste ist ungültig.");
     if (assets.cardIds !== undefined && (!Array.isArray(assets.cardIds) || assets.cardIds.some((id) => typeof id !== "string"))) throw new Error("Die Kartenliste ist ungültig.");
-    return { gold: assets.gold, propertyTileIndices: [...new Set(assets.propertyTileIndices)], cardIds: [...new Set(assets.cardIds ?? [])] };
+    if (assets.relicIds !== undefined && (!Array.isArray(assets.relicIds) || assets.relicIds.some(id => typeof id !== "string" || !Object.hasOwn(RELIC_DEFINITIONS, id)) || new Set(assets.relicIds).size !== assets.relicIds.length)) throw new Error("Die Reliktliste ist ungültig oder enthält doppelte Relikte.");
+    return { gold: assets.gold, propertyTileIndices: [...new Set(assets.propertyTileIndices)], cardIds: [...new Set(assets.cardIds ?? [])], relicIds: [...(assets.relicIds ?? [])] };
+  }
+
+  private finalRelics(owner: GameState["players"][number], outgoing: readonly RelicId[], incoming: readonly RelicId[]): RelicId[] {
+    return [...(owner.relics ?? []).filter(id => !outgoing.includes(id)), ...incoming];
+  }
+
+  private validateRelics(state: GameState, owner: GameState["players"][number], outgoing: readonly RelicId[], incoming: readonly RelicId[]): void {
+    if (new Set(outgoing).size !== outgoing.length || outgoing.some(id => !Object.hasOwn(RELIC_DEFINITIONS, id))) throw new Error("Die Reliktliste ist ungültig.");
+    for (const id of outgoing) {
+      if (!owner.relics?.includes(id)) throw new Error("Ein angebotenes Relikt gehört nicht mehr dem angegebenen Eigentümer.");
+      if (isRelicTradeBound(state, owner, id)) throw new Error("Aktive oder an einen Wurf gebundene Relikte sind nicht handelbar.");
+    }
+    const final = this.finalRelics(owner, outgoing, incoming);
+    if (final.length > MAX_RELICS) throw new Error("Nach dem Handel sind höchstens zwei Relikte pro Spieler erlaubt.");
+    if (new Set(final).size !== final.length) throw new Error("Nach dem Handel darf ein Relikt nicht doppelt vorhanden sein.");
   }
 
   private validateCards(owner: GameState["players"][number], cardIds: readonly string[]): void {

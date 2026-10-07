@@ -2,6 +2,7 @@ import {
   BOARD_TILES,
   canBuildOnProperty,
   canSellBuilding,
+  getEffectivePurchasePrice,
   type AuctionBidIncrement,
   type GameState
 } from "@valenor/shared";
@@ -23,7 +24,7 @@ export class EconomicAi {
       ? state.propertyOwnerships.filter((ownership) => ownership.ownerId === playerId && BOARD_TILES[ownership.tileIndex]?.propertyGroup === tile.propertyGroup).length
       : 0;
     const reserve = groupCount > 0 ? Math.floor(AI_ECONOMY_CONFIG.purchaseGoldReserve / 2) : AI_ECONOMY_CONFIG.purchaseGoldReserve;
-    return player.gold - tile.economy.purchasePrice >= reserve;
+    return player.gold - getEffectivePurchasePrice(state, tile, playerId) >= reserve;
   }
 
   decideAuction(state: GameState, playerId: string): AuctionDecision {

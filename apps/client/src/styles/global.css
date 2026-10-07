@@ -1860,6 +1860,17 @@ body {
 .board-event-layer .order-overlay { max-height:80vh; overflow:auto; padding:1.25rem; background:rgba(8,8,11,.96); }
 .board-event-layer :is(.dungeon-status,.double-notice,.dungeon-notice) { min-width:0; padding:1.1rem 1.35rem; background:rgba(12,9,13,.96); }
 .board-event-layer > :is(.last-round-banner,.building-notice) { top:1.2rem; left:50%; translate:-50% 0; width:min(520px,calc(100% - 3rem)); box-sizing:border-box; }
+.board-event-layer > :is(.chronicle-notice,.tavern-notice,.dragon-notice) { top:50%; translate:-50% -50%; min-width:0; padding:1.4rem; animation:boardEventIn 220ms ease both; }
+:is(.chronicle-notice,.tavern-notice,.dragon-notice) small { color:#d8b968; font-weight:800; letter-spacing:.12em; }
+:is(.chronicle-notice,.tavern-notice,.dragon-notice) strong { font-size:1.6rem; overflow-wrap:anywhere; }
+:is(.chronicle-notice,.tavern-notice,.dragon-notice) span { margin-top:.4rem; color:#e4d7bd; font-size:1rem; font-weight:400; line-height:1.5; }
+.tavern-notice > b { margin-top:.45rem; color:#ffe4a3; font-size:1.8rem; }
+.game-sidebar :is(.active-chronicle,.weltenweg-pot,.wandering-dragon) { min-width:0; display:grid; gap:.25rem; padding:.6rem; color:#e4d7bd; background:rgba(8,8,11,.9); border-left:3px solid #d8b968; }
+.game-sidebar :is(.active-chronicle,.weltenweg-pot,.wandering-dragon) small { color:#d8b968; font-size:.65rem; font-weight:800; letter-spacing:.06em; }
+.game-sidebar :is(.active-chronicle,.weltenweg-pot,.wandering-dragon) strong { color:#f1d99d; font-size:.85rem; line-height:1.35; overflow-wrap:anywhere; }
+.game-sidebar .active-chronicle span { font-size:.75rem; }
+.game-sidebar .active-chronicle__effect { color:#eee1c6; line-height:1.4; }
+.game-sidebar .weltenweg-pot strong { font-size:1.2rem; font-weight:800; }
 @keyframes boardEventIn { from { opacity:0; transform:scale(.9) translateY(14px); } to { opacity:1; transform:none; } }
 
 .board-card-event { z-index:22; }
@@ -1875,8 +1886,12 @@ body {
 }
 
 @media (max-height:800px) and (min-width:721px) {
+  .game-sidebar .game-hud__players { gap:.2rem; }
+  .game-sidebar :is(.active-chronicle,.weltenweg-pot,.wandering-dragon) { padding:.4rem; }
+  .game-sidebar:has(.wandering-dragon) .economy-log { display:none; }
   .game-sidebar .economy-log { display:grid; gap:.25rem; }
-  .game-sidebar .economy-log p:nth-of-type(n+3) { display:none; }
+  .game-sidebar .economy-log p { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+  .game-sidebar .economy-log p:nth-of-type(n+2) { display:none; }
 }
 
 @media (max-width:720px) {

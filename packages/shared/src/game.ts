@@ -74,11 +74,13 @@ export interface PropertyOwnership {
   buildingLevel: BuildingLevel;
 }
 
-export type EconomyLogKind = "purchase" | "rent" | "tax" | "auction" | "building" | "mortgage" | "trade" | "bankruptcy" | "start" | "system";
+export type EconomyLogKind = "purchase" | "rent" | "tax" | "auction" | "building" | "mortgage" | "trade" | "bankruptcy" | "start" | "tavern" | "dragon" | "relic" | "quest" | "system";
 
 export interface EconomyLogEntry {
   id: string;
   kind: EconomyLogKind;
+  relicId?: import("./relics").RelicId;
+  questId?: import("./quests").QuestId;
   message: string;
   playerIds: string[];
   amount?: number;
@@ -103,6 +105,7 @@ export interface PendingPayment {
   reason: string;
   creditorType?: "player" | "bank";
   reasonType?: "rent" | "tax" | "dungeonRelease" | "card" | "cardRepair" | "other";
+  weltenwegPotContribution?: boolean;
 }
 
 export interface DungeonState {
@@ -115,6 +118,7 @@ export interface TurnContext {
   pendingExtraRoll: boolean;
   rollSequence: number;
   movementSequence?: number;
+  awaitingRuneStoneDecision?: boolean;
   rollKind?: "normal" | "dungeonAttempt";
   pendingDungeonMovement?: DiceRoll;
 }
@@ -139,6 +143,7 @@ export interface TradeAssets {
   gold: number;
   propertyTileIndices: number[];
   cardIds?: string[];
+  relicIds?: import("./relics").RelicId[];
 }
 
 export interface HeldCard {
@@ -276,6 +281,10 @@ export interface GamePlayerState {
   isBankrupt: boolean;
   dungeon: DungeonState;
   heldCards?: HeldCard[];
+  relics?: import("./relics").RelicId[];
+  armedRelics?: import("./relics").RelicId[];
+  activeQuests?: import("./quests").PlayerQuest[];
+  processedQuestEventIds?: string[];
 }
 
 export interface GameState {
@@ -290,6 +299,11 @@ export interface GameState {
   currentPlayerId?: string;
   currentTurnIndex: number;
   currentRound: number;
+  activeChronicleEvent?: import("./chronicle-events").ActiveChronicleEvent;
+  chronicleEventHistory?: import("./chronicle-events").ActiveChronicleEvent[];
+  weltenwegPot?: number;
+  wanderingDragon?: { tileIndex: number; nextMoveRound: number; encounterSequence: number };
+  lastDragonEncounterMovementSequence?: number;
   turnNumber: number;
   turnPhase: TurnPhase;
   turnContext: TurnContext;
@@ -314,6 +328,7 @@ export interface GameState {
   gameResult?: GameResult;
   lastResolvedRollSequence?: number;
   lastResolvedMovementSequence?: number;
+  lastRewardedStartMovementSequence?: number;
   lastDiceRoll?: DiceRoll;
   lastMovement?: MovementResult;
   startedAt: number;

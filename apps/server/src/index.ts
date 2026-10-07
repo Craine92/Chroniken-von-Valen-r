@@ -232,6 +232,16 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
   }
 
   if (state.turnPhase === "rolling") {
+    if (state.turnContext.awaitingRuneStoneDecision) {
+      if (current?.type === "computer") scheduleGameAction(roomCode, `computer-rune-${state.turnContext.rollSequence}`, 1_250, () => {
+        try {
+          const reroll = (state.lastDiceRoll?.total ?? 12) < 7 || Boolean(state.lastDiceRoll?.isDouble && state.turnContext.consecutiveDoubles >= 2);
+          const next = rooms.decideRuneStone(roomCode, current.id, "computer", reroll);
+          publishGameState(roomCode, next); orchestrateGame(roomCode, next);
+        } catch { /* The decision was already resolved. */ }
+      });
+      return;
+    }
     scheduleGameAction(roomCode, `begin-move-${state.turnNumber}`, 1_250, () => {
       try {
         const next = rooms.beginMovement(roomCode);
@@ -532,6 +542,28 @@ io.on("connection", (socket) => {
     } catch (error) {
       callback({ ok: false, message: error instanceof Error ? error.message : "Kerkerwurf nicht erlaubt." });
     }
+  });
+
+  for (const event of [SOCKET_EVENTS.gameUseRuneStone, SOCKET_EVENTS.gameKeepRoll]) {
+    socket.on(event, (callback) => {
+      try {
+        const { roomCode, playerId, role } = socket.data;
+        if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
+        const state = rooms.decideRuneStone(roomCode, playerId, "human", event === SOCKET_EVENTS.gameUseRuneStone);
+        publishGameState(roomCode, state); orchestrateGame(roomCode, state);
+        callback({ ok: true, gameState: state });
+      } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Reliktentscheidung nicht erlaubt." }); }
+    });
+  }
+
+  socket.on(SOCKET_EVENTS.relicActivate, (relicId, callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
+      const state = rooms.activateRelic(roomCode, playerId, relicId);
+      publishGameState(roomCode, state);
+      callback({ ok: true, gameState: state });
+    } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Reliktaktivierung nicht erlaubt." }); }
   });
 
   socket.on(SOCKET_EVENTS.gamePayDungeonRelease, (callback) => {

@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { BOARD_TILES, getCardDefinition, getPropertyGroup, getBuildingName, type CreateTradeOfferRequest, type GameState, type TradeOffer, type PropertyOwnership } from "@valenor/shared";
+import { BOARD_TILES, RELIC_DEFINITIONS, isRelicTradeBound, getCardDefinition, getPropertyGroup, getBuildingName, type CreateTradeOfferRequest, type GameState, type TradeOffer, type PropertyOwnership, type RelicId } from "@valenor/shared";
+import { RelicIcon } from "./RelicIcon";
 
 function propertyIdentity(index: number) {
   const tile = BOARD_TILES[index]!;
@@ -19,7 +20,8 @@ function Assets({ state, assets }: { state: GameState; assets: TradeOffer["offer
     {assets.gold > 0 && <span className="trade-gold">✦ {assets.gold} Gold</span>}
     {assets.propertyTileIndices.map(index => <div className="trade-property" key={index} style={{ "--property-group-accent": propertyIdentity(index).accent } as CSSProperties}><PropertyLabel state={state} index={index} /></div>)}
     {(assets.cardIds ?? []).map(cardId => <span className="trade-held-card" key={cardId}>▤ {getCardDefinition(cardId).title}</span>)}
-    {assets.gold === 0 && assets.propertyTileIndices.length === 0 && !assets.cardIds?.length && <span className="trade-empty">Keine Objekte ausgewählt</span>}
+    {(assets.relicIds ?? []).map(id => <span className="trade-relic" key={id}><RelicIcon id={id} /><strong>{RELIC_DEFINITIONS[id].name}</strong></span>)}
+    {assets.gold === 0 && assets.propertyTileIndices.length === 0 && !assets.cardIds?.length && !assets.relicIds?.length && <span className="trade-empty">Keine Objekte ausgewählt</span>}
   </div>;
 }
 
@@ -30,6 +32,17 @@ function PropertyOptions({ state, properties, selected, onToggle }: { state: Gam
     const visual = propertyIdentity(members[0]!.tileIndex);
     return <fieldset className="trade-region" key={label} style={{ "--property-group-accent": visual.accent } as CSSProperties}><legend><span aria-hidden="true">{visual.sigil}</span> {label}</legend>{members.map(entry => <label className={`trade-property${selected.includes(entry.tileIndex) ? " is-selected" : ""}`} key={entry.tileIndex}><input type="checkbox" checked={selected.includes(entry.tileIndex)} onChange={() => onToggle(entry.tileIndex)} /><PropertyLabel state={state} index={entry.tileIndex} /><span className="trade-property__check" aria-hidden="true">{selected.includes(entry.tileIndex) ? "✓" : "+"}</span></label>)}</fieldset>;
   })}{properties.length === 0 && <p className="trade-empty">Keine Grundstücke vorhanden.</p>}</div>;
+}
+
+function RelicOptions({ state, ownerId, selected, onToggle }: { state: GameState; ownerId: string; selected: RelicId[]; onToggle: (id: RelicId) => void }) {
+  const owner = state.players.find(player => player.id === ownerId);
+  return <fieldset className="trade-relic-options"><legend>RELIKTE</legend>{owner?.relics?.length ? owner.relics.map(id => {
+    const bound = isRelicTradeBound(state, owner, id);
+    return <label className={`trade-relic${bound ? " trade-relic--bound" : ""}`} key={id}>
+      <input type="checkbox" aria-label={RELIC_DEFINITIONS[id].name} disabled={bound} checked={!bound && selected.includes(id)} onChange={() => onToggle(id)} />
+      <RelicIcon id={id} /><span><strong>{RELIC_DEFINITIONS[id].name}</strong><small>{bound ? "AKTIV · nicht handelbar" : RELIC_DEFINITIONS[id].shortDescription}</small></span>
+    </label>;
+  }) : <p className="trade-empty">Keine Relikte vorhanden.</p>}</fieldset>;
 }
 
 export function TradePanel({ state, playerId, connected, onCreate, onDecision }: {
@@ -45,6 +58,8 @@ export function TradePanel({ state, playerId, connected, onCreate, onDecision }:
   const [requested, setRequested] = useState<number[]>([]);
   const [offeredCards, setOfferedCards] = useState<string[]>([]);
   const [requestedCards, setRequestedCards] = useState<string[]>([]);
+  const [offeredRelics, setOfferedRelics] = useState<RelicId[]>([]);
+  const [requestedRelics, setRequestedRelics] = useState<RelicId[]>([]);
   const recipient = state.players.find(player => player.id === recipientId);
   const ownProperties = state.propertyOwnerships.filter(entry => entry.ownerId === playerId);
   const recipientProperties = state.propertyOwnerships.filter(entry => entry.ownerId === recipientId);
@@ -57,8 +72,12 @@ export function TradePanel({ state, playerId, connected, onCreate, onDecision }:
   const toggle = <T extends number | string,>(values: T[], value: T, update: (next: T[]) => void) => update(values.includes(value) ? values.filter(entry => entry !== value) : [...values, value]);
   const statusLabel = useMemo(() => ({ accepted: "Angenommen", rejected: "Abgelehnt", cancelled: "Ungültig" }) as const, []);
   const normalizeGold = (value: string) => { if (value === "") return ""; const amount = Number(value); return Number.isFinite(amount) ? String(Math.max(0, Math.trunc(amount))) : ""; };
-  const offer = { gold: Number(offerGold) || 0, propertyTileIndices: offered, cardIds: offeredCards };
-  const request = { gold: Number(requestGold) || 0, propertyTileIndices: requested, cardIds: requestedCards };
+  const availableRelics = (ownerId: string, selected: RelicId[]) => {
+    const owner = state.players.find(player => player.id === ownerId);
+    return selected.filter(id => owner?.relics?.includes(id) && !isRelicTradeBound(state, owner, id));
+  };
+  const offer = { gold: Number(offerGold) || 0, propertyTileIndices: offered, cardIds: offeredCards, relicIds: availableRelics(playerId, offeredRelics) };
+  const request = { gold: Number(requestGold) || 0, propertyTileIndices: requested, cardIds: requestedCards, relicIds: availableRelics(recipientId, requestedRelics) };
   const disabledReason = !safe ? "Handel ist in dieser Spielphase nicht möglich." : !connected ? "Keine Verbindung zum Spielserver." : undefined;
   const renderOffer = (trade: TradeOffer, incoming: boolean) => <article className={`trade-card${incoming ? " trade-card--received" : ""}`} key={trade.id}>
     <strong>{incoming ? `HANDELSANGEBOT VON ${state.players.find(player => player.id === trade.proposerId)?.name.toUpperCase()}` : `An ${state.players.find(player => player.id === trade.recipientId)?.name}`}</strong>
@@ -74,9 +93,9 @@ export function TradePanel({ state, playerId, connected, onCreate, onDecision }:
     {targets.length > 0 ? <details className="trade-create">
       <summary>Handel anbieten</summary>
       {disabledReason && <p className="controller-disabled-reason">{disabledReason}</p>}
-      <label>Handelspartner<select value={recipientId} onChange={event => { setRecipientId(event.target.value); setRequested([]); setRequestedCards([]); }}>{targets.map(player => <option value={player.id} key={player.id}>{player.name}</option>)}</select></label>
-      <section className="trade-side"><h3>Du gibst</h3><label>Gold<input type="number" aria-label="Du gibst Gold" inputMode="numeric" min="0" step="1" placeholder="0" value={offerGold} onChange={event => setOfferGold(normalizeGold(event.target.value))} /></label><PropertyOptions state={state} properties={ownProperties} selected={offered} onToggle={index => toggle(offered, index, setOffered)} />{ownCards.map(held => <label className="trade-held-option" key={held.cardId}><input type="checkbox" checked={offeredCards.includes(held.cardId)} onChange={() => toggle(offeredCards, held.cardId, setOfferedCards)} />▤ {getCardDefinition(held.cardId).title}</label>)}</section>
-      <section className="trade-side"><h3>Du erhältst</h3><label>Gold<input type="number" aria-label="Du erhältst Gold" inputMode="numeric" min="0" step="1" placeholder="0" value={requestGold} onChange={event => setRequestGold(normalizeGold(event.target.value))} /></label><PropertyOptions state={state} properties={recipientProperties} selected={requested} onToggle={index => toggle(requested, index, setRequested)} />{recipientCards.map(held => <label className="trade-held-option" key={held.cardId}><input type="checkbox" checked={requestedCards.includes(held.cardId)} onChange={() => toggle(requestedCards, held.cardId, setRequestedCards)} />▤ {getCardDefinition(held.cardId).title}</label>)}</section>
+      <label>Handelspartner<select value={recipientId} onChange={event => { setRecipientId(event.target.value); setRequested([]); setRequestedCards([]); setRequestedRelics([]); }}>{targets.map(player => <option value={player.id} key={player.id}>{player.name}</option>)}</select></label>
+      <section className="trade-side"><h3>Du gibst</h3><label>Gold<input type="number" aria-label="Du gibst Gold" inputMode="numeric" min="0" step="1" placeholder="0" value={offerGold} onChange={event => setOfferGold(normalizeGold(event.target.value))} /></label><PropertyOptions state={state} properties={ownProperties} selected={offered} onToggle={index => toggle(offered, index, setOffered)} />{ownCards.map(held => <label className="trade-held-option" key={held.cardId}><input type="checkbox" checked={offeredCards.includes(held.cardId)} onChange={() => toggle(offeredCards, held.cardId, setOfferedCards)} />▤ {getCardDefinition(held.cardId).title}</label>)}<RelicOptions state={state} ownerId={playerId} selected={offer.relicIds} onToggle={id => toggle(offeredRelics, id, setOfferedRelics)} /></section>
+      <section className="trade-side"><h3>Du erhältst</h3><label>Gold<input type="number" aria-label="Du erhältst Gold" inputMode="numeric" min="0" step="1" placeholder="0" value={requestGold} onChange={event => setRequestGold(normalizeGold(event.target.value))} /></label><PropertyOptions state={state} properties={recipientProperties} selected={requested} onToggle={index => toggle(requested, index, setRequested)} />{recipientCards.map(held => <label className="trade-held-option" key={held.cardId}><input type="checkbox" checked={requestedCards.includes(held.cardId)} onChange={() => toggle(requestedCards, held.cardId, setRequestedCards)} />▤ {getCardDefinition(held.cardId).title}</label>)}<RelicOptions state={state} ownerId={recipientId} selected={request.relicIds} onToggle={id => toggle(requestedRelics, id, setRequestedRelics)} /></section>
       <div className="trade-summary" aria-live="polite"><h3>Dein Angebot im Überblick</h3><div className="trade-side"><h4>Du gibst</h4><Assets state={state} assets={offer} /></div><div className="trade-side"><h4>Du erhältst</h4><Assets state={state} assets={request} /></div></div>
       <button className="controller-primary-action" disabled={!safe || !connected || !recipient} onClick={() => onCreate({ recipientId, offer, request })}>Angebot senden</button>
     </details> : <p>Kein Handelspartner verfügbar.</p>}

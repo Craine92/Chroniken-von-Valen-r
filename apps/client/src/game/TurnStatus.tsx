@@ -1,4 +1,4 @@
-import { BOARD_TILES, calculatePropertyRent, getBuildingName, type BoardTileType, type GameState } from "@valenor/shared";
+import { BOARD_TILES, getEffectiveRent, getEffectivePurchasePrice, getBuildingName, type BoardTileType, type GameState } from "@valenor/shared";
 import { PropertyCard } from "../components/PropertyCard";
 
 const TYPE_LABELS: Record<BoardTileType, string> = {
@@ -58,7 +58,7 @@ export function TurnStatus({ state }: { state: GameState }) {
   const ownership = shownTile ? state.propertyOwnerships.find((entry) => entry.tileIndex === shownTile.index) : undefined;
   const owner = ownership ? state.players.find((player) => player.id === ownership.ownerId) : undefined;
   const landedRent = landed?.type === "property" && ownership && owner
-    ? calculatePropertyRent(state.propertyOwnerships, landed, owner.id)
+    ? getEffectiveRent(state, landed, owner.id)
     : undefined;
   return (
     <section className="turn-overlay">
@@ -82,7 +82,7 @@ export function TurnStatus({ state }: { state: GameState }) {
           <small>GELANDET AUF FELD {landed.index}</small>
           <strong>{landed.name}</strong>
           <span>{landed.type === "property" && landed.propertyGroup ? `${landed.propertyGroup} · ${TYPE_LABELS[landed.type]}` : TYPE_LABELS[landed.type]}</span>
-          {landed.economy && <b>{landed.economy.purchasePrice} GOLD</b>}
+          {landed.economy && <b>{getEffectivePurchasePrice(state, landed)} GOLD</b>}
           {landed.type === "property" && landed.region && ownership && ownership.buildingLevel > 0 && (
             <><b>{getBuildingName(landed.region, ownership.buildingLevel)}</b><em>Miete: {landedRent} Gold</em></>
           )}
@@ -92,7 +92,7 @@ export function TurnStatus({ state }: { state: GameState }) {
       )}
       {shownTile?.economy && ["propertyDecision", "auction"].includes(state.turnPhase) && (
         <div className="economy-overlay">
-          <PropertyCard tile={shownTile} {...(ownership ? { ownership } : {})} {...(owner ? { owner } : {})} />
+          <PropertyCard tile={shownTile} state={state} {...(ownership ? { ownership } : {})} {...(owner ? { owner } : {})} />
           {state.turnPhase === "propertyDecision" ? (
             <p>{current.name} entscheidet über den Kauf.</p>
           ) : (

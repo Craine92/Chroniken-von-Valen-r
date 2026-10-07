@@ -1,6 +1,7 @@
 import type { AuctionBidIncrement } from "./economy";
 import type { GameConfig, GameRoom, GameState, MagicSignal, Player, TradeAssets } from "./game";
 import type { PropertyGroupId } from "./property-groups";
+import type { RelicId } from "./relics";
 
 export const SOCKET_EVENTS = {
   roomCreate: "room:create",
@@ -18,6 +19,9 @@ export const SOCKET_EVENTS = {
   gameState: "game:state",
   gameRollOrder: "game:rollOrder",
   gameRollDice: "game:rollDice",
+  gameUseRuneStone: "game:useRuneStone",
+  gameKeepRoll: "game:keepRoll",
+  relicActivate: "relic:activate",
   gameRollDungeon: "game:rollDungeon",
   gamePayDungeonRelease: "game:payDungeonRelease",
   gameUseDungeonCard: "game:useDungeonCard",
@@ -109,6 +113,9 @@ export interface ClientToServerEvents {
   "game:start": (callback: (result: StartGameResult) => void) => void;
   "game:rollOrder": (callback: (result: GameActionResult) => void) => void;
   "game:rollDice": (callback: (result: GameActionResult) => void) => void;
+  "game:useRuneStone": (callback: (result: GameActionResult) => void) => void;
+  "game:keepRoll": (callback: (result: GameActionResult) => void) => void;
+  "relic:activate": (relicId: RelicId, callback: (result: GameActionResult) => void) => void;
   "game:rollDungeon": (callback: (result: GameActionResult) => void) => void;
   "game:payDungeonRelease": (callback: (result: GameActionResult) => void) => void;
   "game:useDungeonCard": (callback: (result: GameActionResult) => void) => void;

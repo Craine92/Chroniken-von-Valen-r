@@ -4,6 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { GameState } from "@valenor/shared";
 import { TradePanel } from "./TradePanel";
+import { RELIC_ASSETS } from "../game/assets/asset-manifest";
 
 function state(): GameState {
   return {
@@ -24,6 +25,15 @@ function state(): GameState {
     startedAt: 1
   };
 }
+
+test("relic trades display central assets and descriptions while armed relic selection is disabled", () => {
+  const game = state(); game.players[0]!.relics = ["runestone","merchant-seal"]; game.players[0]!.armedRelics = ["merchant-seal"];
+  game.players[1]!.relics = ["golden-feather"]; game.trades[0]!.offer.relicIds = ["golden-feather"]; game.trades[0]!.request.relicIds = ["runestone"];
+  const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
+  assert.match(markup,/RELIKTE/); assert.match(markup,/AKTIV · nicht handelbar/);
+  assert.match(markup,/aria-label="Siegel des Händlers" disabled=""/); assert.match(markup,/Wurf einmal wiederholen/);
+  for (const id of ["runestone","merchant-seal","golden-feather"] as const) assert.ok(markup.includes(RELIC_ASSETS[id].path));
+});
 
 test("trade panel renders received assets and touch actions", () => {
   const markup = renderToStaticMarkup(<TradePanel state={state()} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);

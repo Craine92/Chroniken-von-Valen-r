@@ -7,6 +7,7 @@ import {
   type BuildingLevel,
   type GameState
 } from "@valenor/shared";
+import { completeQuests } from "./quest-service";
 
 const MAX_LOG_ENTRIES = 12;
 
@@ -34,6 +35,7 @@ export class BuildingService {
       ? `${player.name} errichtet eine ${buildingName} auf ${tile.name} für ${cost} Gold.`
       : `${player.name} erweitert ${tile.name} zum ${buildingName} für ${cost} Gold.`;
     this.record(state, "build", playerId, tileIndex, fromLevel, toLevel, buildingName, cost, message, -cost);
+    completeQuests(state, playerId, state.lastBuildingAction!.id, ["build"]);
   }
 
   sell(state: GameState, playerId: string, tileIndex: number): void {
@@ -91,4 +93,3 @@ export class BuildingService {
     state.economyLog = state.economyLog.slice(-MAX_LOG_ENTRIES);
   }
 }
-

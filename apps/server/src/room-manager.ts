@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import {
   DEFAULT_GAME_CONFIG,
   BUILDING_BANK_CAPACITY,
@@ -12,6 +12,7 @@ import {
   type AuctionBidIncrement,
   type CardDeckType
 } from "@valenor/shared";
+import type { RelicId } from "@valenor/shared";
 import { DiceService } from "./game/dice-service";
 import { EconomyService } from "./game/economy-service";
 import { BuildingService } from "./game/building-service";
@@ -19,6 +20,8 @@ import { MortgageService } from "./game/mortgage-service";
 import { TradeService, type CreateTradeRequest } from "./game/trade-service";
 import { BankruptcyService } from "./game/bankruptcy-service";
 import { TurnEngine } from "./game/turn-engine";
+import { activateRelic, initializeWanderingDragon, resolveDragonEncounter } from "./game/chronicle-event-service";
+import { initializePlayerQuests } from "./game/quest-service";
 import { CardService, type PrivateCardRuntime } from "./game/card-service";
 import type { CardShuffleSource } from "./game/card-deck";
 import { QuickGameClockService, type TimeSource } from "./game/quick-game-clock-service";
@@ -64,8 +67,8 @@ export class RoomManager {
   private readonly quickClock: QuickGameClockService;
   private readonly quickScoring = new QuickGameScoringService();
 
-  constructor(dice?: DiceService, cardShuffleSource?: CardShuffleSource, timeSource?: TimeSource) {
-    this.turns = new TurnEngine(dice);
+  constructor(dice?: DiceService, cardShuffleSource?: CardShuffleSource, timeSource?: TimeSource, private readonly chooseWorldIndex: (count: number) => number = randomInt) {
+    this.turns = new TurnEngine(dice, chooseWorldIndex);
     this.cards = new CardService(cardShuffleSource, dice);
     this.quickClock = new QuickGameClockService(timeSource);
   }
@@ -210,7 +213,8 @@ export class RoomManager {
         position: 0,
         isBankrupt: false,
         dungeon: { inDungeon: false, failedAttempts: 0 },
-        heldCards: []
+        heldCards: [],
+        relics: [], armedRelics: []
       })),
       turnOrder: [],
       orderRolls: room.players.map((player) => ({ playerId: player.id, rolls: [] })),
@@ -218,6 +222,8 @@ export class RoomManager {
       orderRollTargetCount: 1,
       currentTurnIndex: 0,
       currentRound: 1,
+      chronicleEventHistory: [],
+      weltenwegPot: 0,
       turnNumber: 0,
       turnPhase: "determiningOrder",
       turnContext: { consecutiveDoubles: 0, pendingExtraRoll: false, rollSequence: 0 },
@@ -230,6 +236,8 @@ export class RoomManager {
       trades: [],
       startedAt: Date.now()
     };
+    initializeWanderingDragon(gameState, this.chooseWorldIndex);
+    initializePlayerQuests(gameState);
     room.cardRuntime = this.cards.createRuntime();
     this.cards.syncPublicDecks(gameState, room.cardRuntime);
     room.phase = "playing";
@@ -248,6 +256,11 @@ export class RoomManager {
 
   rollTurn(roomCode: string, playerId: string, actorType: PlayerType): GameState {
     const state = this.requireGameState(roomCode);
+    const player = state.players.find(player => player.id === playerId);
+    // Computer players make the same activation choice before their normal roll.
+    if (actorType === "computer" && player?.type === "computer" && state.currentPlayerId === playerId && state.turnPhase === "waitingForRoll") {
+      for (const id of player.relics ?? []) if (id !== "runestone" && !player.armedRelics?.includes(id)) activateRelic(state, playerId, id);
+    }
     this.turns.rollTurn(state, playerId, actorType);
     return this.cloneGameState(state);
   }
@@ -255,6 +268,18 @@ export class RoomManager {
   rollDungeon(roomCode: string, playerId: string, actorType: PlayerType): GameState {
     const state = this.requireGameState(roomCode);
     this.turns.rollDungeon(state, playerId, actorType);
+    return this.cloneGameState(state);
+  }
+
+  decideRuneStone(roomCode: string, playerId: string, actorType: PlayerType, reroll: boolean): GameState {
+    const state = this.requireGameState(roomCode);
+    this.turns.decideRuneStone(state, playerId, actorType, reroll);
+    return this.cloneGameState(state);
+  }
+
+  activateRelic(roomCode: string, playerId: string, relicId: RelicId): GameState {
+    const state = this.requireGameState(roomCode);
+    activateRelic(state, playerId, relicId);
     return this.cloneGameState(state);
   }
 
@@ -292,10 +317,13 @@ export class RoomManager {
     const state = this.requireGameState(roomCode);
     const runtime = this.requireCardRuntime(roomCode);
     const tileType = state.lastMovement?.landedTile.type;
+    this.economy.awardStartPass(state);
+    resolveDragonEncounter(state, this.chooseWorldIndex);
     if (tileType === "adventure" || tileType === "fate") this.cards.awaitDraw(state, tileType);
     else if (tileType === "goToDungeon") {
       if (state.cardResolution?.status === "waitingForLanding") this.cards.sendToDungeonFromLanding(state);
       else this.turns.sendCurrentPlayerToDungeon(state);
+      this.cards.resumeAfterLanding(state, runtime);
     } else {
       this.economy.resolveLanding(state);
       this.cards.resumeAfterLanding(state, runtime);
@@ -612,8 +640,12 @@ export class RoomManager {
     this.finishGameIfReady(gameState);
     return {
       ...gameState,
+      weltenwegPot: gameState.weltenwegPot ?? 0,
       config: { ...gameState.config },
-      players: gameState.players.map((player) => ({ ...player, dungeon: { ...player.dungeon }, heldCards: (player.heldCards ?? []).map((card) => ({ ...card })) })),
+      players: gameState.players.map((player) => ({ ...player, dungeon: { ...player.dungeon }, heldCards: (player.heldCards ?? []).map((card) => ({ ...card })), relics: [...(player.relics ?? [])], armedRelics: [...(player.armedRelics ?? [])],
+        ...(player.activeQuests ? { activeQuests: player.activeQuests.map(quest => ({ ...quest })) } : {}),
+        ...(player.processedQuestEventIds ? { processedQuestEventIds: [...player.processedQuestEventIds] } : {}) })),
+      ...(gameState.wanderingDragon ? { wanderingDragon: { ...gameState.wanderingDragon } } : {}),
       turnContext: {
         ...gameState.turnContext,
         ...(gameState.turnContext.pendingDungeonMovement ? { pendingDungeonMovement: { ...gameState.turnContext.pendingDungeonMovement } } : {})
@@ -627,10 +659,14 @@ export class RoomManager {
       propertyOwnerships: gameState.propertyOwnerships.map((ownership) => ({ ...ownership })),
       buildingBank: { ...gameState.buildingBank },
       economyLog: gameState.economyLog.map((entry) => ({ ...entry, playerIds: [...entry.playerIds] })),
+      chronicleEventHistory: (gameState.chronicleEventHistory ?? []).map((event) => ({ ...event, ...(event.targetRegions ? { targetRegions: [...event.targetRegions] } : {}), ...(event.affectedTileTypes ? { affectedTileTypes: [...event.affectedTileTypes] } : {}) })),
+      ...(gameState.activeChronicleEvent ? { activeChronicleEvent: { ...gameState.activeChronicleEvent,
+        ...(gameState.activeChronicleEvent.targetRegions ? { targetRegions: [...gameState.activeChronicleEvent.targetRegions] } : {}),
+        ...(gameState.activeChronicleEvent.affectedTileTypes ? { affectedTileTypes: [...gameState.activeChronicleEvent.affectedTileTypes] } : {}) } } : {}),
       trades: gameState.trades.map((trade) => ({
         ...trade,
-        offer: { ...trade.offer, propertyTileIndices: [...trade.offer.propertyTileIndices], cardIds: [...(trade.offer.cardIds ?? [])] },
-        request: { ...trade.request, propertyTileIndices: [...trade.request.propertyTileIndices], cardIds: [...(trade.request.cardIds ?? [])] }
+        offer: { ...trade.offer, propertyTileIndices: [...trade.offer.propertyTileIndices], cardIds: [...(trade.offer.cardIds ?? [])], relicIds: [...(trade.offer.relicIds ?? [])] },
+        request: { ...trade.request, propertyTileIndices: [...trade.request.propertyTileIndices], cardIds: [...(trade.request.cardIds ?? [])], relicIds: [...(trade.request.relicIds ?? [])] }
       })),
       ...(gameState.auction ? {
         auction: {

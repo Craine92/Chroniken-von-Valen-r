@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BOARD_CORNER_TILE_INDICES, BOARD_TILES, DUNGEON_TILE_INDEX, NORMAL_STARTING_GOLD, SOCKET_EVENTS, validateBoardTiles, type GameState } from "@valenor/shared";
+import { BOARD_CORNER_TILE_INDICES, BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, NORMAL_STARTING_GOLD, SOCKET_EVENTS, validateBoardTiles, type GameState } from "@valenor/shared";
 import { RoomManager } from "./room-manager";
 import { DiceService, type RandomSource } from "./game/dice-service";
 import { FakeTimeSource } from "./game/quick-game-clock-service";
@@ -11,11 +11,34 @@ class TestSequenceRandom implements RandomSource {
 }
 
 function roomWithHuman() {
-  const manager = new RoomManager();
+  const manager = new RoomManager(undefined, undefined, undefined, () => 0);
   const { room } = manager.createRoom("host-1");
   const human = manager.joinRoom(room.code, "Philipp", "socket-1");
   return { manager, roomCode: room.code, human };
 }
+
+test("chronicle snapshots stay isolated and blessed passage is paid before drawing a card", () => {
+  const { manager, roomCode, human } = roomWithHuman();
+  manager.addComputer(roomCode, "host-1"); manager.startGame(roomCode, "host-1");
+  const live = (manager as unknown as { rooms: Map<string, { gameState: GameState }> }).rooms.get(roomCode)!.gameState;
+  live.currentRound = 4; live.currentPlayerId = human.player.id;
+  live.activeChronicleEvent = { ...CHRONICLE_EVENTS[2]!, startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 1 };
+  live.chronicleEventHistory = [{ ...live.activeChronicleEvent }];
+  const snapshot = manager.getGameState(roomCode)!;
+  snapshot.activeChronicleEvent!.title = "Changed on client";
+  snapshot.chronicleEventHistory![0]!.title = "Changed in history";
+  snapshot.chronicleEventHistory!.length = 0;
+  assert.equal(manager.getGameState(roomCode)!.activeChronicleEvent!.title, "Segen des Runentors");
+  assert.equal(manager.getGameState(roomCode)!.chronicleEventHistory![0]!.title, "Segen des Runentors");
+  live.turnPhase = "landed";
+  live.lastMovement = { kind: "card", sequence: 1, playerId: human.player.id, from: 39, to: 2, path: [0,1,2], passedStart: true, landedTile: BOARD_TILES[2]! };
+  const landed = manager.resolveLanding(roomCode);
+  assert.equal(landed.turnPhase, "awaitingCardDraw");
+  const expectedGold = 1800 + landed.economyLog.filter(entry => entry.kind === "quest").reduce((total, entry) => total + (entry.amount ?? 0), 0);
+  assert.equal(landed.players[0]!.gold, expectedGold);
+  assert.throws(() => manager.resolveLanding(roomCode));
+  assert.equal(manager.getGameState(roomCode)!.players[0]!.gold, expectedGold);
+});
 
 test("allows one human and one computer to start", () => {
   const { manager, roomCode } = roomWithHuman();
@@ -28,6 +51,7 @@ test("allows one human and one computer to start", () => {
   assert.deepEqual(state.economyLog, []);
   assert.deepEqual(state.buildingBank, { settlementUnitsAvailable: 32, grandStructuresAvailable: 12 });
   assert.equal(state.auction, undefined);
+  assert.equal(state.weltenwegPot, 0);
   assert.equal(state.pendingPayment, undefined);
 });
 

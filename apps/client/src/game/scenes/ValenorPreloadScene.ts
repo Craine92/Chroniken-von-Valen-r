@@ -14,6 +14,10 @@ export class ValenorPreloadScene extends Phaser.Scene {
   preload() {
     this.load.on(Phaser.Loader.Events.PROGRESS, (progress: number) => this.callbacks.onProgress?.(progress));
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, (file: Phaser.Loader.File) => {
+      if (file.key.startsWith("dragon-frame-")) {
+        if (import.meta.env.DEV) console.warn(`[Dragon] Missing frame ${file.key}: ${file.url}; remaining frames or procedural fallback will be used.`);
+        return;
+      }
       if (file.key === "field-base-horizontal") {
         console.warn("[Board] Missing horizontal field asset – using fallback");
         return;

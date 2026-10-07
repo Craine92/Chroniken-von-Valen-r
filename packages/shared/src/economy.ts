@@ -48,7 +48,45 @@ export function calculatePropertyRent(
     ? baseRent * 2
     : baseRent;
 }
-import { getPropertyGroupTiles } from "./board";
+import { BOARD_TILES, getPropertyGroupTiles } from "./board";
 import type { BoardTile } from "./board";
-import type { PropertyOwnership } from "./game";
+import type { GameState, PropertyOwnership } from "./game";
 import { isGroupEconomicallyActive } from "./finance";
+import { getActiveChronicleEvent, isChronicleTileAffected } from "./chronicle-events";
+import { isRelicArmed } from "./relics";
+
+export function getEffectivePurchasePrice(state: GameState, tile: BoardTile, buyerId = state.currentPlayerId): number {
+  const price = tile.economy?.purchasePrice ?? 0;
+  const unsold = !state.propertyOwnerships.some((entry) => entry.tileIndex === tile.index);
+  if (!unsold) return price;
+  const event = getActiveChronicleEvent(state);
+  const chronicleDiscount = !state.auction && state.turnPhase !== "auction" && event?.effectType === "purchaseDiscount" && isChronicleTileAffected(event, tile) ? .8 : 1;
+  const sealDiscount = state.turnPhase !== "auction" && isRelicArmed(state.players.find(player => player.id === buyerId), "merchant-seal") ? .75 : 1;
+  return Math.round(price * chronicleDiscount * sealDiscount);
+}
+
+export function applyChronicleRentModifier(state: GameState, tile: BoardTile, rent: number): number {
+  const event = getActiveChronicleEvent(state);
+  if (!isChronicleTileAffected(event, tile)) return rent;
+  if (event?.effectType === "rentDiscount") return Math.round(rent * .75);
+  if (event?.effectType === "regionalRentBonus") return Math.round(rent * 1.25);
+  return rent;
+}
+
+export function getEffectiveRent(state: GameState, tile: BoardTile, ownerId: string): number {
+  const ownership = state.propertyOwnerships.find((entry) => entry.tileIndex === tile.index && entry.ownerId === ownerId);
+  if (!ownership || ownership.mortgaged) return 0;
+  let rent = 0;
+  if (tile.type === "property") rent = calculatePropertyRent(state.propertyOwnerships, tile, ownerId);
+  else {
+    const count = state.propertyOwnerships.filter((entry) => entry.ownerId === ownerId && !entry.mortgaged && BOARD_TILES[entry.tileIndex]?.type === tile.type).length;
+    if (tile.type === "harbor") rent = ECONOMY_CONFIG.harborRents[Math.max(0, count - 1)] ?? 0;
+    if (tile.type === "utility") rent = ECONOMY_CONFIG.utilityMultipliers[count >= 2 ? 1 : 0] * (state.lastDiceRoll?.total ?? 0);
+  }
+  return applyChronicleRentModifier(state, tile, rent);
+}
+
+export function getStartPassReward(state: GameState, playerId = state.currentPlayerId): number {
+  const base = getActiveChronicleEvent(state)?.effectType === "startPassBonus" ? 300 : PASS_START_GOLD;
+  return base + (isRelicArmed(state.players.find(player => player.id === playerId), "golden-feather") ? 100 : 0);
+}

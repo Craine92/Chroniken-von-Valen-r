@@ -1,6 +1,6 @@
 import { audioManager, type AudioSettings } from "../audio/AudioManager";
 
-export type MobileFeedbackType = "turn" | "tradeOffer" | "tradeAccepted" | "tradeRejected" | "purchase" | "build" | "coin" | "adventure" | "fate" | "double";
+export type MobileFeedbackType = "turn" | "tradeOffer" | "tradeAccepted" | "tradeRejected" | "purchase" | "build" | "coin" | "adventure" | "fate" | "double" | "chronicle";
 export interface MobileFeedback {
   id: string;
   type: MobileFeedbackType;

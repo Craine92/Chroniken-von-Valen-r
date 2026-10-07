@@ -98,7 +98,10 @@ export function PropertyGroupOverview({
           );
         })}
       </div>
-      <p className={`property-group__build-status${buildAvailable ? " can-build" : ""}`}>{buildAvailable ? "✦ " : ""}{onSelectTile && missingCount > 0 ? `Fehlt: ${missingTiles.map((tile) => tile.name).join(" · ")}` : buildStatus}</p>
+      <p className={`property-group__build-status${buildAvailable ? " can-build" : ""}`}>
+        {buildAvailable ? "✦ " : ""}{onSelectTile && missingCount > 0 ? `Fehlt: ${missingTiles.map((tile) => tile.name).join(" · ")}` : buildStatus}
+        {onSelectTile && buildAvailable && <span className="property-group__build-hint">Grundstück auswählen</span>}
+      </p>
       {onSelectTile && onSelect && groupDefinition && <button type="button" className="controller-board-focus" aria-pressed={selected} onClick={() => onSelect(groupDefinition.id)}>{selected ? "Markierung aufheben" : "Gruppe auf dem Board markieren"}</button>}
     </div>
   );

@@ -15,7 +15,7 @@ class SequenceRandomSource implements RandomSource {
 }
 
 function managerWithSequence(values: number[]) {
-  return new RoomManager(new DiceService(new SequenceRandomSource(values)));
+  return new RoomManager(new DiceService(new SequenceRandomSource(values)), undefined, undefined, () => 0);
 }
 
 test("dice service reports total and doubles deterministically", () => {

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { BOARD_TILES, type GameState } from "@valenor/shared";
+import { advanceChronicleEvents, advanceWanderingDragon } from "./chronicle-event-service";
 
 export function completeBankruptcyTurn(state: GameState): void {
   delete state.pendingPayment;
@@ -25,7 +26,11 @@ export function completeBankruptcyTurn(state: GameState): void {
   let nextIndex = currentIndex;
   do nextIndex = (nextIndex + 1) % state.turnOrder.length;
   while (state.players.find((player) => player.id === state.turnOrder[nextIndex])?.isBankrupt);
-  if (nextIndex <= currentIndex) state.currentRound += 1;
+  if (nextIndex <= currentIndex) {
+    state.currentRound += 1;
+    advanceChronicleEvents(state);
+    advanceWanderingDragon(state);
+  }
   state.currentTurnIndex = nextIndex;
   state.currentPlayerId = state.turnOrder[nextIndex]!;
   state.turnNumber += 1;

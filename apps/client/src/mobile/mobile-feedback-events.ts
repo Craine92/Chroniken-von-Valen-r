@@ -1,4 +1,4 @@
-import { BOARD_TILES, getPropertyGroup, type GameState } from "@valenor/shared";
+import { BOARD_TILES, RELIC_DEFINITIONS, QUEST_DEFINITIONS, getActiveChronicleEvent, getChronicleRegionLabel, getPropertyGroup, type GameState } from "@valenor/shared";
 import { openControllerTrade, type MobileFeedback } from "./mobile-feedback";
 
 // Reads server-confirmed records only. No actions, balances or game rules are changed.
@@ -23,6 +23,10 @@ export class MobileFeedbackEventTracker {
     if (!viewer || viewer.isBankrupt || state.status !== "playing") { this.previous = state; return events; }
     const name = (id: string) => state.players.find((player) => player.id === id)?.name;
     const region = (index: number) => getPropertyGroup(BOARD_TILES[index]?.propertyGroupId);
+
+    const chronicle = getActiveChronicleEvent(state);
+    if (chronicle) add({ id: `chronicle:${chronicle.id}:${chronicle.startedAtRound}`, type: "chronicle",
+      title: chronicle.title.toUpperCase(), message: [getChronicleRegionLabel(chronicle), chronicle.effectSummary].filter(Boolean).join(" · "), icon: "✦" });
 
     if (state.currentPlayerId === playerId && state.turnPhase !== "determiningOrder" && state.turnPhase !== "turnTransition") {
       add({ id: `turn:${state.turnNumber}:${playerId}`, type: "turn", title: "DU BIST AM ZUG",
@@ -60,7 +64,10 @@ export class MobileFeedbackEventTracker {
     }
     for (const entry of state.economyLog) {
       if (!entry.playerIds.includes(playerId)) continue;
-      if (entry.kind === "purchase") {
+      if (entry.kind === "quest" && entry.questId && entry.amount !== undefined) {
+        const quest = QUEST_DEFINITIONS[entry.questId];
+        add({ id: `economy:${entry.id}`, type: "coin", title: "AUFTRAG ERFÜLLT", message: `${quest.title} · +${entry.amount} Gold`, icon: quest.symbol, hapticPattern: 60 });
+      } else if (entry.kind === "purchase") {
         const acquired = state.propertyOwnerships.filter((ownership) => ownership.ownerId === playerId &&
           !this.previous?.propertyOwnerships.some((old) => old.tileIndex === ownership.tileIndex && old.ownerId === playerId));
         const tile = acquired.length === 1 ? BOARD_TILES[acquired[0]!.tileIndex] : undefined;
@@ -68,6 +75,13 @@ export class MobileFeedbackEventTracker {
           message: tile ? `${tile.name} gehört jetzt dir.` : entry.message,
           accent: tile ? region(tile.index)?.accent : undefined,
           icon: tile ? region(tile.index)?.sigil ?? "♜" : "♜" });
+      } else if (entry.kind === "dragon" || entry.kind === "relic") {
+        const relic = entry.relicId ? RELIC_DEFINITIONS[entry.relicId] : undefined;
+        add({ id: `economy:${entry.id}`, type: "coin", title: entry.kind === "dragon" ? "DER WANDERNDE DRACHE" : relic?.name.toUpperCase() ?? "RELIKT VERWENDET",
+          message: entry.kind === "dragon" && relic ? `${relic.name}: ${relic.shortDescription}` : entry.message, icon: relic?.symbol ?? "✦" });
+      } else if (entry.kind === "tavern" && entry.amount !== undefined && entry.amount > 0) {
+        add({ id: `economy:${entry.id}`, type: "coin", title: "TAVERNE AM WELTENWEG",
+          message: `Glück beim Knobeln! +${entry.amount} Gold`, icon: "V" });
       } else if (entry.kind === "rent" && entry.playerIds.length === 2 && entry.amount !== undefined) {
         // EconomyService records payer first, recipient second, after settlement.
         const [payer, recipient] = entry.playerIds;

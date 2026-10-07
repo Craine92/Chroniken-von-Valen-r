@@ -1,10 +1,10 @@
 import Phaser from "phaser";
-import { BOARD_TILES, DUNGEON_TILE_INDEX, type GameState, type PropertyGroupId, type RegionType } from "@valenor/shared";
-import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, getBoardFitZoom, getTilePlacement, getTileWorldPosition, getTokenLabelOffset, getTokenSlotOffset } from "../board-layout";
+import { BOARD_TILES, DUNGEON_TILE_INDEX, MAX_RELICS, RELIC_DEFINITIONS, isRelicArmed, type GameState, type PropertyGroupId, type RegionType } from "@valenor/shared";
+import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, getBoardFitZoom, getInnerEdgeOffset, getTilePlacement, getTileWorldPosition, getTokenLabelOffset, getTokenSlotOffset } from "../board-layout";
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { PropertyGroupLayer } from "../layers/PropertyGroupLayer";
 import { BoardArtLayer } from "../layers/BoardArtLayer";
-import { CHARACTER_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
+import { CHARACTER_ASSETS, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
 import { fitImage } from "../assets/asset-runtime";
 import { BOARD_DEPTHS } from "../layers/board-depths";
 import { DEFAULT_GRAPHICS_QUALITY, VISUAL_QUALITY, prefersReducedMotion } from "../visual-config";
@@ -40,6 +40,9 @@ export class ValenorBoardScene extends Phaser.Scene {
   private readonly tokenVisuals = new Map<string, Phaser.GameObjects.Container>();
   private readonly tokenNameLabels = new Map<string, Phaser.GameObjects.Container>();
   private readonly tokenPointers = new Map<string, Phaser.GameObjects.Graphics>();
+  private readonly tokenRelics = new Map<string, Phaser.GameObjects.Container>();
+  private relicSignature = "";
+  private relicBadgeSize = 24;
   private readonly dungeonMarkers = new Map<string, Phaser.GameObjects.Container>();
   private readonly activeRings = new Map<string, Phaser.GameObjects.Container>();
   private readonly ownershipMarkers = new Map<number, Phaser.GameObjects.Container>();
@@ -56,6 +59,10 @@ export class ValenorBoardScene extends Phaser.Scene {
   private propertyGroupLayer: PropertyGroupLayer | undefined;
   private externalPropertyGroupFocus: PropertyGroupId | undefined;
   private currentPlayerId: string | undefined;
+  private dragon: Phaser.GameObjects.Container | undefined;
+  private readonly dragonVisuals: Phaser.GameObjects.Container[] = [];
+  private dragonSprite: Phaser.GameObjects.Sprite | undefined;
+  private dragonTileIndex: number | undefined;
   private readonly reducedMotion = prefersReducedMotion();
   private readonly visualQuality = VISUAL_QUALITY[DEFAULT_GRAPHICS_QUALITY];
   private lastDiagnosticAt = 0;
@@ -89,9 +96,12 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.drawRealmMiniatures(renderedRealmBackgrounds);
     this.artLayer.renderBoardEffects();
     this.drawCenterTitle();
+    this.artLayer.syncChronicle(this.state, this.reducedMotion);
     this.drawCardDecks();
     this.drawMotes();
     this.drawPlayerTokens();
+    this.syncTokenRelics(this.state);
+    this.syncDragon(this.state);
     this.syncActivePlayer(this.state.currentPlayerId);
     this.drawOwnershipMarkers();
     this.developmentLayer = new PropertyDevelopmentLayer(this);
@@ -116,6 +126,12 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.propertyGroupLayer = undefined;
       this.artLayer = undefined;
       this.tileLayer = undefined;
+      this.dragon = undefined;
+      this.dragonSprite = undefined;
+      this.dragonTileIndex = undefined;
+      this.dragonVisuals.length = 0;
+      this.tokenRelics.clear();
+      this.relicSignature = "";
     });
     if (import.meta.env.DEV) {
       console.info("ValenorBoardScene created");
@@ -151,9 +167,12 @@ export class ValenorBoardScene extends Phaser.Scene {
     const playerChanged = this.currentPlayerId !== next.currentPlayerId;
     this.state = next;
     this.propertyGroupLayer?.sync(next);
+    this.artLayer?.syncChronicle(next, this.reducedMotion);
     this.syncActivePlayer(next.currentPlayerId);
     if (playerChanged && next.turnPhase === "waitingForRoll") this.focusActivePlayer(next.currentPlayerId);
     this.syncDungeonMarkers(next);
+    this.syncTokenRelics(next);
+    this.syncDragon(next);
     this.developmentLayer?.sync(next, true);
     const ownershipSignature = next.propertyOwnerships.map((entry) => `${entry.tileIndex}:${entry.ownerId}:${entry.mortgaged}`).join("|");
     if (ownershipSignature !== this.ownershipSignature) this.drawOwnershipMarkers();
@@ -178,6 +197,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.lastDiagnosticAt = time;
     this.game.canvas.dataset.activeDisplayObjects = String(this.children.list.filter((object) => object.active).length);
     this.game.canvas.dataset.activeTweens = String(this.tweens.getTweens().length);
+    this.game.canvas.dataset.dragonFrame = this.dragonSprite?.texture.key ?? "fallback";
   }
 
   private drawTableSurface() {
@@ -513,6 +533,9 @@ export class ValenorBoardScene extends Phaser.Scene {
       dungeonMarker.add([bars, chain]);
       const tokenVisual = this.add.container(0, 0).setName("token-visual");
       tokenVisual.add([pointer, shadowSoft, shadowCore, glow, baseLower, baseOuter, baseInner, baseRune, miniatureVisual, dungeonMarker, activeRing, nameLabel]);
+      const relicBadges = this.add.container(0, 0).setName(`relics-${player.id}`);
+      tokenVisual.add(relicBadges);
+      this.tokenRelics.set(player.id, relicBadges);
       token.add(tokenVisual);
       this.tokens.set(player.id, token);
       this.tokenVisuals.set(player.id, tokenVisual);
@@ -526,6 +549,42 @@ export class ValenorBoardScene extends Phaser.Scene {
         this.tweens.add({ targets: miniatureVisual, y: -4, duration: 1500 + index * 170, yoyo: true, repeat: -1, ease: "Sine.InOut" });
       }
     });
+  }
+
+  private syncTokenRelics(state: GameState): void {
+    const signature = state.players.map(player => `${player.id}:${player.position}:${player.relics?.join(",")}:${player.armedRelics?.join(",")}`).join("|") + this.relicBadgeSize;
+    if (signature === this.relicSignature) return;
+    this.relicSignature = signature;
+    let iconCount = 0;
+    state.players.forEach(player => {
+      const row = this.tokenRelics.get(player.id);
+      if (!row) return;
+      row.removeAll(true);
+      const sameTile = state.players.filter(other => other.position === player.position);
+      const slot = sameTile.findIndex(other => other.id === player.id);
+      const offsets = sameTile.map((_, index) => getTokenSlotOffset(player.position, sameTile.length, index));
+      const minX = Math.min(...offsets.map(offset => offset.x));
+      const maxX = Math.max(...offsets.map(offset => offset.x));
+      const ownX = offsets[slot]!.x;
+      const side = getTilePlacement(player.position).side;
+      // Fan badges away from the neighboring miniature, using its existing slot.
+      const direction = maxX > minX ? (ownX === minX ? -1 : 1) : side === "left" ? -1 : 1;
+      const startX = Math.max(48, direction > 0 ? maxX - ownX + 48 : ownX - minX + 48);
+      (player.relics ?? []).slice(0, MAX_RELICS).forEach((id, index) => {
+        const size = this.relicBadgeSize;
+        const badge = this.add.container(direction * (startX + index * (size + 5)), -30).setName(`relic-${id}`);
+        const shadow = this.add.circle(1, 3, size / 2 + 2, 0x000000, .5);
+        const armed = isRelicArmed(player, id);
+        if (armed) badge.add(this.add.circle(0, 0, size / 2 + 5, 0xeabc5c, .16).setStrokeStyle(2, 0xf5d17c, .9));
+        const frame = this.add.circle(0, 0, size / 2 + 1, 0x0b0911, .96).setStrokeStyle(1, 0xd8b968, .85);
+        const asset = RELIC_ASSETS[id];
+        const icon = this.textures.exists(asset.key) ? fitImage(this.add.image(0, 0, asset.key), size - 3, size - 3, "contain") :
+          this.add.text(0, 0, RELIC_DEFINITIONS[id].symbol, { color: "#f1d99d", fontSize: `${size * .7}px` }).setOrigin(.5);
+        badge.add([shadow, frame, icon]);
+        row.add(badge); iconCount++;
+      });
+    });
+    if (import.meta.env.DEV) this.game.canvas.dataset.relicIconCount = String(iconCount);
   }
 
   private drawTokenPointer(
@@ -652,7 +711,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     if (!movement) return;
     const token = this.tokens.get(movement.playerId);
     if (!token) return;
-    let previousRegion = BOARD_TILES[movement.from]?.region;
+    let startPassPlayed = false;
     const step = (index: number) => {
       const tileIndex = movement.path[index];
       if (tileIndex === undefined) return;
@@ -664,9 +723,11 @@ export class ValenorBoardScene extends Phaser.Scene {
       const position = { x: fieldPosition.x + slot.x, y: fieldPosition.y + slot.y };
       const region = BOARD_TILES[tileIndex]?.region;
       const playArrivalAudio = () => {
-        deriveMovementStepAudioEvents(tileIndex, movement.passedStart, previousRegion)
-          .forEach((event) => audioManager.play(event));
-        previousRegion = region ?? previousRegion;
+        deriveMovementStepAudioEvents(tileIndex, movement.passedStart && !startPassPlayed)
+          .forEach((event) => {
+            if (event === "START_PASS") startPassPlayed = true;
+            audioManager.play(event);
+          });
       };
       const trailColor = region ? REGION_TRAIL[region] : 0xd7bb78;
       const trail = this.add.circle(token.x, token.y, region === "orcs" ? 3.5 : 4.5, trailColor, 0.42).setDepth(BOARD_DEPTHS.effects);
@@ -708,6 +769,65 @@ export class ValenorBoardScene extends Phaser.Scene {
       });
     };
     step(0);
+  }
+
+  private syncDragon(state: GameState): void {
+    const tileIndex = state.wanderingDragon?.tileIndex;
+    if (tileIndex === undefined) {
+      this.tweens.killTweensOf(this.dragonVisuals);
+      this.dragonVisuals.forEach(visual => visual.setVisible(false));
+      this.dragonTileIndex = undefined;
+      return;
+    }
+    const definitions = getDragonTerritoryVisuals(tileIndex);
+    if (!this.dragon) {
+      const frames = getAvailableDragonFrames(key => this.textures.exists(key));
+      if (import.meta.env.DEV) this.game.canvas.dataset.dragonFrameCount = String(frames.length);
+      if (frames.length && !this.anims.exists(DRAGON_ANIMATION.key)) this.anims.create({ ...DRAGON_ANIMATION, frames });
+      definitions.forEach((definition, index) => {
+        const main = index === 0;
+        const visual = this.add.container(0, 0).setName(main ? "dragon-main" : `dragon-projection-${index}`)
+          .setDepth(BOARD_DEPTHS.players - 1).setScale(definition.scale).setAlpha(definition.alpha);
+        this.dragonVisuals.push(visual);
+        if (main) {
+          this.dragon = visual;
+          const territory = this.add.ellipse(0, 27, 96, 34, 0xe8aa46, .05).setStrokeStyle(1, 0xf0bd68, .25);
+          visual.add(territory);
+          if (!this.reducedMotion) this.tweens.add({ targets: territory, alpha: .45, scale: 1.1, duration: 1600, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+        }
+        const shadow = this.add.ellipse(0, 31, 65, 18, 0x000000, main ? .3 : .2);
+        const glow = this.add.circle(0, -4, 32, 0xf0ae43, main ? .14 : .08);
+        if (frames.length) {
+          const sprite = this.add.sprite(0, -16, frames[0]!.key).setDisplaySize(96, 96).play(DRAGON_ANIMATION.key);
+          if (main) this.dragonSprite = sprite;
+          visual.add([shadow, glow, sprite]);
+          if (!this.reducedMotion) this.tweens.add({ targets: [sprite, glow], y: "-=5", duration: 950, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+        } else {
+          visual.add([shadow, glow, this.add.text(0, -16, "🐉", { color: "#f5bd6c", fontSize: "40px" }).setOrigin(.5)]);
+        }
+      });
+      if (import.meta.env.DEV && this.dragonSprite) {
+        this.game.canvas.dataset.dragonFrameRate = String(this.dragonSprite.anims.currentAnim!.frameRate);
+        this.game.canvas.dataset.dragonRepeat = String(this.dragonSprite.anims.currentAnim!.repeat);
+      }
+    }
+    this.dragonVisuals.forEach(visual => visual.setVisible(true));
+    if (this.dragonTileIndex === tileIndex) return;
+    const place = () => this.dragonVisuals.forEach((visual, index) => {
+      const field = getTileWorldPosition(definitions[index]!.tileIndex), offset = getInnerEdgeOffset(definitions[index]!.tileIndex, index === 0 ? 95 : 155);
+      visual.setPosition(field.x + offset.x, field.y + offset.y - (index === 0 ? 0 : 36));
+    });
+    this.tweens.killTweensOf(this.dragonVisuals);
+    if (this.dragonTileIndex === undefined || this.reducedMotion) {
+      place(); this.dragonVisuals.forEach((visual, index) => visual.setAlpha(definitions[index]!.alpha));
+    } else this.tweens.add({ targets: this.dragonVisuals, alpha: 0, duration: 220, onComplete: () => {
+      place(); this.dragonVisuals.forEach((visual, index) => this.tweens.add({ targets: visual, alpha: definitions[index]!.alpha, duration: 280 }));
+    } });
+    this.dragonTileIndex = tileIndex;
+    if (import.meta.env.DEV) {
+      this.game.canvas.dataset.dragonTileIndex = String(tileIndex);
+      this.game.canvas.dataset.dragonVisualTiles = JSON.stringify(definitions.map(definition => definition.tileIndex));
+    }
   }
 
   private animateLanding(tileIndex: number, color: number) {
@@ -827,6 +947,8 @@ export class ValenorBoardScene extends Phaser.Scene {
     const scale = getBoardVisualScale(boardZoom, this.scale.width);
     this.ownershipMarkerScale = scale.markerScale;
     this.tokenVisuals.forEach((visual) => visual.setScale(scale.visualTokenScale));
+    this.relicBadgeSize = Math.max(18, Math.min(34, 22 / (boardZoom * scale.visualTokenScale)));
+    this.syncTokenRelics(this.state);
     this.ownershipMarkers.forEach((marker) => marker.setScale(scale.markerScale));
     this.developmentLayer?.setVisualScale(scale.buildingScale);
     this.propertyGroupLayer?.setVisualScale(scale.groupMarkerScale);

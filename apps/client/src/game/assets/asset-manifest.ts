@@ -1,4 +1,4 @@
-import type { BuildingLevel, RegionType } from "@valenor/shared";
+import { BOARD_TILES, type BuildingLevel, type RegionType, type RelicId } from "@valenor/shared";
 
 export type AssetAvailability = "slot" | "ready";
 
@@ -123,7 +123,14 @@ export const VALENOR_ASSETS = {
       grandStructure: imageSlot("building-steppe-grand", "/assets/buildings/steppe/totem-hall.png", 362, 531, "ready")
     }
   },
+  relics: {
+    runestone: imageSlot("relic-runestone", "/assets/Relicts/Runenstein.png", 1254, 1254, "ready"),
+    "merchant-seal": imageSlot("relic-merchant-seal", "/assets/Relicts/SIEGELDESHÄNDLERS.png", 1254, 1254, "ready"),
+    "dungeon-amulet": imageSlot("relic-dungeon-amulet", "/assets/Relicts/KERKERAMULETT.png", 1254, 1254, "ready"),
+    "golden-feather": imageSlot("relic-golden-feather", "/assets/Relicts/GOLDENEFEDER.png", 1254, 1254, "ready")
+  } satisfies Record<RelicId, ImageAssetDefinition>,
   characters: {
+    dragon: Array.from({ length: 8 }, (_, index) => imageSlot(`dragon-frame-${index + 1}`, `/assets/Dragon/Drache${index + 1}.png`, 1254, 1254, "ready")),
     elvenSpellweaver: imageSlot("character-elven-spellweaver", "/assets/characters/elven-spellweaver.png", 542, 724, "ready"),
     humanKnight: imageSlot("character-human-knight", "/assets/characters/human-knight.png", 543, 711, "ready"),
     orcWarlord: imageSlot("character-orc-warlord", "/assets/characters/orc-warlord.png", 543, 713, "ready"),
@@ -156,6 +163,25 @@ export const FIELD_BASE_ASSETS = {
   portrait: VALENOR_ASSETS.ui.boardFieldHorizontal,
   landscape: VALENOR_ASSETS.ui.boardFieldVertical
 } as const;
+
+export const RELIC_ASSETS = VALENOR_ASSETS.relics;
+
+export const DRAGON_ANIMATION = { key: "wandering-dragon-loop", frameRate: 3.8, repeat: -1,
+  frames: VALENOR_ASSETS.characters.dragon.map(asset => ({ key: asset.key })) } as const;
+
+/** Visual projections of the existing territory; does not change encounter rules. */
+export function getDragonTerritoryVisuals(tileIndex: number) {
+  const count = BOARD_TILES.length;
+  return [
+    { tileIndex, scale: 1, alpha: 1 },
+    { tileIndex: (tileIndex + count - 1) % count, scale: .5, alpha: .62 },
+    { tileIndex: (tileIndex + 1) % count, scale: .5, alpha: .62 }
+  ] as const;
+}
+
+export function getAvailableDragonFrames(hasTexture: (key: string) => boolean) {
+  return DRAGON_ANIMATION.frames.filter(frame => hasTexture(frame.key));
+}
 
 function isAssetDefinition(value: unknown): value is ValenorAssetDefinition {
   return Boolean(value && typeof value === "object" && "kind" in value && "key" in value && "availability" in value);

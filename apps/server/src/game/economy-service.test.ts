@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BOARD_TILES, STARTING_GOLD, type GameState } from "@valenor/shared";
+import { BOARD_TILES, CHRONICLE_EVENTS, REST_TILE_INDEX, STARTING_GOLD, type GameState } from "@valenor/shared";
 import { EconomyService } from "./economy-service";
+import { MortgageService } from "./mortgage-service";
 
 const economy = new EconomyService();
 
@@ -17,7 +18,7 @@ function stateOn(tileIndex: number, gold: number = STARTING_GOLD): GameState {
     turnContext: { consecutiveDoubles: 0, pendingExtraRoll: false, rollSequence: 1 },
     lastDiceRoll: { die1: 3, die2: 4, total: 7, isDouble: false },
     lastMovement: { kind: "normal", playerId: "p1", from: 0, to: tileIndex, path: [tileIndex], passedStart: false, landedTile: BOARD_TILES[tileIndex]! },
-    propertyOwnerships: [], buildingBank: { settlementUnitsAvailable: 32, grandStructuresAvailable: 12 }, economyLog: [], trades: [], startedAt: 1
+    propertyOwnerships: [], buildingBank: { settlementUnitsAvailable: 32, grandStructuresAvailable: 12 }, economyLog: [], trades: [], weltenwegPot: 0, startedAt: 1
   };
 }
 
@@ -101,7 +102,104 @@ test("taxes use the configured amounts and never make gold negative", () => {
   economy.resolveLanding(poor);
   assert.equal(poor.players[0]!.gold, 150);
   assert.equal(poor.turnPhase, "paymentRequired");
-  assert.deepEqual(poor.pendingPayment, { payerId: "p1", amount: 200, reason: "Kronenzoll", creditorType: "bank", reasonType: "tax" });
+  assert.deepEqual(poor.pendingPayment, { payerId: "p1", amount: 200, reason: "Kronenzoll", creditorType: "bank", reasonType: "tax", weltenwegPotContribution: true });
+});
+
+for (const [tileIndex, amount] of [[4, 200], [38, 100]] as const) {
+  test(`${BOARD_TILES[tileIndex]!.name} adds its actual payment to the shared pot exactly once`, () => {
+    const state = stateOn(tileIndex); state.weltenwegPot = 300;
+    economy.resolveLanding(state);
+    assert.equal(state.players[0]!.gold, STARTING_GOLD - amount);
+    assert.equal(state.weltenwegPot, 300 + amount);
+    assert.match(state.economyLog.at(-1)!.message, new RegExp(`Weltenweg-Pott steigt auf ${300 + amount} Gold`));
+    state.turnPhase = "landed"; economy.resolveLanding(state);
+    assert.equal(state.weltenwegPot, 300 + amount);
+    assert.equal(state.players[0]!.gold, STARTING_GOLD - amount);
+  });
+}
+
+test("pending field taxes fund the pot only after settlement, including mortgage funding and retries", () => {
+  for (const [tileIndex, amount, gold] of [[4, 200, 150], [38, 100, 20]] as const) {
+    const state = stateOn(tileIndex, gold); state.weltenwegPot = 70;
+    state.propertyOwnerships = [{ tileIndex: 39, ownerId: "p1", mortgaged: false, buildingLevel: 0 }];
+    economy.resolveLanding(state);
+    assert.equal(state.turnPhase, "paymentRequired");
+    assert.equal(state.pendingPayment?.amount, amount);
+    assert.equal(state.weltenwegPot, 70);
+    assert.throws(() => economy.settlePendingPayment(state, "p1"), /reicht/);
+    assert.throws(() => economy.settlePendingPayment(state, "p2"), /anderen/);
+    assert.equal(state.weltenwegPot, 70);
+    new MortgageService().mortgage(state, "p1", 39);
+    const fundedGold = state.players[0]!.gold;
+    assert.equal(state.weltenwegPot, 70);
+    economy.settlePendingPayment(state, "p1");
+    assert.equal(state.players[0]!.gold, fundedGold - amount);
+    assert.equal(state.weltenwegPot, 70 + amount);
+    assert.equal(state.pendingPayment, undefined);
+    assert.throws(() => economy.settlePendingPayment(state, "p1"), /keine offene/);
+    state.turnPhase = "landed"; economy.resolveLanding(state);
+    assert.equal(state.weltenwegPot, 70 + amount);
+    assert.equal(state.players[0]!.gold, fundedGold - amount);
+  }
+});
+
+test("normal tavern landing pays the full pot, empties it and never repeats that movement", () => {
+  const state = stateOn(REST_TILE_INDEX); state.weltenwegPot = 500;
+  economy.resolveLanding(state);
+  assert.equal(state.players[0]!.gold, STARTING_GOLD + 500);
+  assert.equal(state.weltenwegPot, 0);
+  const win = state.economyLog.at(-1)!;
+  assert.equal(win.kind, "tavern"); assert.equal(win.amount, 500);
+  assert.deepEqual(win.playerIds, ["p1"]); assert.match(win.message, /gewinnt beim Knobeln/);
+  // A replay must not claim money paid into the pot since the original win.
+  state.weltenwegPot = 100; state.turnPhase = "landed"; economy.resolveLanding(state);
+  assert.equal(state.players[0]!.gold, STARTING_GOLD + 500);
+  assert.equal(state.weltenwegPot, 100);
+  assert.equal(state.economyLog.filter(entry => entry.kind === "tavern").length, 1);
+});
+
+test("an empty tavern never creates gold or a winning log", () => {
+  const state = stateOn(REST_TILE_INDEX); economy.resolveLanding(state);
+  assert.equal(state.players[0]!.gold, STARTING_GOLD);
+  assert.equal(state.weltenwegPot, 0);
+  assert.equal(state.economyLog.filter(entry => entry.kind === "tavern").length, 0);
+});
+
+test("passing the tavern or landing there through a card does not claim the pot", () => {
+  const passing = stateOn(REST_TILE_INDEX + 1); passing.weltenwegPot = 500;
+  passing.lastMovement = { ...passing.lastMovement!, from: REST_TILE_INDEX - 1, path: [REST_TILE_INDEX, REST_TILE_INDEX + 1] };
+  const card = stateOn(REST_TILE_INDEX); card.weltenwegPot = 500; card.lastMovement!.kind = "card";
+  for (const state of [passing, card]) {
+    economy.resolveLanding(state);
+    assert.equal(state.players[0]!.gold, STARTING_GOLD);
+    assert.equal(state.weltenwegPot, 500);
+    assert.equal(state.economyLog.filter(entry => entry.kind === "tavern").length, 0);
+  }
+});
+
+test("card and dungeon-release bank payments do not contribute to the field-tax pot", () => {
+  for (const reasonType of ["card", "cardRepair", "dungeonRelease"] as const) {
+    const state = stateOn(4); state.turnPhase = "paymentRequired"; state.weltenwegPot = 300;
+    state.pendingPayment = { payerId: "p1", amount: 100, reason: "Gebühr", creditorType: "bank", reasonType };
+    economy.settlePendingPayment(state, "p1");
+    assert.equal(state.players[0]!.gold, STARTING_GOLD - 100);
+    assert.equal(state.weltenwegPot, 300);
+  }
+});
+
+test("every chronicle leaves field taxes and the tavern jackpot unchanged", () => {
+  for (const event of CHRONICLE_EVENTS) {
+    const state = stateOn(4); state.currentRound = 4; state.weltenwegPot = 300;
+    state.activeChronicleEvent = { ...event, startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 1 };
+    economy.resolveLanding(state);
+    assert.equal(state.weltenwegPot, 500);
+    assert.equal(state.players[0]!.gold, STARTING_GOLD - 200);
+    state.lastMovement = { kind: "normal", sequence: 2, playerId: "p1", from: REST_TILE_INDEX - 1,
+      to: REST_TILE_INDEX, path: [REST_TILE_INDEX], passedStart: false, landedTile: BOARD_TILES[REST_TILE_INDEX]! };
+    state.turnPhase = "landed"; economy.resolveLanding(state);
+    assert.equal(state.weltenwegPot, 0);
+    assert.equal(state.players[0]!.gold, STARTING_GOLD + 300);
+  }
 });
 
 test("mandatory rent pauses safely when the payer cannot cover it", () => {

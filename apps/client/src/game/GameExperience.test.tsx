@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BOARD_TILES, DUNGEON_TILE_INDEX, type GameState } from "@valenor/shared";
+import { BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, getBloodMoonDefinition, getRegionalChronicleDefinition, type GameState, type RegionType } from "@valenor/shared";
 import { DOUBLE_BANNER_DURATION_MS, GameExperience } from "./GameExperience";
 import { hasTurnStatusContent, TurnStatus } from "./TurnStatus";
+import { GameHud } from "./GameHud";
 
 function startedGameState(playerCount: 2 | 4): GameState {
   return {
@@ -38,6 +39,48 @@ function startedGameState(playerCount: 2 | 4): GameState {
     startedAt: 1
   };
 }
+
+test("the left HUD shows only a currently active chronicle and counts its remaining rounds", () => {
+  const state = startedGameState(2); state.currentRound = 4;
+  state.activeChronicleEvent = { ...getBloodMoonDefinition("orcs"), startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 1 };
+  let markup = renderToStaticMarkup(<GameHud gameState={state} />);
+  assert.match(markup, /AKTIVE CHRONIK/);
+  assert.match(markup, /Blutmond/);
+  assert.match(markup, /Eisenöde/);
+  assert.match(markup, /Mieten: \+25 %/);
+  assert.match(markup, /Noch 2 Runden/);
+  state.currentRound = 5;
+  assert.match(renderToStaticMarkup(<GameHud gameState={state} />), /Noch 1 Runde/);
+  state.currentRound = 6;
+  markup = renderToStaticMarkup(<GameHud gameState={state} />);
+  assert.doesNotMatch(markup, /AKTIVE CHRONIK/);
+});
+
+test("every chronicle supplies its own compact HUD effect text and the pot stays visible at zero", () => {
+  const state = startedGameState(2); state.currentRound = 4;
+  for (const event of CHRONICLE_EVENTS) {
+    assert.ok(event.effectSummary);
+    state.activeChronicleEvent = { ...event, startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 1 };
+    const markup = renderToStaticMarkup(<GameHud gameState={state} />);
+    assert.ok(markup.includes(event.title));
+    assert.ok(markup.includes(event.effectSummary));
+    assert.match(markup, /Noch 2 Runden/);
+    assert.match(markup, /WELTENWEG-POTT/);
+    assert.match(markup, /0 GOLD/);
+  }
+  delete state.activeChronicleEvent; state.weltenwegPot = 500;
+  assert.match(renderToStaticMarkup(<GameHud gameState={state} />), /500 GOLD/);
+});
+
+test("regional HUD shows concrete targets and uses compact labels for three or four realms", () => {
+  const state = startedGameState(4); state.currentRound = 4;
+  for (const [regions,label] of [[['elves','orcs'],'Amethystwald · Eisenöde'],[['elves','humans','orcs'],'3 Reiche betroffen'],[['elves','humans','orcs','steppe'],'ALLE VIER REICHE']] as Array<[RegionType[],string]>) {
+    state.activeChronicleEvent = {...getRegionalChronicleDefinition(CHRONICLE_EVENTS[1]!,regions),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
+    const markup = renderToStaticMarkup(<GameHud gameState={state} />); assert.ok(markup.includes(label)); assert.match(markup,/Mieten: \+25 %/);
+  }
+  state.activeChronicleEvent = {...CHRONICLE_EVENTS[2]!,startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
+  assert.doesNotMatch(renderToStaticMarkup(<GameHud gameState={state} />),/active-chronicle__regions/);
+});
 
 for (const playerCount of [2, 4] as const) {
   test(`a started ${playerCount}-player state renders the game view instead of the lobby`, () => {

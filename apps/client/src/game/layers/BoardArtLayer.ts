@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import type { RegionType } from "@valenor/shared";
+import { getActiveChronicleEvent, getChronicleTargetRegions, type GameState, type RegionType } from "@valenor/shared";
 import { BOARD_HEIGHT, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_INNER_HEIGHT, BOARD_INNER_WIDTH, BOARD_WIDTH, getTileWorldPosition } from "../board-layout";
 import { VALENOR_ASSETS, type AtlasAssetDefinition, type ImageAssetDefinition } from "../assets/asset-manifest";
 import { addFittedImage, hasLoadedAsset, type AssetFit } from "../assets/asset-runtime";
@@ -15,6 +15,9 @@ interface RealmArtPlacement {
 
 export class BoardArtLayer {
   private readonly maskSources: Phaser.GameObjects.Graphics[] = [];
+  private readonly realmPoints = new Map<RegionType, Phaser.Types.Math.Vector2Like[]>();
+  private readonly chronicleMarkers = new Map<RegionType, Phaser.GameObjects.Graphics>();
+  private chronicleSignature = "";
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -76,6 +79,7 @@ export class BoardArtLayer {
       }
     ];
     placements.forEach(({ realm, asset, points }) => {
+      this.realmPoints.set(realm, points);
       const image = this.addMaskedRealmImage(asset, points);
       if (!image) return;
       rendered.add(realm);
@@ -88,8 +92,38 @@ export class BoardArtLayer {
   }
 
   destroy(): void {
+    this.clearChronicleMarkers();
+    this.realmPoints.clear();
     this.maskSources.forEach((source) => source.destroy());
     this.maskSources.length = 0;
+  }
+
+  syncChronicle(state: GameState, reducedMotion = false): void {
+    const event = state.status === "playing" ? getActiveChronicleEvent(state) : undefined;
+    const regions = getChronicleTargetRegions(event);
+    const signature = regions.length ? `${event!.id}:${event!.startedAtRound}:${event!.effectType}:${[...regions].sort().join(",")}` : "";
+    if (signature === this.chronicleSignature) return;
+    this.clearChronicleMarkers();
+    this.chronicleSignature = signature;
+    const aura = event?.effectType === "regionalRentBonus" ? 0x9b263e : event?.effectType === "purchaseDiscount" ? 0x87a466 : 0xb5c6d7;
+    regions.forEach(region => {
+      const points = this.realmPoints.get(region);
+      if (!points) return;
+      const graphics = this.scene.add.graphics().setName(`chronicle-realm-${region}`).setDepth(BOARD_DEPTHS.decorations + 2);
+      graphics.fillStyle(0xe9c578, .018).fillPoints(points, true);
+      graphics.fillStyle(aura, .045).fillPoints(points, true);
+      graphics.lineStyle(14, 0xefc86d, .12).strokePoints(points, true);
+      graphics.lineStyle(3, 0xf5d58a, .85).strokePoints(points, true);
+      this.chronicleMarkers.set(region, graphics);
+      if (!reducedMotion) this.scene.tweens.add({ targets: graphics, alpha: .65, duration: 1600, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+    });
+    if (import.meta.env.DEV) this.scene.game.canvas.dataset.chronicleRegions = JSON.stringify([...this.chronicleMarkers.keys()]);
+  }
+
+  private clearChronicleMarkers(): void {
+    this.chronicleMarkers.forEach(marker => { this.scene.tweens.killTweensOf(marker); marker.destroy(); });
+    this.chronicleMarkers.clear();
+    this.chronicleSignature = "";
   }
 
   renderRealmDecorations(): Set<RegionType> {

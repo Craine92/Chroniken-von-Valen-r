@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BOARD_TILES, type GameState, type TradeOffer } from "@valenor/shared";
+import { BOARD_TILES, CHRONICLE_EVENTS, QUEST_DEFINITIONS, RELIC_DEFINITIONS, RELIC_USE_MESSAGES, type GameState, type TradeOffer, type RelicId } from "@valenor/shared";
 import { DEFAULT_AUDIO_SETTINGS, normalizeAudioSettings } from "../audio/AudioManager";
 import { MobileFeedbackEventTracker } from "./mobile-feedback-events";
 import { MobileFeedbackQueue, TOAST_FADE_MS, openControllerTrade, playMobileFeedback, type MobileFeedback } from "./mobile-feedback";
@@ -19,8 +19,61 @@ function state(): GameState {
 }
 const trade = (id: string): TradeOffer => ({ id, proposerId: "p2", recipientId: "p1", status: "pending",
   offer: { gold: 50, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [] }, createdAt: 2 });
+
+test("a server-confirmed quest reward uses one positive toast and never replays on snapshots or reconnect", () => {
+  const before = state(), tracker = new MobileFeedbackEventTracker(); tracker.update(before,"p1");
+  const after = structuredClone(before);
+  after.economyLog.push({id:"quest-1",kind:"quest",questId:"dragonfriend",playerIds:["p1"],amount:150,message:"Auftrag erfüllt",createdAt:2});
+  const feedback = tracker.update(after,"p1"); assert.equal(feedback.length,1); assert.equal(feedback[0]!.title,"AUFTRAG ERFÜLLT");
+  assert.equal(feedback[0]!.message,`${QUEST_DEFINITIONS.dragonfriend.title} · +150 Gold`); assert.equal(feedback[0]!.hapticPattern,60);
+  assert.deepEqual(tracker.update(structuredClone(after),"p1"),[]); assert.deepEqual(new MobileFeedbackEventTracker().update(after,"p1"),[]);
+  assert.deepEqual(new MobileFeedbackEventTracker().update(after,"p2").filter(event => event.title === "AUFTRAG ERFÜLLT"),[]);
+});
+
+test("each consumed relic uses its name and effect message in the existing toast without replay", () => {
+  for (const id of Object.keys(RELIC_DEFINITIONS) as RelicId[]) {
+    const before = state(), tracker = new MobileFeedbackEventTracker(); tracker.update(before, "p1");
+    const after = structuredClone(before);
+    after.economyLog.push({ id: `used-${id}`, kind: "relic", relicId: id, playerIds: ["p1"], createdAt: 2, message: RELIC_USE_MESSAGES[id] });
+    const feedback = tracker.update(after, "p1");
+    assert.equal(feedback.length, 1); assert.equal(feedback[0]!.title, RELIC_DEFINITIONS[id].name.toUpperCase());
+    assert.equal(feedback[0]!.message, RELIC_USE_MESSAGES[id]);
+    assert.deepEqual(tracker.update(structuredClone(after), "p1"), []);
+  }
+});
+
+test("a new chronicle uses one existing toast without replay on snapshots or reconnect", () => {
+  const before = state(), tracker = new MobileFeedbackEventTracker();
+  tracker.update(before, "p1");
+  const next = structuredClone(before); next.currentRound = 4;
+  next.activeChronicleEvent = { ...CHRONICLE_EVENTS[0]!, targetRegions: ["humans", "steppe"], startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 2 };
+  const events = tracker.update(next, "p1");
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.type, "chronicle");
+  assert.equal(events[0]?.title, "FEST DER HÄNDLER");
+  assert.equal(events[0]?.message, "Kronenwald · Sonnensteppe · Kaufpreise: −20 %");
+  assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
+  assert.deepEqual(new MobileFeedbackEventTracker().update(next, "p1"), []);
+  const later = structuredClone(next); later.currentRound = 10;
+  later.activeChronicleEvent = { ...later.activeChronicleEvent!, startedAfterRound: 9, startedAtRound: 10, expiresAtRound: 12 };
+  assert.equal(tracker.update(later, "p1").filter(event => event.type === "chronicle").length, 1);
+});
 const notice = (id: string, type: MobileFeedback["type"] = "purchase"): MobileFeedback => ({
   id, type, title: id, message: id
+});
+
+test("only the tavern winner receives one existing coin toast, without audio or replay", () => {
+  const before = state(), own = new MobileFeedbackEventTracker(), other = new MobileFeedbackEventTracker();
+  own.update(before, "p1"); other.update(before, "p2");
+  const next = structuredClone(before);
+  next.economyLog.push({ id: "tavern-win", kind: "tavern", message: "Myrra gewinnt beim Knobeln.", playerIds: ["p1"], amount: 500, createdAt: 2 });
+  const events = own.update(next, "p1");
+  assert.equal(events.length, 1); assert.equal(events[0]?.type, "coin");
+  assert.equal(events[0]?.message, "Glück beim Knobeln! +500 Gold");
+  assert.equal("sound" in events[0]!, false);
+  assert.deepEqual(own.update(structuredClone(next), "p1"), []);
+  assert.deepEqual(other.update(next, "p2"), []);
+  assert.deepEqual(new MobileFeedbackEventTracker().update(next, "p1"), []);
 });
 function clock() {
   let now = 0, sequence = 0;

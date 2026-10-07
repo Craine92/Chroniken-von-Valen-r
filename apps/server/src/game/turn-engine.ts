@@ -1,8 +1,9 @@
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import {
   BOARD_TILES,
   DUNGEON_TILE_INDEX,
   DUNGEON_RELEASE_COST,
+  consumeRelic,
   type DiceRoll,
   type GamePlayerState,
   type GameState,
@@ -10,9 +11,10 @@ import {
   type TurnActionKind
 } from "@valenor/shared";
 import { DiceService } from "./dice-service";
+import { advanceChronicleEvents, advanceWanderingDragon, preventDungeonWithAmulet, recordRelicUse } from "./chronicle-event-service";
 
 export class TurnEngine {
-  constructor(private readonly dice = new DiceService()) {}
+  constructor(private readonly dice = new DiceService(), private readonly chooseWorldIndex: (count: number) => number = randomInt) {}
 
   rollForOrder(state: GameState, playerId: string, actorType: PlayerType): void {
     this.requirePhase(state, "determiningOrder");
@@ -43,12 +45,30 @@ export class TurnEngine {
     state.turnContext.rollKind = "normal";
     state.lastDiceRoll = roll;
     delete state.lastMovement;
+    delete state.lastTurnAction;
+    state.turnContext.pendingExtraRoll = false;
+
+    if (player.relics?.includes("runestone")) {
+      state.turnContext.awaitingRuneStoneDecision = true;
+      state.turnPhase = "rolling";
+      return;
+    }
+    this.resolveNormalRoll(state, player);
+  }
+
+  private resolveNormalRoll(state: GameState, player: GamePlayerState): void {
+    const roll = state.lastDiceRoll!;
 
     if (roll.isDouble) {
       const consecutiveDoubles = state.turnContext.consecutiveDoubles + 1;
       if (consecutiveDoubles >= 3) {
         state.turnContext.consecutiveDoubles = 0;
         state.turnContext.pendingExtraRoll = false;
+        if (preventDungeonWithAmulet(state, player)) {
+          delete state.lastTurnAction;
+          state.turnPhase = "waitingForEndTurn";
+          return;
+        }
         player.dungeon = { inDungeon: true, failedAttempts: 0 };
         state.lastMovement = this.createDungeonTransfer(state, player.id, player.position);
         this.setTurnAction(state, "thirdDouble", player.id);
@@ -68,6 +88,22 @@ export class TurnEngine {
 
     state.lastMovement = this.createNormalMovement(state, player, roll);
     state.turnPhase = "rolling";
+  }
+
+  decideRuneStone(state: GameState, playerId: string, actorType: PlayerType, reroll: boolean): void {
+    this.requirePhase(state, "rolling");
+    if (state.currentPlayerId !== playerId || !state.turnContext.awaitingRuneStoneDecision || state.turnContext.rollKind !== "normal") throw new Error("Es gibt keinen normalen Wurf zur Reliktentscheidung.");
+    const player = this.requireActor(state, playerId, actorType);
+    if (player.dungeon.inDungeon || !player.relics?.includes("runestone") || !state.lastDiceRoll) throw new Error("Der Runenstein ist hier nicht nutzbar.");
+    if (reroll) {
+      const replacement = this.dice.roll();
+      consumeRelic(player, "runestone");
+      recordRelicUse(state, player, "runestone");
+      state.lastDiceRoll = replacement;
+      state.turnContext.rollSequence += 1;
+    }
+    delete state.turnContext.awaitingRuneStoneDecision;
+    this.resolveNormalRoll(state, player);
   }
 
   rollDungeon(state: GameState, playerId: string, actorType: PlayerType): void {
@@ -165,6 +201,7 @@ export class TurnEngine {
 
   beginMovement(state: GameState): void {
     this.requirePhase(state, "rolling");
+    if (state.turnContext.awaitingRuneStoneDecision) throw new Error("Der Wurf muss zuerst bestätigt werden.");
     state.turnPhase = "moving";
   }
 
@@ -178,6 +215,10 @@ export class TurnEngine {
   sendCurrentPlayerToDungeon(state: GameState): void {
     this.requirePhase(state, "landed");
     const player = this.requireCurrentPlayer(state);
+    if (preventDungeonWithAmulet(state, player)) {
+      state.turnPhase = "waitingForEndTurn";
+      return;
+    }
     player.dungeon = { inDungeon: true, failedAttempts: 0 };
     state.turnContext.consecutiveDoubles = 0;
     state.turnContext.pendingExtraRoll = false;
@@ -233,13 +274,18 @@ export class TurnEngine {
     const previousIndex = state.currentTurnIndex;
     do state.currentTurnIndex = (state.currentTurnIndex + 1) % state.turnOrder.length;
     while (state.players.find((candidate) => candidate.id === state.turnOrder[state.currentTurnIndex])?.isBankrupt);
-    if (state.currentTurnIndex <= previousIndex) state.currentRound += 1;
+    if (state.currentTurnIndex <= previousIndex) {
+      state.currentRound += 1;
+      advanceChronicleEvents(state, this.chooseWorldIndex);
+      advanceWanderingDragon(state, this.chooseWorldIndex);
+    }
     state.turnNumber += 1;
     state.currentPlayerId = state.turnOrder[state.currentTurnIndex]!;
     state.turnContext.consecutiveDoubles = 0;
     state.turnContext.pendingExtraRoll = false;
     delete state.turnContext.rollKind;
     delete state.turnContext.pendingDungeonMovement;
+    delete state.turnContext.awaitingRuneStoneDecision;
   }
 
   private createNormalMovement(state: GameState, player: GamePlayerState, roll: DiceRoll) {

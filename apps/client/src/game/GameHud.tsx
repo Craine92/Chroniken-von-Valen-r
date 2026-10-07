@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { GameState } from "@valenor/shared";
+import { BOARD_TILES, getActiveChronicleEvent, getChronicleRegionLabel, getChronicleRoundsRemaining, type GameState } from "@valenor/shared";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 
 function GoldAmount({ gold }: { gold: number }) {
@@ -19,6 +19,7 @@ function GoldAmount({ gold }: { gold: number }) {
 const MINIATURE_SIGILS = ["♞", "➶", "✧", "⚒"];
 
 export function GameHud({ gameState }: { gameState: GameState }) {
+  const chronicle = gameState.status === "playing" ? getActiveChronicleEvent(gameState) : undefined;
   const modeLabel = gameState.config.mode === "quick"
     ? `Schnelles Abenteuer · ${gameState.config.quickGameDurationMinutes} Min`
     : "Chroniken-Modus";
@@ -52,6 +53,21 @@ export function GameHud({ gameState }: { gameState: GameState }) {
             <GoldAmount gold={player.gold} />
           </article>
         ))}
+        {chronicle && <aside className="active-chronicle" role="status">
+          <small>AKTIVE CHRONIK</small>
+          <strong>{chronicle.title}</strong>
+          {getChronicleRegionLabel(chronicle) && <span className="active-chronicle__regions">{getChronicleRegionLabel(chronicle)}</span>}
+          <span className="active-chronicle__effect">{chronicle.effectSummary}</span>
+          <span>Noch {getChronicleRoundsRemaining(gameState)} {getChronicleRoundsRemaining(gameState) === 1 ? "Runde" : "Runden"}</span>
+        </aside>}
+        <aside className="weltenweg-pot" role="status" aria-label="Weltenweg-Pott">
+          <small>WELTENWEG-POTT</small>
+          <strong>{(gameState.weltenwegPot ?? 0).toLocaleString("de-DE")} GOLD</strong>
+        </aside>
+        {gameState.wanderingDragon && <aside className="wandering-dragon" role="status">
+          <small>WANDERNDER DRACHE</small>
+          <strong>Bei: {BOARD_TILES[gameState.wanderingDragon.tileIndex]?.name}</strong>
+        </aside>}
       </div>
     </div>
   );

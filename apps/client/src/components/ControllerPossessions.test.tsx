@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BOARD_TILES, getPropertyGroupTiles, type GameState } from "@valenor/shared";
+import { BOARD_TILES, RELIC_DEFINITIONS, RELIC_ACTIONS, getPropertyGroupTiles, type GameState, type RelicId } from "@valenor/shared";
+import { RELIC_ASSETS } from "../game/assets/asset-manifest";
 import { ControllerPossessions, ControllerPropertyDetails } from "./ControllerPossessions";
 
 function state(): GameState {
@@ -17,6 +18,37 @@ function state(): GameState {
   };
 }
 const callbacks = { onSelectGroup: () => undefined, onBuild: () => undefined, onMortgage: () => undefined };
+
+test("possessions show two compact relic slots using the shared relic definitions", () => {
+  const game = state(); game.players[0]!.relics = ["runestone","golden-feather"];
+  const markup = renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
+  assert.match(markup, /DEINE RELIKTE/); assert.match(markup, /2 \/ 2/);
+  for (const id of game.players[0]!.relics) {
+    assert.ok(markup.includes(RELIC_DEFINITIONS[id].name));
+    assert.ok(markup.includes(RELIC_DEFINITIONS[id].description));
+    assert.ok(markup.includes(RELIC_ASSETS[id].path));
+  }
+});
+
+test("all relics display their name, full explanation, icon and activation state", () => {
+  for (const id of Object.keys(RELIC_DEFINITIONS) as RelicId[]) {
+    const game = state(); game.players[0]!.relics = [id];
+    const render = () => renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} onActivateRelic={() => undefined} onUseRuneStone={() => undefined} />);
+    let markup = render();
+    assert.ok(markup.includes(RELIC_DEFINITIONS[id].name)); assert.ok(markup.includes(RELIC_DEFINITIONS[id].description));
+    assert.ok(markup.includes(RELIC_ASSETS[id].path)); assert.match(markup, /role="img"/);
+    if (id === "runestone") {
+      assert.match(markup, /disabled=""[^>]*>Neu würfeln/); assert.match(markup, /Nach einem normalen Würfelwurf verfügbar/);
+      game.turnPhase = "rolling"; game.turnContext.awaitingRuneStoneDecision = true; game.turnContext.rollKind = "normal";
+      assert.match(render(), /<button type="button">Neu würfeln/);
+      game.currentPlayerId = "p2"; assert.match(render(), /disabled=""[^>]*>Neu würfeln/);
+    } else {
+      assert.ok(markup.includes(RELIC_ACTIONS[id].label));
+      game.players[0]!.armedRelics = [id]; markup = render();
+      assert.ok(markup.includes(RELIC_ACTIONS[id].status)); assert.match(markup, /controller-relic--armed/);
+    }
+  }
+});
 
 test("mobile possessions start with compact groups and no expanded property details", () => {
   const game = state();

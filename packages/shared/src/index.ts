@@ -6,3 +6,6 @@ export * from "./economy";
 export * from "./building";
 export * from "./finance";
 export * from "./cards";
+export * from "./chronicle-events";
+export * from "./relics";
+export * from "./quests";

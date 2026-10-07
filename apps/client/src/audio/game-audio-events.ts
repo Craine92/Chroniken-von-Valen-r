@@ -1,4 +1,4 @@
-import { BOARD_TILES, getCardDefinition, type GameState, type RegionType } from "@valenor/shared";
+import { getCardDefinition, type GameState } from "@valenor/shared";
 import type { AudioEvent } from "./audio-config";
 
 export interface ScheduledAudioEvent {
@@ -8,13 +8,10 @@ export interface ScheduledAudioEvent {
 
 export function deriveMovementStepAudioEvents(
   tileIndex: number,
-  passedStart: boolean,
-  previousRegion: RegionType | undefined
+  passedStart: boolean
 ): AudioEvent[] {
   const events: AudioEvent[] = ["TOKEN_MOVE"];
-  const region = BOARD_TILES[tileIndex]?.region;
   if (tileIndex === 0 && passedStart) events.push("START_PASS");
-  if (region && previousRegion && region !== previousRegion) events.push("REALM_TRANSITION");
   return events;
 }
 
@@ -35,6 +32,8 @@ function economyCue(previous: GameState, next: GameState): AudioEvent | undefine
     case "purchase": return "PROPERTY_BUY";
     case "rent": return "PROPERTY_RENT";
     case "tax": return "GOLD_PAY";
+    case "tavern": return "GOLD_GAIN";
+    case "dragon": return entry.relicId ? "EVENT_POSITIVE" : undefined;
     case "auction": return "PROPERTY_BUY";
     // Passage audio comes from the visible field arrival, not the gold/state update.
     case "start": return undefined;
@@ -71,8 +70,14 @@ export function deriveGameAudioEvents(previous: GameState, next: GameState, view
     events.push({ event: "CARD_DRAW" }, { event: cardEvent(next.activeCard.cardId), delayMs: 480 });
   }
 
+  // Actual detention covers normal, third-double and card transfers without
+  // treating a visit as entry or replaying the cue on later transfer snapshots.
+  if (next.players.some((player) => player.dungeon.inDungeon &&
+    previous.players.some((old) => old.id === player.id && !old.dungeon.inDungeon))) {
+    events.push({ event: "PRISON_ENTER" });
+  }
+
   if (next.lastTurnAction?.id && next.lastTurnAction.id !== previous.lastTurnAction?.id) {
-    if (["thirdDouble", "sentToDungeon"].includes(next.lastTurnAction.kind)) events.push({ event: "PRISON_ENTER" });
     if (["dungeonEscaped", "dungeonPaid"].includes(next.lastTurnAction.kind)) events.push({ event: "PRISON_EXIT" });
   }
 

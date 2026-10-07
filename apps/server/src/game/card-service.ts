@@ -13,6 +13,7 @@ import {
   type PlayerType
 } from "@valenor/shared";
 import { DiceService } from "./dice-service";
+import { preventDungeonWithAmulet } from "./chronicle-event-service";
 import {
   CryptoCardShuffleSource,
   createDecks,
@@ -104,6 +105,10 @@ export class CardService {
     const resolution = this.requireResolution(state);
     if (state.turnPhase !== "landed" || resolution.status !== "waitingForLanding") throw new Error("Der Kerkertransfer kann gerade nicht beginnen.");
     const player = this.requirePlayer(state, resolution.playerId);
+    if (preventDungeonWithAmulet(state, player)) {
+      state.turnPhase = "waitingForEndTurn";
+      return;
+    }
     player.dungeon = { inDungeon: true, failedAttempts: 0 };
     state.turnContext.consecutiveDoubles = 0;
     state.turnContext.pendingExtraRoll = false;
@@ -251,6 +256,7 @@ export class CardService {
         continue;
       }
       if (effect.type === "goToDungeon") {
+        if (preventDungeonWithAmulet(state, player)) continue;
         player.dungeon = { inDungeon: true, failedAttempts: 0 };
         state.turnContext.consecutiveDoubles = 0;
         state.turnContext.pendingExtraRoll = false;

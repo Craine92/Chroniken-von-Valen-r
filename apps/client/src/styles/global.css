@@ -1976,3 +1976,129 @@ body {
   .game-hud__context-gold b { color:#ffe4a0; font-size:24px; line-height:1.25; }
 }
 @media (max-width:720px) { .game-hud__context { display:none; } }
+
+/* Premium tabletop: shared brass, dark wood and readable TV hierarchy. */
+@media (min-width:721px) {
+  .game-sidebar { background:radial-gradient(ellipse at 50% 0,rgba(118,82,39,.17),transparent 55%),linear-gradient(110deg,#1c1713,#08080b); border-right:2px solid #a1844b; box-shadow:8px 0 24px #0008,inset -4px 0 0 #211a13; }
+  .game-sidebar .hud-player,.game-sidebar .hud-player:has(> em) { grid-template-columns:42px minmax(0,1fr); gap:.1rem .55rem; min-height:62px; padding:.35rem .5rem; border:1px solid #66543b; border-left:4px solid currentColor; border-radius:5px; clip-path:none; background:linear-gradient(125deg,#30251b,#111013); box-shadow:0 5px 12px #0006,inset 0 1px #e7c98016; }
+  .game-sidebar .hud-player > em { display:none; }
+  .game-sidebar .hud-player__portrait { grid-row:1 / 3; width:40px; height:45px; overflow:hidden; position:relative; border-radius:18px 18px 7px 7px; background:radial-gradient(ellipse at 50% 25%,#8e774c66,#08080b); border:2px solid currentColor; }
+  .game-sidebar .hud-player__portrait img { position:absolute; width:145%; height:185%; max-width:none; left:-22.5%; top:-3%; object-fit:contain; object-position:50% 0; }
+  .game-sidebar .hud-player strong { color:#fff1d2; font:700 16px/1.2 Georgia,serif; }
+  .game-sidebar .hud-player > div > span { display:block; color:#c4b79f; font-size:11px; line-height:1.25; }
+  .game-sidebar .hud-player b { grid-column:2; font-size:15px; line-height:1.15; color:#f7d78e; }
+  .game-sidebar .hud-player.is-active { border-color:#ddbd70; border-left-color:currentColor; box-shadow:0 0 18px #d8b96826,inset 0 0 0 1px #d8b96866; background:linear-gradient(125deg,#463320,#171215); }
+  .game-sidebar .hud-player.is-active::after { content:"♛"; position:absolute; right:5px; top:4px; color:#edce83; background:none; font-size:13px; padding:0; }
+  .game-sidebar .weltenweg-pot { position:relative; padding:.65rem .6rem .65rem 2.6rem; background:linear-gradient(135deg,#513922,#1d1410); border:1px solid #ab884c; border-radius:5px; box-shadow:inset 0 1px #e1c18355,0 5px 12px #0005; }
+  .game-sidebar .weltenweg-pot::before { content:"▣"; position:absolute; left:.6rem; top:50%; translate:0 -50%; color:#d8b968; font:26px Georgia,serif; }
+  .game-sidebar .weltenweg-pot small,.game-sidebar .wandering-dragon small { color:#d5bc8a; font-size:10px; letter-spacing:.08em; }
+  .game-sidebar .weltenweg-pot strong { color:#ffe4a1; font:700 23px/1.3 Georgia,serif; }
+  .game-sidebar .wandering-dragon { padding:.55rem .6rem; background:linear-gradient(135deg,#2f2635,#121016); border:1px solid #8a7351; border-radius:5px; }
+  .game-sidebar .wandering-dragon strong { color:#f0e4ce; font:700 13px/1.35 Arial,sans-serif; }
+  .game-sidebar .active-chronicle { gap:.15rem; padding:.45rem .6rem; }
+  .game-sidebar .active-chronicle small { font-size:10px; }
+  .game-sidebar .active-chronicle span { font-size:11px; line-height:1.2; }
+  .game-sidebar .game-hud__context[data-context-kind="chronicle"],.game-sidebar .game-hud__context[data-context-kind="neutral"] { min-height:120px; }
+  .game-sidebar .game-hud__context[data-context-kind="chronicle"] > small { display:none; }
+  .game-sidebar .economy-log { gap:.4rem; }
+  .game-sidebar .economy-log > strong { font-size:11px; color:#e0c28a; }
+  .game-sidebar .economy-log p { display:grid; grid-template-columns:16px minmax(0,1fr); align-items:start; gap:.35rem; padding:.3rem .4rem; font-size:14px; font-weight:600; line-height:1.45; color:#eee3cf; border-left:2px solid #b99c60; background:linear-gradient(100deg,#30241a99,#09090d); }
+  .game-sidebar .economy-log p i { color:#d8b968; font:normal 15px/1.45 Georgia,serif; }
+  .game-sidebar .economy-log p span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; overflow-wrap:anywhere; }
+  .board-event-layer .dice-result { top:28.5%; width:auto; grid-template-columns:auto auto auto auto; gap:.65rem 1rem; padding:.8rem 1.3rem 1rem; border:3px solid #b89a5a; border-radius:8px; background:radial-gradient(ellipse at top,#634a2c66,transparent 70%),linear-gradient(135deg,#27201bfa,#08080dfa); box-shadow:0 12px 30px #0009,inset 0 0 0 2px #e8ca8438; }
+  .board-event-layer .dice-result small { grid-column:1 / -1; display:flex; justify-content:center; align-items:center; gap:1rem; color:#dbc08a; font-size:12px; font-weight:800; letter-spacing:.14em; }
+  .board-event-layer .dice-result small em { color:#ffe29b; font:700 15px Georgia,serif; letter-spacing:.05em; }
+  .board-event-layer .dice-result > span { width:clamp(54px,5vw,88px); height:clamp(54px,5vw,88px); font-size:clamp(26px,2.5vw,42px); border-radius:12px; background:linear-gradient(145deg,#fff1d2,#baa374); box-shadow:inset 0 0 0 2px #fff4d9,0 7px 0 #493824,0 10px 14px #0006; }
+  .board-event-layer .dice-result b { grid-column:4; padding-left:.7rem; color:#ffe5a3; font:700 clamp(48px,4vw,68px)/1 Georgia,serif; border-left:1px solid #b89a5a88; }
+  .board-event-layer .dice-result b::before { content:none; }
+  .board-stage:has(.dice-result) .board-notification-lane { visibility:hidden; }
+}
+@media (min-width:721px) and (max-height:800px) {
+  .game-sidebar .hud-player,.game-sidebar .hud-player:has(> em) { min-height:62px; padding:.35rem .45rem; }
+  .game-sidebar .hud-player__portrait { height:45px; }
+  .game-sidebar .economy-log { gap:.25rem; }
+  .game-sidebar .economy-log p { padding:.2rem .35rem; font-size:13px; }
+  .game-sidebar .economy-log p span { -webkit-line-clamp:2; }
+  .game-sidebar .game-hud__context[data-context-kind="chronicle"],.game-sidebar .game-hud__context[data-context-kind="neutral"] { display:none; }
+}
+@media (min-width:2400px) {
+  .board-page,.board-page.has-context-event,.board-page.is-context-idle { --gameplay-left-rail:280px; }
+  .game-sidebar .game-hud,.game-sidebar .economy-log { zoom:1.25; }
+}
+@media (min-width:3400px) {
+  .board-page,.board-page.has-context-event,.board-page.is-context-idle { --gameplay-left-rail:396px; }
+  .game-sidebar .game-hud,.game-sidebar .economy-log { zoom:1.8; }
+}
+
+/* Presentation pass 2: the upper table margin stays outside the printed board. */
+.board-top-hud { position:absolute; z-index:18; top:3px; left:50%; translate:-50% 0; box-sizing:border-box; height:max(0px,calc(var(--board-top-space,52px) - 6px)); max-height:104px; max-width:calc(100% - 1rem); display:flex; align-items:center; gap:clamp(.5rem,1vw,1.2rem); padding:0 clamp(.7rem,1vw,1.3rem); color:#f5dfaa; background:linear-gradient(120deg,#34271de8,#100f13f5); border:2px solid #b99a59; border-radius:5px; box-shadow:0 6px 16px #0008,inset 0 0 0 2px #e0c27a18; overflow:hidden; pointer-events:none; }
+.board-stage::before { content:""; position:absolute; z-index:1; top:0; left:0; right:0; height:var(--board-top-space,52px); pointer-events:none; opacity:.14; background:radial-gradient(ellipse at 50% 90%,#c5a36833,transparent 60%),linear-gradient(#030308d9,#08080c),url('/assets/board/realms/realm-human.webp') 50% 38% / cover; }
+.board-top-hud__dice { display:flex; align-items:center; gap:.45rem; height:100%; }
+.dice-face { display:grid; place-items:center; width:clamp(28px,calc(var(--board-top-space,52px) * .7),70px); height:clamp(28px,calc(var(--board-top-space,52px) * .7),70px); flex-shrink:0; color:#2c2011; font:clamp(29px,calc(var(--board-top-space,52px) * .66),64px)/1 'Segoe UI Symbol',Arial,sans-serif; background:linear-gradient(135deg,#fff0ce,#bda472); border:1px solid #d5b574; border-radius:5px; box-shadow:0 2px 0 #70532e,inset 0 0 0 1px #fff4da; }
+.board-top-hud__caption { display:grid; gap:2px; min-width:0; }
+.board-top-hud__caption small { color:#d5b879; font-size:clamp(9px,calc(var(--board-top-space,52px) * .2),16px); font-weight:800; letter-spacing:.1em; white-space:nowrap; }
+.board-top-hud__caption strong { overflow:hidden; font:700 clamp(12px,calc(var(--board-top-space,52px) * .3),24px)/1.1 Georgia,serif; white-space:nowrap; text-overflow:ellipsis; }
+.board-top-hud__total { color:#ffe6a8; font:700 clamp(28px,calc(var(--board-top-space,52px) * .68),68px)/1 Georgia,serif; padding-left:.6rem; border-left:1px solid #92754888; }
+.board-top-hud__prompt { font:700 clamp(10px,calc(var(--board-top-space,52px) * .24),19px) Georgia,serif; letter-spacing:.06em; }
+.board-top-hud > i { color:#d8b968; font:normal clamp(20px,calc(var(--board-top-space,52px) * .55),42px) Georgia,serif; }
+.board-top-hud > em { color:#ffe3a2; font:700 clamp(10px,calc(var(--board-top-space,52px) * .22),18px) Georgia,serif; }
+.board-top-hud.is-rolling .dice-face { animation:topDiceRoll .25s ease-in-out infinite alternate; }
+@keyframes topDiceRoll { from { transform:rotate(-7deg); opacity:.7; } to { transform:rotate(7deg); opacity:1; } }
+.board-stage:has(.board-top-hud) .board-notification-lane { top:calc(var(--board-top-space,52px) + 145px * var(--board-scale,1)); }
+.board-card-event { --draw-x:calc(0px - var(--card-source-x,390px)); }
+.board-card-event[data-deck="fate"] { --draw-x:var(--card-source-x,390px); }
+.board-card-event .card-reveal { animation:deckCardDraw .76s cubic-bezier(.2,.72,.2,1) both; transform-origin:50% 50%; }
+.board-card-event .card-reveal__content { animation:deckCardText .76s ease both; }
+@keyframes deckCardDraw {
+  0% { opacity:.65; transform:translate(var(--draw-x),var(--card-source-y,78px)) scale(var(--card-start-scale,.21)) rotate(-2deg); }
+  18% { opacity:1; transform:translate(var(--draw-x),calc(var(--card-source-y,78px) - 8px)) scale(var(--card-start-scale,.21)) rotate(0); }
+  100% { opacity:1; transform:translate(0,0) scale(1) rotate(0); }
+}
+@keyframes deckCardText { 0%,70% { opacity:0; } 100% { opacity:1; } }
+@media (min-width:721px) {
+  .game-sidebar .game-hud__context { align-content:space-between; gap:.25rem; background:radial-gradient(ellipse at top,#d8b9680b,transparent 70%),linear-gradient(145deg,#2c2119,#100d10); box-shadow:inset 0 1px #ecd29520,0 5px 12px #0004; }
+  .game-hud__context > strong { animation:contextTitleIn .25s ease both; hyphens:auto; font-size:19px; }
+  .game-hud__context-stats { display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:.35rem; margin:.2rem 0; padding:.4rem 0; border-top:1px solid #9d814d55; border-bottom:1px solid #9d814d55; }
+  .game-hud__context-stats div { display:grid; gap:.15rem; }
+  .game-hud__context-stats dt { color:#c1ad83; font-size:10px; }
+  .game-hud__context-stats dd { margin:0; color:#ffe3a0; font:700 17px/1.1 Georgia,serif; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] > small { display:none; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] > span { font-size:11px; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] > p { font-size:12px; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] { gap:.15rem; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] .game-hud__context-stats { margin:0; padding:.2rem 0; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] dt { line-height:1; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] dd { line-height:1.05; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] > p { font-size:11px; line-height:1.3; }
+}
+@keyframes contextTitleIn { from { opacity:.6; transform:translateY(3px); } to { opacity:1; transform:none; } }
+@media (max-width:720px) { .board-top-hud { display:none; } }
+@media (prefers-reduced-motion:reduce) {
+  .board-top-hud.is-rolling .dice-face,.board-card-event .card-reveal,.board-card-event .card-reveal__content,.game-hud__context > strong { animation:none; }
+}
+
+/* The existing table art fills the TV surface; the board keeps its own aspect ratio. */
+.board-page { background:linear-gradient(#05040759,#05040759),url('/assets/board/table/table-background.webp') center / cover no-repeat; }
+.board-stage { background:transparent; }
+.board-stage::before { display:none; }
+
+/* Final polish keeps the table margin and printed board unchanged. */
+.board-top-hud { top:2px; height:max(0px,calc(var(--board-top-space,52px) - 4px)); width:clamp(360px,calc(var(--board-top-space,52px) * 7.2),580px); justify-content:space-between; padding:0 clamp(1rem,1.5vw,2rem); border-color:#d0ad62; box-shadow:0 7px 18px #0008,inset 0 0 0 2px #e7c77b22; }
+.board-top-hud.has-result { width:clamp(560px,calc(var(--board-top-space,52px) * 10.8),950px); }
+.board-top-hud__caption strong { font-size:clamp(20px,calc(var(--board-top-space,52px) * .42),32px); }
+.board-top-hud__caption small { font-size:clamp(12px,calc(var(--board-top-space,52px) * .24),18px); }
+.board-top-hud__prompt { font-size:clamp(15px,calc(var(--board-top-space,52px) * .32),24px); }
+.board-top-hud__total { font-size:clamp(40px,calc(var(--board-top-space,52px) * .85),78px); }
+.board-top-hud > em { font-size:clamp(12px,calc(var(--board-top-space,52px) * .26),20px); }
+@media (min-width:721px) {
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] { position:relative; min-height:168px; gap:.2rem; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] > small { display:block; font-size:10px; letter-spacing:.06em; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] > strong { max-width:calc(100% - 44px); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:20px; }
+  .game-hud__context-portrait { position:absolute; top:31px; right:10px; }
+  .game-sidebar .game-hud__context-portrait .hud-player__portrait { width:32px; height:36px; color:#d8b968; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] .game-hud__context-stats { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:.3rem .55rem; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] .game-hud__context-stats div { display:flex; justify-content:space-between; align-items:baseline; gap:.2rem; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] dt { font-size:10px; white-space:nowrap; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] dd { font-size:16px; white-space:nowrap; }
+  .game-sidebar .game-hud__context[data-context-kind="neutral"] .game-hud__context-stats div:first-child dd { font-size:18px; }
+}

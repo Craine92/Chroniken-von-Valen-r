@@ -170,12 +170,13 @@ export const DRAGON_ANIMATION = { key: "wandering-dragon-loop", frameRate: 3.8, 
   frames: VALENOR_ASSETS.characters.dragon.map(asset => ({ key: asset.key })) } as const;
 
 /** Visual projections of the existing territory; does not change encounter rules. */
+export const DRAGON_PRESENTATION_SCALE = .9;
 export function getDragonTerritoryVisuals(tileIndex: number) {
   const count = BOARD_TILES.length;
   return [
-    { tileIndex, scale: 1, alpha: 1 },
-    { tileIndex: (tileIndex + count - 1) % count, scale: .5, alpha: .85 },
-    { tileIndex: (tileIndex + 1) % count, scale: .5, alpha: .85 }
+    { tileIndex, scale: DRAGON_PRESENTATION_SCALE, alpha: 1 },
+    { tileIndex: (tileIndex + count - 1) % count, scale: DRAGON_PRESENTATION_SCALE/2, alpha: 1 },
+    { tileIndex: (tileIndex + 1) % count, scale: DRAGON_PRESENTATION_SCALE/2, alpha: 1 }
   ] as const;
 }
 

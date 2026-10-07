@@ -30,7 +30,6 @@ export function getBoardFitZoom(viewportWidth: number, viewportHeight: number): 
 }
 
 export type BoardSide = "bottom" | "left" | "top" | "right" | "corner";
-const TOKEN_INNER_CLEARANCE = 86;
 
 export interface TilePlacement {
   x: number;
@@ -77,36 +76,70 @@ export function getTokenFormationOffset(count: number, index: number) {
   return formation[index] ?? { x: 0, y: 0 };
 }
 
-/** Fixed slots outside the information area, rotated toward the inner board. */
-export function getTokenSlotOffset(tileIndex: number, count: number, index: number) {
+/** Upright artwork footprints, expressed in units of the current field's shorter side. */
+export function getTileInnerAnchor(tileIndex: number, purpose: "token" | "dragon" | "building", occupiedByBuilding = false) {
+  const place = getTilePlacement(tileIndex);
+  const unit = Math.min(place.width, place.height);
+  const normal = getInnerEdgeOffset(tileIndex, 0);
+  const bounds = purpose === "building" ? {left:.32,right:.32,top:.76,bottom:.25}
+    : purpose === "dragon" ? {left:.54,right:.54,top:.72,bottom:.46}
+    : {left:occupiedByBuilding ? .98 : .52,right:occupiedByBuilding ? .98 : .52,top:.92,bottom:.44};
+  return {x:normal.x ? normal.x + Math.sign(normal.x)*unit*(normal.x>0 ? bounds.left : bounds.right) : 0,
+    y:normal.y ? normal.y + Math.sign(normal.y)*unit*(normal.y>0 ? bounds.top : bounds.bottom) : 0};
+}
+
+/** Compact formations use the same geometry-derived anchor as the pointer. */
+export function getTokenSlotOffset(tileIndex: number, count: number, index: number, occupiedByBuilding = false) {
   const normalized = ((tileIndex % 40) + 40) % 40;
   const place = getTilePlacement(normalized);
+  const unit = Math.min(place.width, place.height);
+  const anchor = getTileInnerAnchor(normalized,"token",occupiedByBuilding);
+  const formationUnit = Math.min(unit,BOARD_CELL_SIZE);
+  const columnGap = formationUnit * .92;
+  const rowGap = formationUnit * 1.4;
   if (place.side === "corner") {
     const sx = normalized === 0 || normalized === 33 ? -1 : 1;
     const sy = normalized === 0 || normalized === 13 ? -1 : 1;
-    const baseX = place.width / 2 + TOKEN_INNER_CLEARANCE;
-    const baseY = place.height / 2 + TOKEN_INNER_CLEARANCE;
-    const slots = [{ x: 0, y: 0 }, { x: 58, y: 0 }, { x: 0, y: 58 }, { x: 58, y: 58 }];
+    const slots = [{ x: 0, y: 0 }, { x: columnGap, y: 0 }, { x: 0, y: rowGap }, { x: columnGap, y: rowGap }];
     const slot = slots[index] ?? slots[0]!;
-    return { x: sx * (baseX + slot.x), y: sy * (baseY + slot.y) };
+    return { x: anchor.x+sx*slot.x, y: anchor.y+sy*slot.y };
   }
   const horizontal = place.side === "bottom" || place.side === "top";
-  const tangent = horizontal ? Math.min(36, place.width * .25) : Math.min(22, place.height * .3);
-  const radial = 58;
-  const slots = count <= 1
-    ? [{ tangent: 0, inward: 0 }]
-    : count === 2
-      ? [{ tangent: -tangent, inward: 0 }, { tangent, inward: 0 }]
-      : count === 3
-        ? [{ tangent: -tangent, inward: 0 }, { tangent, inward: 0 }, { tangent: 0, inward: radial }]
-        : [{ tangent: -tangent, inward: 0 }, { tangent, inward: 0 }, { tangent: -tangent, inward: radial }, { tangent, inward: radial }];
-  const slot = slots[index] ?? slots[0]!;
-  const base = (horizontal ? place.height : place.width) / 2 + TOKEN_INNER_CLEARANCE;
-  if (place.side === "bottom") return { x: slot.tangent, y: -base - slot.inward };
-  if (place.side === "left") return { x: base + slot.inward, y: slot.tangent };
-  if (place.side === "top") return { x: slot.tangent, y: base + slot.inward };
-  return { x: -base - slot.inward, y: slot.tangent };
+  if(horizontal){
+    const tangent = occupiedByBuilding ? unit*.64 : columnGap/2;
+    const column = count<=1 ? occupiedByBuilding ? (place.x>0 ? -tangent : tangent) : 0 : index%2 ? tangent : -tangent;
+    const row = count<=2 ? 0 : index>=2 ? rowGap : 0;
+    return {x:column,y:anchor.y+Math.sign(anchor.y)*row};
+  }
+  const column = count<=1 ? 0 : index%2 ? columnGap : 0;
+  const row = count<=2 ? 0 : index>=2 ? rowGap/2 : -rowGap/2;
+  const minY = -BOARD_INNER_HALF_HEIGHT + unit*.92 + (count>2 ? rowGap/2 : 0);
+  const maxY = BOARD_INNER_HALF_HEIGHT - unit*.44 - (count>2 ? rowGap/2 : 0);
+  const centerY = Math.max(minY,Math.min(maxY,place.y));
+  return {x:anchor.x+Math.sign(anchor.x)*column,y:centerY-place.y+row};
 }
+
+export function getDragonAnchor(tileIndex: number, visualScale = 1) {
+  const edge=getInnerEdgeOffset(tileIndex,0),anchor=getTileInnerAnchor(tileIndex,"dragon");
+  return {x:edge.x+(anchor.x-edge.x)*visualScale,y:edge.y+(anchor.y-edge.y)*visualScale};
+}
+
+export const REALM_LABEL_POSITIONS = {
+  humans: {xFactor:.35,yFactor:.36}, orcs: {xFactor:.62,yFactor:.2},
+  elves: {xFactor:.29,yFactor:.89}, steppe: {xFactor:.61,yFactor:.67}
+} as const;
+
+export const REALM_LABEL_ALTERNATIVES = {
+  humans:[[.35,.53],[.35,.2],[.35,.8],[.63,.52],[.26,.45]],
+  orcs:[[.68,.35],[.6,.53],[.55,.15],[.32,.48]],
+  elves:[[.26,.76],[.26,.62],[.6,.88]],
+  steppe:[[.65,.85],[.5,.9],[.73,.57],[.26,.62],[.27,.73]]
+} as const;
+
+export const REALM_LABEL_SAFE_ZONES = [
+  {x:-470,y:-20,width:160,height:205}, {x:310,y:-20,width:160,height:205},
+  {x:-125,y:-120,width:250,height:255}
+] as const;
 
 export function getInnerEdgeOffset(tileIndex: number, extra = 12) {
   const place = getTilePlacement(tileIndex);
@@ -125,9 +158,5 @@ export function getInnerEdgeOffset(tileIndex: number, extra = 12) {
 
 export function getTokenLabelOffset(tileIndex: number) {
   const place = getTilePlacement(tileIndex);
-  if (place.side === "bottom") return { x: 0, y: -58 };
-  if (place.side === "left") return { x: 58, y: 0 };
-  if (place.side === "top") return { x: 0, y: 58 };
-  if (place.side === "right") return { x: -58, y: 0 };
-  return { x: 0, y: -58 };
+  return { x:0,y:Math.min(place.width,place.height)*.25 };
 }

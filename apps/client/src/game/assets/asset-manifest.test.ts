@@ -42,12 +42,12 @@ test("dragon images form an ordered 3.8-fps loop and missing textures are safely
   assert.deepEqual(getAvailableDragonFrames(() => false), []);
 });
 
-test("dragon visuals contain one full-size dragon and exactly two subdued cyclic neighbors", () => {
+test("dragon visuals contain one full-size dragon and two opaque half-size cyclic neighbors", () => {
   for (const [tile, expected] of [[15,[15,14,16]], [0,[0,39,1]], [39,[39,38,0]]] as const) {
     const visuals = getDragonTerritoryVisuals(tile);
     assert.deepEqual(visuals.map(visual => visual.tileIndex), expected);
-    assert.equal(visuals.length, 3); assert.equal(visuals[0].scale, 1); assert.equal(visuals[0].alpha, 1);
-    for (const projection of visuals.slice(1)) { assert.equal(projection.scale, .5); assert.equal(projection.alpha, .85); }
+    assert.equal(visuals.length, 3); assert.equal(visuals[0].scale, .9); assert.equal(visuals[0].alpha, 1);
+    for (const projection of visuals.slice(1)) { assert.equal(projection.scale, visuals[0].scale/2); assert.equal(projection.alpha, 1); }
   }
 });
 

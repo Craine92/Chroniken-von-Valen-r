@@ -6,7 +6,7 @@ import {
   type PropertyGroupDefinition,
   type PropertyGroupId
 } from "@valenor/shared";
-import { getTilePlacement } from "../board-layout";
+import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
 import { BOARD_DEPTHS } from "./board-depths";
 
 function colorNumber(color: string): number {
@@ -64,15 +64,21 @@ export class PropertyGroupLayer {
 
   private drawGroup(group: PropertyGroupDefinition): Phaser.GameObjects.Container {
     const tiles = getPropertyGroupTiles(group.id);
-    const placements = tiles.map((tile) => ({ tile, placement: getTilePlacement(tile.index) }));
+    const placements = tiles.map((tile) => ({ tile, placement: getBoardTileVisualLayout(tile.index) }));
     const container = this.scene.add.container(0, 0);
-    const accent = colorNumber(group.accent);
-    placements.forEach(({ placement }) => {
-      const glow = this.scene.add.rectangle(placement.x, placement.y, placement.width - 5, placement.height - 5, accent, .08)
-        .setStrokeStyle(5, accent, .94)
+    const groupColor = colorNumber(group.accent);
+    const accent = Phaser.Display.Color.GetColor(Math.round((groupColor>>>16 & 255)*.68),Math.round((groupColor>>>8 & 255)*.68),Math.round((groupColor & 255)*.68));
+    placements.forEach(({ tile, placement }) => {
+      const glow = this.scene.add.rectangle(placement.x, placement.y, placement.width - 12, placement.height - 12, accent, .01)
+        .setStrokeStyle(5, accent, .08)
         .setName(`group-highlight-${group.id}`)
+        .setData("tileIndex",tile.index)
         .setVisible(false);
-      container.add(glow);
+      const contour = this.scene.add.rectangle(placement.x, placement.y, placement.width - 8, placement.height - 8, accent, 0)
+        .setStrokeStyle(3.5,accent,.85).setName(`group-highlight-${group.id}`).setData("tileIndex",tile.index).setVisible(false);
+      const gold=this.scene.add.rectangle(placement.x,placement.y,placement.width-14,placement.height-14,0x000000,0)
+        .setStrokeStyle(1.2,0xd8b968,.65).setName(`group-highlight-${group.id}`).setData("tileIndex",tile.index).setVisible(false);
+      container.add([glow,contour,gold]);
     });
     return container;
   }
@@ -82,7 +88,6 @@ export class PropertyGroupLayer {
     this.groups.forEach((container, groupId) => {
       const active = groupId === activeId;
       container.setAlpha(activeId ? active ? 1 : .34 : .9);
-      container.setScale(active ? 1.018 : 1);
       container.list.forEach((child) => {
         if (child.name === `group-highlight-${groupId}` && child instanceof Phaser.GameObjects.Rectangle) child.setVisible(active);
       });

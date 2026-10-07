@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import type { BoardTile, PropertyGroupId } from "@valenor/shared";
+import { CROWN_TAX, DRAGON_TITHE, type BoardTile, type PropertyGroupId } from "@valenor/shared";
 import { FIELD_BASE_ASSETS, SPECIAL_TILE_ASSETS } from "../assets/asset-manifest";
 import { fitImage, hasLoadedAsset } from "../assets/asset-runtime";
 import type { BoardArtLayer } from "../layers/BoardArtLayer";
@@ -13,14 +13,21 @@ export interface BoardTileRendererOptions {
 }
 
 export class BoardTileRenderer {
+  private readonly typography = new Map<number, {title:string;fontSize:number;titleWidth:number;titleHeight:number;price:string;iconSize:number}>();
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly options: BoardTileRendererOptions
   ) {}
 
   renderAll(tiles: readonly BoardTile[]): Phaser.GameObjects.Layer {
-    const cellSize = 256;
+    const atlasScale = 2;
+    // Pack the existing 40 fields at twice their world resolution without a 4K-square atlas.
+    const cellSize = Math.ceil(Math.max(...tiles.map(tile => {
+      const layout = getBoardTileVisualLayout(tile.index);
+      return Math.max(layout.width, layout.height);
+    })) * atlasScale) + 4;
     const columns = 10;
+    this.typography.clear();
     const rows = Math.ceil(tiles.length / columns);
     const atlas = this.scene.add.renderTexture(0, 0, columns * cellSize, rows * cellSize)
       .setOrigin(0)
@@ -30,7 +37,7 @@ export class BoardTileRenderer {
       const column = index % columns;
       const row = Math.floor(index / columns);
       const source = this.createTileSource(tile);
-      source.setPosition(column * cellSize + cellSize / 2, row * cellSize + cellSize / 2);
+      source.setScale(atlasScale).setPosition(column * cellSize + cellSize / 2, row * cellSize + cellSize / 2);
       atlasSource.add(source);
     });
     atlas.draw(atlasSource);
@@ -51,12 +58,12 @@ export class BoardTileRenderer {
       atlasTexture.add(
         frameName,
         0,
-        column * cellSize + (cellSize - layout.width) / 2,
-        row * cellSize + (cellSize - layout.height) / 2,
-        layout.width,
-        layout.height
+        column * cellSize + (cellSize - layout.width * atlasScale) / 2,
+        row * cellSize + (cellSize - layout.height * atlasScale) / 2,
+        layout.width * atlasScale,
+        layout.height * atlasScale
       );
-      const image = this.scene.add.image(layout.x, layout.y, atlasTexture.key, frameName).setDepth(0);
+      const image = this.scene.add.image(layout.x, layout.y, atlasTexture.key, frameName).setDisplaySize(layout.width,layout.height).setDepth(0).setName(`board-field-${tile.index}`).setData('typography',this.typography.get(tile.index));
       if (tile.type === "property" && tile.propertyGroupId && this.options.onPropertyGroupFocus) {
         image.setInteractive({ useHandCursor: true })
           .on(Phaser.Input.Events.GAMEOBJECT_POINTER_OVER, () => this.options.onPropertyGroupFocus?.(tile.propertyGroupId!, "hover"))
@@ -81,19 +88,20 @@ export class BoardTileRenderer {
       : this.createAssetAccent(tile, layout, palette);
 
     const emblemObjects = this.drawEmblem(tile, layout, palette);
-    const tileTitle = getTileTitle(tile.name);
+    const tileTitle = getTileTitle(tile.name, tile.type === "property" ? 7 : undefined);
     const title = this.scene.add.text(layout.title.x, layout.title.y, tileTitle, {
       color: palette.text,
-      fontFamily: "Trebuchet MS, Arial, sans-serif",
+      fontFamily: tile.type === "adventure" || tile.type === "fate" ? "Arial, sans-serif" : "Georgia, serif",
       fontSize: `${layout.title.fontSize}px`,
       fontStyle: "bold",
       align: "center",
-      wordWrap: { width: layout.title.width },
-      lineSpacing: -5,
+      lineSpacing: -6,
       stroke: "#080706",
       strokeThickness: 3,
       shadow: { color: "#000000", blur: 2, fill: true, offsetY: 1 }
     }).setOrigin(.5).setMaxLines(layout.title.maxLines).setResolution(2);
+    let titleSize=layout.title.fontSize;
+    while(title.width>layout.title.width && titleSize>16)title.setFontSize(--titleSize);
     const footer = this.scene.add.text(layout.footer.x, layout.footer.y, getTileFooter(tile), {
       color: palette.mutedText,
       fontFamily: "Arial, sans-serif",
@@ -105,19 +113,21 @@ export class BoardTileRenderer {
       stroke: "#080706",
       strokeThickness: 2,
       lineSpacing: 1
-    }).setOrigin(.5).setMaxLines(1).setResolution(2);
-    const price = this.scene.add.text(layout.price.x, layout.price.y, getTilePrimaryAction(tile), {
+    }).setOrigin(.5).setMaxLines(1).setResolution(2).setVisible(layout.kind === "corner");
+    const primary = tile.economy ? `✦ ${tile.economy.purchasePrice}` : tile.type === "tax" ? `✦ ${tile.index === 38 ? DRAGON_TITHE : CROWN_TAX}` : tile.type === "adventure" || tile.type === "fate" ? "ZIEHEN" : getTilePrimaryAction(tile);
+    const price = this.scene.add.text(layout.price.x, layout.price.y, primary, {
       color: "#ffebad",
       fontFamily: "Arial, sans-serif",
       fontSize: `${layout.price.fontSize}px`,
       fontStyle: "bold",
       align: "center",
-      letterSpacing: .8,
+      letterSpacing: .25,
       wordWrap: { width: layout.price.width },
       stroke: "#080706",
       strokeThickness: 3,
       shadow: { color: "#000000", blur: 2, fill: true, offsetY: 1 }
     }).setOrigin(.5).setMaxLines(2).setResolution(2);
+    this.typography.set(tile.index,{title:tileTitle,fontSize:titleSize,titleWidth:title.width,titleHeight:title.height,price:primary,iconSize:layout.emblem.size});
     const objects: Phaser.GameObjects.GameObject[] = [plate];
     if (assetAccent) objects.push(assetAccent);
     objects.push(...emblemObjects, title, footer, price);
@@ -141,38 +151,13 @@ export class BoardTileRenderer {
     palette: TilePalette
   ): Phaser.GameObjects.Graphics {
     const graphics = this.scene.add.graphics();
-    const accent = tile.type === "property" ? getPropertyGroupVisual(tile.propertyGroup).accent : getRegionAccent(tile.region);
-    const badge = layout.kind === "portrait"
-      ? { x: -layout.width / 2 + 19, y: -layout.height / 2 + 50 }
-      : { x: -layout.width / 2 + 10, y: 0 };
-    const size = tile.type === "property" ? 5 : 3.5;
-    graphics.fillStyle(accent, tile.type === "property" ? .34 : .2)
-      .fillCircle(badge.x, badge.y, size + 4);
-    graphics.lineStyle(tile.type === "property" ? 2 : 1.25, accent, .92)
-      .strokePoints([
-        { x: badge.x, y: badge.y - size },
-        { x: badge.x + size, y: badge.y },
-        { x: badge.x, y: badge.y + size },
-        { x: badge.x - size, y: badge.y }
-      ], true);
-    graphics.fillStyle(accent, tile.type === "property" ? .18 : .1)
-      .fillRoundedRect(
-        layout.accent.x - layout.accent.width / 2 - 2,
-        layout.accent.y - layout.accent.height,
-        layout.accent.width + 4,
-        layout.accent.height * 2,
-        layout.accent.height
-      );
-    graphics.fillStyle(accent, tile.type === "property" ? .96 : .72)
-      .fillRoundedRect(
-        layout.accent.x - layout.accent.width / 2,
-        layout.accent.y - layout.accent.height / 2,
-        layout.accent.width,
-        layout.accent.height,
-        layout.accent.height / 2
-      );
-    graphics.lineStyle(1, palette.accent, tile.type === "property" ? .28 : .18)
-      .strokeRoundedRect(-layout.width / 2 + 8, -layout.height / 2 + 8, layout.width - 16, layout.height - 16, 4);
+    graphics.fillGradientStyle(palette.surfaceTop,palette.surfaceTop,palette.surfaceBottom,palette.surfaceBottom,.96);
+    graphics.fillRoundedRect(-layout.width/2+6,-layout.height/2+6,layout.width-12,layout.height-12,5);
+    graphics.fillStyle(0x060708,.75).fillRoundedRect(-layout.width/2+8,-layout.height/2+8,layout.width-16,layout.kind === "portrait" ? 49 : 42,4);
+    graphics.lineStyle(2,0xc7a76a,.72).strokeRoundedRect(-layout.width/2+4,-layout.height/2+4,layout.width-8,layout.height-8,5);
+    graphics.lineStyle(1,palette.accent,.75).lineBetween(-layout.width/2+12,layout.kind === "portrait" ? -14 : -12,layout.width/2-12,layout.kind === "portrait" ? -14 : -12);
+    graphics.fillStyle(0x08080c,.7).fillRoundedRect(-layout.width/2+9,layout.height/2-29,layout.width-18,22,4);
+    graphics.lineStyle(1,0xb99c62,.45).lineBetween(-layout.width/2+14,layout.height/2-29,layout.width/2-14,layout.height/2-29);
     return graphics;
   }
 
@@ -261,7 +246,7 @@ export class BoardTileRenderer {
 
   private drawEmblem(tile: BoardTile, layout: BoardTileVisualLayout, palette: TilePalette): Phaser.GameObjects.GameObject[] {
     const { x, y, size } = layout.emblem;
-    const graphics = this.scene.add.graphics().setPosition(x, y);
+    const graphics = this.scene.add.graphics().setPosition(x, y).setScale(layout.kind === "landscape" ? .82 : 1);
     const radius = size * .38;
     graphics.fillStyle(0x070709, .66).fillCircle(2, 3, radius + 2);
     graphics.fillStyle(palette.panel, .95).fillCircle(0, 0, radius);
@@ -313,13 +298,24 @@ export class BoardTileRenderer {
       graphics.fillPoints([{ x: -13, y: 7 }, { x: -10, y: -10 }, { x: -3, y: -3 }, { x: 0, y: -14 }, { x: 5, y: -3 }, { x: 12, y: -10 }, { x: 13, y: 7 }], true);
       graphics.fillStyle(palette.highlight, .9).fillRect(-13, 9, 26, 4);
     } else if (tile.type === "adventure") {
-      graphics.lineStyle(3, palette.accent, .95).lineBetween(-10, 11, 10, -11).lineBetween(5, -11, 11, -5);
-      graphics.lineStyle(3, palette.highlight, .9).lineBetween(10, 11, -10, -11).lineBetween(-5, -11, -11, -5);
-      graphics.fillStyle(0x17110b, 1).fillCircle(0, 0, 4);
+      graphics.fillStyle(0x684325,1).fillRoundedRect(-16,-9,32,23,4);
+      graphics.lineStyle(2,palette.highlight,.95).strokeRoundedRect(-16,-9,32,23,4).lineBetween(-15,0,15,0);
+      graphics.fillStyle(palette.highlight,1).fillRect(-3,-3,6,10);
     } else if (tile.type === "fate") {
       graphics.fillStyle(0xe7e4ff, .95).fillCircle(-2, 0, 13);
       graphics.fillStyle(palette.panel, 1).fillCircle(4, -4, 13);
       graphics.fillStyle(0xffffff, .9).fillCircle(-13, -8, 1.4).fillCircle(13, 7, 1.2);
+    } else if(tile.type === "property" && tile.region === "humans") {
+      graphics.lineStyle(3,palette.highlight,.95).lineBetween(0,0,0,16).lineBetween(-9,15,9,15);
+      graphics.fillStyle(palette.accent,1).fillCircle(-7,-4,10).fillCircle(7,-4,10).fillCircle(0,-12,10);
+      graphics.lineStyle(1,palette.highlight,.7).strokeCircle(0,-12,8);
+    } else if(tile.type === "property" && tile.region === "orcs") {
+      graphics.fillStyle(0x411915,1).fillTriangle(-17,14,0,-17,17,14);
+      graphics.lineStyle(2,palette.highlight,.9).strokeTriangle(-17,14,0,-17,17,14);
+      graphics.fillStyle(palette.accent,1).fillTriangle(-5,12,1,-9,8,12);
+    } else if(tile.type === "property" && tile.region === "steppe") {
+      graphics.fillStyle(palette.highlight,1).fillCircle(0,0,10);
+      for(let index=0;index<8;index++){const angle=index*Math.PI/4;graphics.lineStyle(2,palette.accent,1).lineBetween(Math.cos(angle)*14,Math.sin(angle)*14,Math.cos(angle)*19,Math.sin(angle)*19);}
     } else {
       graphics.fillPoints([{ x: 0, y: -15 }, { x: 12, y: 0 }, { x: 0, y: 15 }, { x: -12, y: 0 }], true);
       graphics.fillStyle(palette.highlight, .82).fillPoints([{ x: 0, y: -9 }, { x: 7, y: 0 }, { x: 0, y: 9 }, { x: -7, y: 0 }], true);

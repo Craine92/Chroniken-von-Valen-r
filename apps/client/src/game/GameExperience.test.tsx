@@ -4,8 +4,9 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, getBloodMoonDefinition, getRegionalChronicleDefinition, type GameState, type RegionType } from "@valenor/shared";
 import { DOUBLE_BANNER_DURATION_MS, GameExperience } from "./GameExperience";
-import { hasTurnStatusContent, TurnStatus } from "./TurnStatus";
+import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
 import { GameHud, getCurrentBoardContext } from "./GameHud";
+import { getBoardScreenLayout, getCardPresentationKey } from "./board-presentation";
 
 function startedGameState(playerCount: 2 | 4): GameState {
   return {
@@ -47,6 +48,43 @@ test("TV context uses actual ownership, building level, effective rent and free 
   assert.ok(context.lines.includes('Besitz: Computer 1'));assert.ok(context.lines.some(line=>line.startsWith('Baustufe 2')));assert.equal(context.gold,30);assert.equal(context.goldLabel,'MIETE');
   state.propertyOwnerships[0]!.mortgaged=true;assert.equal(getCurrentBoardContext(state,1000).gold,0);
   state.turnPhase='waitingForRoll';assert.equal(getCurrentBoardContext(state,6000,false).kind,'neutral');
+});
+
+test("neutral context shows current balances and a chronicle introduction expires back to turn information",()=>{
+  const state=startedGameState(2);state.currentPlayerId="p1";state.turnPhase="waitingForRoll";
+  state.players[0]!.activeQuests=[{id:"traveler",assignedAtTurn:0},{id:"builder",assignedAtTurn:0},{id:"landbuyer",assignedAtTurn:0}];
+  state.players[0]!.relics=["runestone"];
+  assert.deepEqual(getCurrentBoardContext(state,1000,false).stats,[{label:"Gold",value:"1.500"},{label:"Besitz",value:"0"},{label:"Aufträge",value:"3"},{label:"Relikte",value:"1"},{label:"Runde",value:"1"}]);
+  state.currentRound=4;state.activeChronicleEvent={...getBloodMoonDefinition("orcs"),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1000};
+  assert.equal(getCurrentBoardContext(state,1500,false).kind,"chronicle");
+  assert.equal(getCurrentBoardContext(state,6000,false).kind,"neutral");
+  assert.match(renderToStaticMarkup(<GameHud gameState={state} />),/active-chronicle/);
+});
+
+test("top HUD retains a completed roll and clears the previous result before the next roll",()=>{
+  const state=startedGameState(2);state.currentPlayerId="p1";state.turnPhase="waitingForEndTurn";
+  state.lastDiceRoll={die1:4,die2:4,total:8,isDouble:true};
+  let markup=renderToStaticMarkup(<BoardTopHud state={state} />);
+  assert.match(markup,/WÜRFELERGEBNIS/);assert.match(markup,/PASCH!/);assert.match(markup,/board-top-hud__total">8/);
+  state.turnPhase="waitingForRoll";markup=renderToStaticMarkup(<BoardTopHud state={state} />);
+  assert.match(markup,/AM ZUG/);assert.match(markup,/WÜRFLE/);assert.doesNotMatch(markup,/PASCH!|board-top-hud__total/);
+});
+
+test("the context identifies counteroffers and accepted trades using participants rather than action IDs",()=>{
+  const state=startedGameState(2);state.currentPlayerId="p1";state.turnPhase="waitingForEndTurn";
+  state.trades=[{id:"offer",counterToTradeId:"original",proposerId:"p2",recipientId:"p1",offer:{gold:100,propertyTileIndices:[]},request:{gold:0,propertyTileIndices:[1]},status:"pending",createdAt:1000}];
+  state.lastTradeAction={id:"separate-action",type:"created",proposerId:"p2",recipientId:"p1",createdAt:1001};
+  let context=getCurrentBoardContext(state,2000,false);assert.equal(context.kind,"trade");assert.ok(context.lines.includes("GEGENANGEBOT"));assert.match(context.title,/Computer 1 ↔ Mensch/);
+  state.lastTradeAction.type="accepted";assert.ok(getCurrentBoardContext(state,2000,false).lines.includes("ANGENOMMEN"));
+  assert.equal(getCurrentBoardContext(state,6000,false).kind,"neutral");
+});
+
+test("card presentation ignores resolution updates but distinguishes consecutive draws of the same card",()=>{
+  const state=startedGameState(2);state.activeCard={cardId:"fate_025",deck:"fate",playerId:"p1",status:"resolving"};
+  state.decks={fate:{drawCount:1,discardCount:0},adventure:{drawCount:0,discardCount:0}};
+  const key=getCardPresentationKey(state);state.activeCard.status="readyToAcknowledge";assert.equal(getCardPresentationKey(state),key);
+  state.decks.fate.drawCount++;assert.notEqual(getCardPresentationKey(state),key);
+  for(const [width,height] of [[1699,1080],[2280,1440],[3444,2160]])assert.ok(getBoardScreenLayout(width!,height!).topSpace>45);
 });
 
 test("TV context prioritizes decisions and cards and expires transient events without stale turns",()=>{
@@ -265,7 +303,7 @@ test("the action log renders up to four newest entries in reverse chronological 
     const before=JSON.stringify(state.economyLog);
     const markup = renderToStaticMarkup(<GameExperience gameState={state} />);
     const log=markup.match(/<aside class="economy-log"[^>]*>(.*?)<\/aside>/)![1]!;
-    const messages=[...log.matchAll(/<p\b[^>]*>(.*?)<\/p>/g)].map(match=>match[1]);
+    const messages=[...log.matchAll(/<p\b[^>]*>.*?<span>(.*?)<\/span><\/p>/g)].map(match=>match[1]);
     assert.deepEqual(messages,state.economyLog.slice(-4).reverse().map(entry=>entry.message));
     assert.equal(messages.length,Math.min(count,4));
     assert.equal(JSON.stringify(state.economyLog),before);

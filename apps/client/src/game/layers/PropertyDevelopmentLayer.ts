@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { BOARD_TILES, type BuildingLevel, type GameState, type RegionType } from "@valenor/shared";
-import { getInnerEdgeOffset, getTilePlacement } from "../board-layout";
+import { getTileInnerAnchor, getTilePlacement } from "../board-layout";
 import { getBuildingAsset } from "../assets/asset-manifest";
 import { fitImage, hasLoadedAsset } from "../assets/asset-runtime";
 import { BOARD_DEPTHS } from "./board-depths";
@@ -60,7 +60,7 @@ export class PropertyDevelopmentLayer {
   private createDevelopment(tileIndex: number, region: RegionType, level: BuildingLevel): Phaser.GameObjects.Container {
     const place = getTilePlacement(tileIndex);
     const artScale = level === 5 ? 1.33 : 1.38;
-    const inner = getInnerEdgeOffset(tileIndex, place.side === "top" ? (level === 5 ? 56 : 46) : 34);
+    const inner = getTileInnerAnchor(tileIndex,"building");
     const container = this.scene.add.container(place.x + inner.x, place.y + inner.y).setRotation(place.rotation).setScale(this.visualScale).setDepth(BOARD_DEPTHS.buildings);
     const shadow = this.scene.add.ellipse(2, 10, (level === 5 ? 48 : 37) * artScale, (level === 5 ? 19 : 13) * artScale, 0x000000, .55);
     const ground = this.scene.add.ellipse(0, 7, (level === 5 ? 44 : 34) * artScale, (level === 5 ? 16 : 11) * artScale, region === "orcs" ? 0x583426 : region === "steppe" ? 0x74613b : 0x2d3a2d, .92).setStrokeStyle(2, REALM_LIGHT[region], .62);
@@ -93,10 +93,10 @@ export class PropertyDevelopmentLayer {
   }
 
   private addLevelBadge(container: Phaser.GameObjects.Container, rotation: number, level: BuildingLevel): void {
-    const badge = this.scene.add.graphics().setName("building-level-badge").setPosition(24, 12).setRotation(-rotation);
+    const badge = this.scene.add.graphics().setName("building-level-badge").setPosition(0, 8).setRotation(-rotation);
     badge.fillStyle(level === 5 ? 0x261d0d : 0x08080b, .96).fillRoundedRect(-17, -12, 34, 24, 5);
     badge.lineStyle(level === 5 ? 2.5 : 2, level === 5 ? 0xf3d681 : 0xd8bd78, .98).strokeRoundedRect(-17, -12, 34, 24, 5);
-    const label = this.scene.add.text(24, 12, `${level}`, {
+    const label = this.scene.add.text(0, 8, `${level}`, {
       color: level === 5 ? "#fff0a8" : "#fff7dc", fontFamily: "Arial,sans-serif", fontSize: "16px", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 2
     }).setName("building-level-label").setOrigin(.5).setRotation(-rotation).setResolution(2);

@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { getActiveChronicleEvent, getChronicleTargetRegions, type GameState, type RegionType } from "@valenor/shared";
-import { BOARD_HEIGHT, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_INNER_HEIGHT, BOARD_INNER_WIDTH, BOARD_WIDTH, getTileWorldPosition } from "../board-layout";
+import { BOARD_HEIGHT, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_INNER_HEIGHT, BOARD_INNER_WIDTH, BOARD_WIDTH, REALM_LABEL_ALTERNATIVES, REALM_LABEL_POSITIONS, REALM_LABEL_SAFE_ZONES, getTileWorldPosition } from "../board-layout";
 import { VALENOR_ASSETS, type AtlasAssetDefinition, type ImageAssetDefinition } from "../assets/asset-manifest";
 import { addFittedImage, hasLoadedAsset, type AssetFit } from "../assets/asset-runtime";
 import { ANIMATED_REALM_DECORATIONS, REALM_DECORATIONS } from "../assets/realm-decoration-config";
@@ -19,6 +19,8 @@ export class BoardArtLayer {
   private readonly chronicleMarkers = new Map<RegionType, Phaser.GameObjects.Graphics>();
   private chronicleSignature = "";
   private readonly realmLabels: Phaser.GameObjects.Text[] = [];
+  private readonly atmosphere: Phaser.GameObjects.GameObject[] = [];
+  private readonly ambient = new Map<RegionType, Phaser.GameObjects.Sprite | Phaser.GameObjects.Graphics>();
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -81,10 +83,14 @@ export class BoardArtLayer {
     ];
     placements.forEach(({ realm, asset, points }) => {
       this.realmPoints.set(realm, points);
+      this.scene.add.graphics().setDepth(BOARD_DEPTHS.decorations + 1).setName(`realm-border-${realm}`)
+        .lineStyle(8, 0x120e0c, .8).strokePoints(points, true)
+        .lineStyle(2, 0xc3a264, .6).strokePoints(points, true);
       const names={elves:"AMETHYSTWALD",humans:"KRONENWALD",orcs:"EISENÖDE",steppe:"SONNENSTEPPE"};
-      const x=(realm === "elves" || realm === "humans" ? -1 : 1)*edgeX*.62;
-      const y=(realm === "humans" || realm === "orcs" ? -1 : 1)*edgeY*.8;
-      this.realmLabels.push(this.scene.add.text(x,y,names[realm],{fontFamily:"Georgia,serif",fontSize:"28px",color:"#e2d2ac",letterSpacing:3,stroke:"#16130f",strokeThickness:4,shadow:{color:"#000000",blur:6,fill:true}}).setOrigin(.5).setAlpha(.85).setDepth(BOARD_DEPTHS.decorations+3).setName(`realm-label-${realm}`));
+      const {xFactor,yFactor}=REALM_LABEL_POSITIONS[realm];
+      const x=Math.min(...points.map(point=>point.x!))+edgeX*xFactor;
+      const y=Math.min(...points.map(point=>point.y!))+edgeY*yFactor;
+      this.realmLabels.push(this.scene.add.text(x,y,names[realm],{fontFamily:"Georgia,serif",fontSize:"31px",fontStyle:"bold",color:"#eddbaf",letterSpacing:3,stroke:"#16130f",strokeThickness:4,shadow:{color:"#000000",blur:6,fill:true}}).setOrigin(.5).setAlpha(.92).setDepth(BOARD_DEPTHS.players-.5).setName(`realm-label-${realm}`));
       const image = this.addMaskedRealmImage(asset, points);
       if (!image) return;
       rendered.add(realm);
@@ -97,6 +103,10 @@ export class BoardArtLayer {
   }
 
   destroy(): void {
+    this.ambient.forEach(object => { this.scene.tweens.killTweensOf(object); object.destroy(); });
+    this.ambient.clear();
+    this.atmosphere.forEach(object => object.destroy());
+    this.atmosphere.length = 0;
     this.clearChronicleMarkers();
     this.realmPoints.clear();
     this.realmLabels.forEach(label=>label.destroy());this.realmLabels.length=0;
@@ -144,17 +154,74 @@ export class BoardArtLayer {
         .setOrigin(.5, .78);
       renderedCounts.set(placement.realm, (renderedCounts.get(placement.realm) ?? 0) + 1);
     });
-    ANIMATED_REALM_DECORATIONS.forEach((placement) => {
-      const sprite = this.addAtlasSprite(placement.asset, placement.x * 1.52, placement.y * .76, placement.depth);
-      if (!sprite) return;
-      sprite.setScale(placement.scale).setRotation(placement.rotation ?? 0).setFlipX(placement.flipX ?? false);
-    });
     const complete = new Set<RegionType>();
     (["elves", "humans", "orcs", "steppe"] as const).forEach((realm) => {
       const required = REALM_DECORATIONS.filter((placement) => placement.realm === realm).length;
       if (required > 0 && renderedCounts.get(realm) === required) complete.add(realm);
     });
     return complete;
+  }
+
+  renderRealmAtmosphere(reducedMotion: boolean, animate: boolean): void {
+    if (this.atmosphere.length) return;
+    this.realmPoints.forEach((points, realm) => {
+      const minX = Math.min(...points.map(point => point.x!)), minY = Math.min(...points.map(point => point.y!));
+      const width = BOARD_INNER_HALF_WIDTH, height = BOARD_INNER_HALF_HEIGHT;
+      const shade = this.scene.add.graphics().setDepth(BOARD_DEPTHS.realmBackground + 2);
+      // Four short gradients darken only the edges of each printed realm.
+      shade.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, .2, .2, 0, 0).fillRect(minX,minY,width,38);
+      shade.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0, 0, .2, .2).fillRect(minX,minY+height-38,width,38);
+      shade.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, .16, 0, .16, 0).fillRect(minX,minY,38,height);
+      shade.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0, .16, 0, .16).fillRect(minX+width-38,minY,38,height);
+      const colors = {humans:0xb3c989,orcs:0xea864a,elves:0xb291e2,steppe:0xf0cf81};
+      const pool = this.scene.add.ellipse(minX+width*.55,minY+height*.5,180,80,colors[realm],.035).setDepth(BOARD_DEPTHS.realmBackground + 2);
+      this.atmosphere.push(shade,pool);
+    });
+    ANIMATED_REALM_DECORATIONS.forEach(placement => {
+      const x=placement.x*1.52,y=placement.y*.76;
+      const sprite=this.addAtlasSprite(placement.asset,x,y,BOARD_DEPTHS.decorations + 1);
+      if(sprite){
+        sprite.setScale(placement.scale).setAlpha(.25).setName(`ambient-${placement.realm}`);
+        sprite.anims.timeScale=.4;
+        if(reducedMotion || !animate)sprite.anims.stop();
+        this.ambient.set(placement.realm,sprite);
+        return;
+      }
+      const accent=this.scene.add.graphics().setPosition(x,y).setAlpha(.2).setDepth(BOARD_DEPTHS.decorations + 1).setName(`ambient-${placement.realm}`);
+      if(placement.realm === "humans"){
+        accent.lineStyle(1,0xd9efdc,.8).strokeEllipse(0,0,58,9).lineBetween(-12,-3,3,-3).lineBetween(8,3,23,3);
+      }else if(placement.realm === "orcs"){
+        accent.fillStyle(0xef9b55,.8).fillTriangle(-7,9,0,-11,8,9).fillStyle(0xffd594,.8).fillTriangle(-3,8,1,-4,4,8);
+      }else if(placement.realm === "elves"){
+        accent.fillStyle(0xcba0ff,.8).fillTriangle(-10,10,-4,-8,0,10).fillTriangle(1,10,7,-3,11,10);
+        accent.lineStyle(1,0xe9d2ff,.5).strokeEllipse(0,11,35,9);
+      }else{
+        accent.lineStyle(2,0x72654c,.8).lineBetween(-9,13,-9,-14);
+        accent.fillStyle(0xd5b169,.75).fillPoints([{x:-8,y:-13},{x:15,y:-8},{x:10,y:0},{x:-8,y:-3}],true);
+      }
+      this.ambient.set(placement.realm,accent);
+      if(!reducedMotion && animate)this.scene.tweens.add({targets:accent,alpha:placement.realm === "orcs" ? .12 : .09,
+        ...(placement.realm === "humans" ? {scaleX:1.035,y:y-1} : placement.realm === "steppe" ? {angle:3} : {}),
+        duration:placement.realm === "orcs" ? 2000 : 4200,yoyo:true,repeat:-1,ease:"Sine.InOut"});
+    });
+  }
+
+  syncRealmLabels(blockers: readonly Phaser.Geom.Rectangle[]): void {
+    this.realmLabels.forEach(label => {
+      const realm=label.name.replace("realm-label-","") as RegionType;
+      const points=this.realmPoints.get(realm)!;
+      const minX=Math.min(...points.map(point=>point.x!)),minY=Math.min(...points.map(point=>point.y!));
+      const preferred=REALM_LABEL_POSITIONS[realm];
+      let best={x:minX+BOARD_INNER_HALF_WIDTH*preferred.xFactor,y:minY+BOARD_INNER_HALF_HEIGHT*preferred.yFactor,score:Infinity};
+      for(const [xf,yf] of [[preferred.xFactor,preferred.yFactor],...REALM_LABEL_ALTERNATIVES[realm]]){
+        const x=minX+BOARD_INNER_HALF_WIDTH*xf!,y=minY+BOARD_INNER_HALF_HEIGHT*yf!;
+        const box=new Phaser.Geom.Rectangle(x-label.width/2-6,y-label.height/2-6,label.width+12,label.height+12);
+        if(REALM_LABEL_SAFE_ZONES.some(zone=>Phaser.Geom.Intersects.RectangleToRectangle(box,new Phaser.Geom.Rectangle(zone.x,zone.y,zone.width,zone.height))))continue;
+        const score=blockers.reduce((sum,blocker)=>sum+Math.max(0,Math.min(box.right,blocker.right)-Math.max(box.left,blocker.left))*Math.max(0,Math.min(box.bottom,blocker.bottom)-Math.max(box.top,blocker.top)),0);
+        if(score<best.score)best={x,y,score};
+      }
+      label.setPosition(best.x,best.y);
+    });
   }
 
   renderBoardEffects(): void {

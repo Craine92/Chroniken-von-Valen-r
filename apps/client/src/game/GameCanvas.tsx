@@ -3,7 +3,7 @@ import type { GameState, PropertyGroupId } from "@valenor/shared";
 import { createGame } from "./createGame";
 import type { ValenorBoardScene } from "./scenes/ValenorBoardScene";
 import { GameSceneBridge } from "./GameSceneBridge";
-import { DEFAULT_BOARD_PRESENTATION_MODE, type BoardPresentationMode } from "./board-presentation";
+import { DEFAULT_BOARD_PRESENTATION_MODE, getBoardScreenLayout, type BoardPresentationMode } from "./board-presentation";
 import { audioManager } from "../audio/AudioManager";
 
 function getDiceSignature(state: GameState): string {
@@ -25,6 +25,19 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
   useEffect(() => {
     if (!containerRef.current) return;
     let active = true;
+    const stage = containerRef.current.closest<HTMLElement>(".board-stage");
+    const syncLayout = () => {
+      if (!stage) return;
+      const layout = getBoardScreenLayout(stage.clientWidth, stage.clientHeight);
+      stage.style.setProperty("--board-top-space", `${layout.topSpace}px`);
+      stage.style.setProperty("--board-scale", String(layout.zoom));
+      stage.style.setProperty("--card-source-x", `${layout.deckX}px`);
+      stage.style.setProperty("--card-source-y", `${layout.deckY}px`);
+      stage.style.setProperty("--card-start-scale", String(layout.cardScale));
+    };
+    const observer = new ResizeObserver(syncLayout);
+    if (stage) observer.observe(stage);
+    syncLayout();
     const { game, scene } = createGame(containerRef.current, initialStateRef.current, {
       onProgress: (progress) => { if (active) setLoadProgress(progress); },
       onComplete: () => { if (active) setLoading(false); }
@@ -33,6 +46,7 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
     bridgeRef.current!.attach(scene);
     return () => {
       active = false;
+      observer.disconnect();
       bridgeRef.current?.detach(scene);
       sceneRef.current = null;
       game.destroy(true);

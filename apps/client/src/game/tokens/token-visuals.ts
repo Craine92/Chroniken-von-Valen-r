@@ -1,9 +1,9 @@
-import { getTilePlacement, getTokenSlotOffset } from "../board-layout";
+import { BOARD_CELL_SIZE, getTilePlacement, getTokenSlotOffset } from "../board-layout";
 
 export const TOKEN_VISUAL_CONFIG = {
-  miniatureScale: 1.14,
-  assetWidth: 64,
-  assetHeight: 89,
+  miniatureScale: 1,
+  assetWidth: Math.round(BOARD_CELL_SIZE * .49),
+  assetHeight: Math.round(BOARD_CELL_SIZE * .68),
   outlineExpansion: 6,
   shadow: { softWidth: 56, softHeight: 23, coreWidth: 46, coreHeight: 16 },
   base: { centerY: 10, outerWidth: 48, outerHeight: 25, innerWidth: 35, innerHeight: 17 },
@@ -14,8 +14,8 @@ export const TOKEN_VISUAL_CONFIG = {
     halfWidth: 3.25,
     outlineWidth: 4,
     lineWidth: 2,
-    activeAlpha: .96,
-    inactiveAlpha: .3
+    activeAlpha: .55,
+    inactiveAlpha: .1
   },
   activeAuraRadius: 34,
   activeRingRadius: 30
@@ -56,8 +56,8 @@ function getCornerTip(tileIndex: number, count: number, index: number, center: {
   return { x: corner.x, y: corner.y - sy * spacing * (index === 2 ? .55 : 1.35) };
 }
 
-export function getTokenPointerGeometry(tileIndex: number, count: number, index: number): TokenPointerGeometry {
-  const offset = getTokenSlotOffset(tileIndex, count, index);
+export function getTokenPointerGeometry(tileIndex: number, count: number, index: number, visualScale = 1, occupiedByBuilding = false): TokenPointerGeometry {
+  const offset = getTokenSlotOffset(tileIndex, count, index, occupiedByBuilding);
   const place = getTilePlacement(tileIndex);
   const renderedOffset = { x: offset.x, y: offset.y + TOKEN_VISUAL_CONFIG.pointer.settledTokenYOffset };
   const center = { x: -renderedOffset.x, y: -renderedOffset.y };
@@ -72,12 +72,12 @@ export function getTokenPointerGeometry(tileIndex: number, count: number, index:
         : place.side === "left"
           ? { x: center.x + place.width / 2, y: center.y + fan }
           : { x: center.x - place.width / 2, y: center.y + fan };
-  const baseCenter = { x: 0, y: TOKEN_VISUAL_CONFIG.base.centerY };
+  const baseCenter = { x: 0, y: TOKEN_VISUAL_CONFIG.base.centerY * visualScale };
   const targetDistance = Math.hypot(tip.x - baseCenter.x, tip.y - baseCenter.y) || 1;
   const direction = { x: (tip.x - baseCenter.x) / targetDistance, y: (tip.y - baseCenter.y) / targetDistance };
   const perpendicular = { x: -direction.y, y: direction.x };
-  const radiusX = TOKEN_VISUAL_CONFIG.base.outerWidth / 2;
-  const radiusY = TOKEN_VISUAL_CONFIG.base.outerHeight / 2;
+  const radiusX = TOKEN_VISUAL_CONFIG.base.outerWidth * visualScale / 2;
+  const radiusY = TOKEN_VISUAL_CONFIG.base.outerHeight * visualScale / 2;
   const baseRadius = 1 / Math.sqrt(direction.x ** 2 / radiusX ** 2 + direction.y ** 2 / radiusY ** 2);
   const start = { x: baseCenter.x + direction.x * baseRadius, y: baseCenter.y + direction.y * baseRadius };
   const { arrowLength, halfWidth } = TOKEN_VISUAL_CONFIG.pointer;

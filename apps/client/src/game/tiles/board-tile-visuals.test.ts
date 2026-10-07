@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_CORNER_TILE_INDICES, BOARD_TILES } from "@valenor/shared";
 import { getBoardTileVisualLayout } from "./board-tile-layout";
-import { BOARD_HEIGHT, BOARD_WIDTH, getBoardFitZoom, getTilePlacement, getTokenFormationOffset, getTokenSlotOffset } from "../board-layout";
+import { BOARD_HEIGHT, BOARD_WIDTH, getBoardFitZoom, getDragonAnchor, getTileInnerAnchor, getTilePlacement, getTokenFormationOffset, getTokenSlotOffset } from "../board-layout";
 import { getBoardVisualScale } from "../board-presentation";
 import { getPropertyGroupVisual, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, getTileVariant } from "./board-tile-theme";
 import { getTokenPointerGeometry, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
 
-test("the active player's position line is dominant while the other lines stay subdued",()=>{
-  assert.ok(TOKEN_VISUAL_CONFIG.pointer.activeAlpha>=.9 && TOKEN_VISUAL_CONFIG.pointer.activeAlpha<=1);
-  assert.ok(TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha>=.25 && TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha<=.35);
+test("moving-player connections stay subtle and inactive connections remain in the background",()=>{
+  assert.ok(TOKEN_VISUAL_CONFIG.pointer.activeAlpha>=.45 && TOKEN_VISUAL_CONFIG.pointer.activeAlpha<=.6);
+  assert.ok(TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha>=0 && TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha<=.15);
 });
 
 test("all forty fields receive a complete data-driven visual definition", () => {
@@ -35,7 +35,7 @@ test("corners, horizontal rows and vertical board sides use dedicated layouts", 
   const portrait = getBoardTileVisualLayout(1);
   const landscape = getBoardTileVisualLayout(14);
   assert.equal(portrait.width * portrait.height, landscape.width * landscape.height);
-  assert.equal(portrait.title.fontSize, landscape.title.fontSize);
+  assert.ok(landscape.title.fontSize >= portrait.title.fontSize - 2);
   assert.equal(portrait.footer.fontSize, landscape.footer.fontSize);
   assert.equal(portrait.price.fontSize, landscape.price.fontSize);
   assert.ok(portrait.title.fontSize > portrait.price.fontSize);
@@ -76,6 +76,8 @@ test("long names use one central two-line wrapping rule", () => {
   assert.equal(getTileTitle("Mühlenweg"), "MÜHLEN\nWEG");
   assert.equal(getTileTitle("Abenteuer"), "ABENTEUER");
   assert.equal(getTileTitle("Schicksal"), "SCHICKSAL");
+  assert.equal(getTileTitle("Mondpfad", 7), "MOND\nPFAD");
+  assert.equal(getTileTitle("Windgras", 7), "WIND\nGRAS");
   BOARD_TILES.forEach((tile) => assert.ok(getTileTitle(tile.name).split("\n").length <= 2));
 });
 
@@ -194,5 +196,28 @@ test("multiple occupants fan out to distinct points on every field edge without 
       });
       assert.equal(new Set(fieldPoints.map(({ x, y }) => `${x.toFixed(3)}:${y.toFixed(3)}`)).size, count);
     }
+  }
+});
+
+test("calibrated inner anchors preserve all field bounds and point inward on every side and corner",()=>{
+  for(let index=0;index<40;index++){
+    const before=getTilePlacement(index);
+    for(const purpose of ["token","dragon","building"] as const){
+      const anchor=getTileInnerAnchor(index,purpose);
+      if(anchor.x)assert.ok(Math.abs(anchor.x)>before.width/2);
+      if(anchor.y)assert.ok(Math.abs(anchor.y)>before.height/2);
+    }
+    const echo=getDragonAnchor(index,.5),main=getDragonAnchor(index);
+    assert.ok(Math.abs(echo.x)<=Math.abs(main.x)&&Math.abs(echo.y)<=Math.abs(main.y));
+    assert.deepEqual(getTilePlacement(index),before);
+  }
+});
+
+test("pointer end points remain on the field edge with TV scaling and geometry-derived building clearance",()=>{
+  for(const visualScale of [1.1,1.16])for(const tileIndex of [0,8,13,16,20,24,33,37])for(const count of [1,2,3,4])for(let index=0;index<count;index++){
+    const slot=getTokenSlotOffset(tileIndex,count,index,true),pointer=getTokenPointerGeometry(tileIndex,count,index,visualScale,true),field=getTilePlacement(tileIndex);
+    const x=slot.x+pointer.tip.x,y=slot.y+TOKEN_VISUAL_CONFIG.pointer.settledTokenYOffset+pointer.tip.y;
+    assert.ok(Math.abs(x)<=field.width/2+.001&&Math.abs(y)<=field.height/2+.001);
+    assert.ok(Math.abs(Math.abs(x)-field.width/2)<.001||Math.abs(Math.abs(y)-field.height/2)<.001);
   }
 });

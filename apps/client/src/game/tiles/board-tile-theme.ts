@@ -43,7 +43,7 @@ const REGION_PALETTES: Record<RegionType, TilePalette> = {
     accent: 0xe37b55, rim: 0x8a6845, highlight: 0xf0cf91, text: "#fff0dc", mutedText: "#d5b1a0", specialFrame: false
   },
   steppe: {
-    surfaceTop: 0x29301b, surfaceBottom: 0x12170d, panel: 0x1d2414, header: 0x68733a,
+    surfaceTop: 0x46311c, surfaceBottom: 0x20150d, panel: 0x352419, header: 0x87623b,
     accent: 0xe0bd68, rim: 0x9b7843, highlight: 0xf3d99a, text: "#fff3d6", mutedText: "#d5ca9c", specialFrame: false
   }
 };
@@ -54,7 +54,7 @@ const SPECIAL_PALETTES: Partial<Record<BoardTileType, TilePalette>> = {
     accent: 0xbca2ff, rim: 0xb99755, highlight: 0xf7dfa2, text: "#fff6df", mutedText: "#c9c2ec", specialFrame: true
   },
   dungeon: {
-    surfaceTop: 0x242329, surfaceBottom: 0x09090c, panel: 0x121116, header: 0x353039,
+    surfaceTop: 0x301a1d, surfaceBottom: 0x09090c, panel: 0x1b1116, header: 0x4d252c,
     accent: 0xcf5f5f, rim: 0x77634b, highlight: 0xdabf8a, text: "#f5e8d8", mutedText: "#b8a9a4", specialFrame: true
   },
   goToDungeon: {
@@ -147,11 +147,11 @@ export function getTileVariant(tile: BoardTile): TileVisualVariant {
   return tile.type;
 }
 
-export function getTileTitle(name: string): string {
+export function getTileTitle(name: string, singleLineLimit = TITLE_SINGLE_LINE_LIMIT): string {
   const upper = name.trim().replace(/\s+/g, " ").toUpperCase();
   const words = upper.split(" ");
-  if (words.length > 1) return upper.length > TITLE_SINGLE_LINE_LIMIT ? balanceTitleWords(words) : upper;
-  return upper.length > TITLE_SINGLE_LINE_LIMIT ? breakCompoundTitle(upper) : upper;
+  if (words.length > 1) return upper.length > singleLineLimit ? balanceTitleWords(words) : upper;
+  return upper.length > singleLineLimit ? breakCompoundTitle(upper) : upper;
 }
 
 export function getTileFooter(tile: BoardTile): string {

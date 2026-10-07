@@ -14,7 +14,7 @@ export function createGame(parent: HTMLElement, gameState: GameState, preloadCal
     width: parent.clientWidth,
     height: parent.clientHeight,
     backgroundColor: "#05060c",
-    transparent: false,
+    transparent: true,
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [preloadScene, scene],
     render: { antialias: true }

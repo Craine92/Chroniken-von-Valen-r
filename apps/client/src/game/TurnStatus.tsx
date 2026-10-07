@@ -1,5 +1,33 @@
+import { useEffect, useState } from "react";
 import { BOARD_TILES, getEffectiveRent, getEffectivePurchasePrice, getBuildingName, type BoardTileType, type GameState } from "@valenor/shared";
 import { PropertyCard } from "../components/PropertyCard";
+import { DICE_SETTLE_DURATION_MS } from "./board-presentation";
+
+export function BoardTopHud({ state }: { state: GameState }) {
+  const current = state.players.find(player => player.id === state.currentPlayerId);
+  const waiting = ["waitingForRoll", "dungeonDecision", "turnTransition", "determiningOrder"].includes(state.turnPhase);
+  const roll = waiting ? undefined : state.lastDiceRoll;
+  const rolling = ["rolling", "dungeonRolling", "dungeonTransfer"].includes(state.turnPhase);
+  const key = roll ? `${state.turnNumber}:${state.turnContext.rollSequence}:${roll.die1}:${roll.die2}` : "";
+  const [settled, setSettled] = useState(!rolling);
+  useEffect(() => {
+    setSettled(!rolling);
+    if (!key || !rolling) return;
+    const timer = window.setTimeout(() => setSettled(true), DICE_SETTLE_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [key]);
+  if (state.status !== "playing") return null;
+  return <aside className={`board-top-hud${roll ? " has-result" : ""}${roll && !settled ? " is-rolling" : ""}`} aria-label="Zug und Würfelergebnis">
+    {roll ? <>
+      <div className="board-top-hud__dice" aria-label={`Würfel ${roll.die1} und ${roll.die2}`}>
+        {[roll.die1, roll.die2].map((die, index) => <span key={index} className="dice-face" aria-hidden="true">{["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][die]}</span>)}
+      </div>
+      <div className="board-top-hud__caption"><small>{settled ? "WÜRFELERGEBNIS" : "DIE WÜRFEL ROLLEN"}</small><strong>{current?.name}</strong></div>
+      <b className="board-top-hud__total">{settled ? roll.total : "…"}</b>
+      {roll.isDouble && settled && <em>PASCH!</em>}
+    </> : <><i aria-hidden="true">♛</i><div className="board-top-hud__caption"><small>AM ZUG</small><strong>{current?.name ?? "Das Schicksal entscheidet"}</strong></div><b className="board-top-hud__prompt">{state.turnPhase === "waitingForRoll" ? "WÜRFLE" : "VALENØR"}</b></>}
+  </aside>;
+}
 
 const TYPE_LABELS: Record<BoardTileType, string> = {
   start: "Runentor", property: "Grundstück", adventure: "Abenteuer", fate: "Schicksal",
@@ -73,9 +101,6 @@ export function TurnStatus({ state }: { state: GameState }) {
       )}
       {turnAction?.kind === "dungeonEscaped" && (
         <aside className="double-notice"><strong>KERKER-PASCH</strong><span>{actionPlayer?.name} ist frei und zieht mit diesem Wurf.</span></aside>
-      )}
-      {state.lastDiceRoll && ["rolling", "dungeonRolling", "moving", "cardMoving"].includes(state.turnPhase) && (
-        <div className="dice-result"><span>{state.lastDiceRoll.die1}</span><i>+</i><span>{state.lastDiceRoll.die2}</span><b>{state.lastDiceRoll.total}</b></div>
       )}
       {landed && ["landed", "waitingForEndTurn"].includes(state.turnPhase) && (
         <div className="landed-card">

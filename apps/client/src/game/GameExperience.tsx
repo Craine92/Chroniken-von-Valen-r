@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BOARD_TILES, RELIC_DEFINITIONS, canBuildOnProperty, getActiveChronicleEvent, getPropertyGroup, getPropertyGroupTiles, type GameState, type PropertyGroupId } from "@valenor/shared";
 import { GameHud } from "./GameHud";
-import { hasTurnStatusContent, TurnStatus } from "./TurnStatus";
+import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
 import { CardReveal } from "../components/CardReveal";
 import { GameResultPanel } from "../components/GameResultPanel";
-import { DEFAULT_BOARD_PRESENTATION_MODE, type BoardPresentationMode } from "./board-presentation";
+import { DEFAULT_BOARD_PRESENTATION_MODE, getCardPresentationKey, type BoardPresentationMode } from "./board-presentation";
 import { audioManager } from "../audio/AudioManager";
 import { GameAudioEventTracker } from "../audio/game-audio-events";
 
@@ -15,6 +15,11 @@ const GameCanvas = lazy(() =>
 export const DOUBLE_BANNER_DURATION_MS = 2_200;
 export const CHRONICLE_NOTICE_DURATION_MS = 3_000;
 export const TAVERN_NOTICE_DURATION_MS = 4_000;
+
+const ACTION_SIGILS: Partial<Record<GameState["economyLog"][number]["kind"], string>> = {
+  purchase: "♜", rent: "✦", tax: "♛", auction: "⚖", building: "⌂", mortgage: "⛓",
+  trade: "⇄", bankruptcy: "⊘", start: "ᚱ", tavern: "⚄", dragon: "♞", relic: "✧", quest: "✓"
+};
 
 export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE }: { gameState: GameState; onNewChronicle?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined }) {
   const [introVisible, setIntroVisible] = useState(true);
@@ -139,10 +144,11 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
         <GameHud gameState={gameState} />
         <aside className="economy-log" aria-live="polite">
           <strong>LETZTE AKTIONEN</strong>
-          {gameState.economyLog.slice(-4).reverse().map((entry) => <p key={entry.id} title={entry.message}>{entry.message}</p>)}
+          {gameState.economyLog.slice(-4).reverse().map((entry) => <p key={entry.id} title={entry.message}><i aria-hidden="true">{ACTION_SIGILS[entry.kind] ?? "·"}</i><span>{entry.message}</span></p>)}
         </aside>
       </aside>
       <section className="board-stage" aria-label="Brettbereich">
+        <BoardTopHud state={gameState} />
         <Suspense fallback={<div className="game-loading">Die Welt von Valenør erwacht …</div>}>
           <GameCanvas gameState={gameState} focusedPropertyGroupId={focusedPropertyGroupId} presentationMode={boardPresentationMode} />
         </Suspense>
@@ -195,7 +201,7 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
           )}
         </div>
         {gameState.activeCard && (
-          <aside className="board-card-event" aria-live="polite">
+          <aside key={getCardPresentationKey(gameState)} className="board-card-event" data-deck={gameState.activeCard.deck} aria-live="polite">
             <CardReveal activeCard={gameState.activeCard} />
           </aside>
         )}

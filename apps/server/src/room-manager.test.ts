@@ -40,6 +40,48 @@ test("chronicle snapshots stay isolated and blessed passage is paid before drawi
   assert.equal(manager.getGameState(roomCode)!.players[0]!.gold, expectedGold);
 });
 
+test("humans choose free lobby colors and occupied human colors fail without changing the room", () => {
+  const { manager, roomCode, human } = roomWithHuman();
+  let room = manager.updatePlayerColor(roomCode, human.player.id, "red", "socket-1");
+  assert.equal(room.players[0]!.color,"red");
+  const other = manager.joinRoom(roomCode,"Myrra","socket-2");
+  const before = manager.getRoom(roomCode);
+  assert.throws(()=>manager.updatePlayerColor(roomCode,other.player.id,"red","socket-2"),/belegt/);
+  assert.deepEqual(manager.getRoom(roomCode),before);
+  room.players[0]!.color="blue";
+  assert.equal(manager.getRoom(roomCode)!.players[0]!.color,"red");
+  assert.equal(manager.joinRoom(roomCode,"Philipp","new-socket",human.playerToken).player.color,"red");
+});
+
+test("a human color request swaps the NPC color without duplicates in a full lobby and persists into the game", () => {
+  const { manager, roomCode, human } = roomWithHuman();
+  for(let index=0;index<3;index++) manager.addComputer(roomCode,"host-1");
+  for(const color of ["green","blue","red","violet"] as const) {
+    const previous = manager.getRoom(roomCode)!;
+    const npc = previous.players.find(player=>player.color===color&&player.type==="computer");
+    const room = manager.updatePlayerColor(roomCode,human.player.id,color,"socket-1");
+    assert.equal(room.players[0]!.color,color);
+    assert.equal(new Set(room.players.map(player=>player.color)).size,4);
+    if(npc) assert.equal(room.players.find(player=>player.id===npc.id)!.color,previous.players[0]!.color);
+  }
+  const room = manager.updatePlayerColor(roomCode,human.player.id,"blue","socket-1");
+  const started = manager.startGame(roomCode,"host-1");
+  assert.deepEqual(started.players.map(player=>player.color),room.players.map(player=>player.color));
+  assert.throws(()=>manager.updatePlayerColor(roomCode,human.player.id,"red","socket-1"),/Spielbeginn/);
+});
+
+test("lobby color changes validate player, socket, type, connection and runtime color values", () => {
+  const { manager, roomCode, human } = roomWithHuman();
+  const npc = manager.addComputer(roomCode,"host-1").players[1]!;
+  for(const [id,socket] of [[human.player.id,"wrong-socket"],[npc.id,"socket-1"],["missing","socket-1"]]) {
+    assert.throws(()=>manager.updatePlayerColor(roomCode,id!,"blue",socket!));
+  }
+  for(const color of ["gold",null,{},undefined]) assert.throws(()=>manager.updatePlayerColor(roomCode,human.player.id,color as "blue","socket-1"),/ungültig/);
+  manager.disconnectPlayer(roomCode,human.player.id);
+  assert.throws(()=>manager.updatePlayerColor(roomCode,human.player.id,"blue","socket-1"));
+  assert.equal(new Set(manager.getRoom(roomCode)!.players.map(player=>player.color)).size,2);
+});
+
 test("allows one human and one computer to start", () => {
   const { manager, roomCode } = roomWithHuman();
   manager.addComputer(roomCode, "host-1");

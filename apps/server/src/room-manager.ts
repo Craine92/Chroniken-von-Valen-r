@@ -8,6 +8,7 @@ import {
   type GameRoom,
   type GameState,
   type Player,
+  type PlayerColor,
   type PlayerType,
   type AuctionBidIncrement,
   type CardDeckType
@@ -168,6 +169,22 @@ export class RoomManager {
     const player = room.players.find((candidate) => candidate.id === playerId);
     if (!player || player.type !== "computer") throw new Error("Dieser Computer wurde nicht gefunden.");
     room.players = room.players.filter((candidate) => candidate.id !== playerId);
+    return this.toPublicRoom(room);
+  }
+
+  updatePlayerColor(roomCode: string, playerId: string, color: PlayerColor, socketId: string): GameRoom {
+    const room = this.requireRoom(roomCode);
+    if (room.phase !== "lobby") throw new Error("Die Spielerfarbe kann nur vor Spielbeginn geändert werden.");
+    const player = room.players.find(candidate => candidate.id === playerId);
+    if (!player || player.type !== "human" || player.socketId !== socketId || player.connectionState !== "connected") {
+      throw new Error("Nur verbundene menschliche Spieler dürfen ihre eigene Farbe wählen.");
+    }
+    if (!PLAYER_COLORS.includes(color)) throw new Error("Diese Spielerfarbe ist ungültig.");
+    const occupant = room.players.find(candidate => candidate.id !== playerId && candidate.color === color);
+    if (occupant?.type === "human") throw new Error(`Diese Farbe ist bereits von ${occupant.name} belegt.`);
+    // Swapping with the requesting human preserves uniqueness even in a full lobby.
+    if (occupant) occupant.color = player.color;
+    player.color = color;
     return this.toPublicRoom(room);
   }
 

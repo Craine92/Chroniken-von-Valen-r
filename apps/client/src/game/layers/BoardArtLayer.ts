@@ -117,7 +117,7 @@ export class BoardArtLayer {
   syncChronicle(state: GameState, reducedMotion = false): void {
     const event = state.status === "playing" ? getActiveChronicleEvent(state) : undefined;
     const regions = getChronicleTargetRegions(event);
-    const signature = regions.length ? `${event!.id}:${event!.startedAtRound}:${event!.effectType}:${[...regions].sort().join(",")}` : "";
+    const signature = regions.length ? `${event!.id}:${event!.startedAtRound}:${event!.effectType}:${[...regions].sort().join(",")}:${reducedMotion}` : "";
     if (signature === this.chronicleSignature) return;
     this.clearChronicleMarkers();
     this.chronicleSignature = signature;
@@ -126,10 +126,14 @@ export class BoardArtLayer {
       const points = this.realmPoints.get(region);
       if (!points) return;
       const graphics = this.scene.add.graphics().setName(`chronicle-realm-${region}`).setDepth(BOARD_DEPTHS.decorations + 2);
-      graphics.fillStyle(0xe9c578, .018).fillPoints(points, true);
+      graphics.fillStyle(0xe9c578, .04).fillPoints(points, true);
       graphics.fillStyle(aura, .045).fillPoints(points, true);
-      graphics.lineStyle(14, 0xefc86d, .12).strokePoints(points, true);
-      graphics.lineStyle(3, 0xf5d58a, .85).strokePoints(points, true);
+      graphics.lineStyle(16, 0xefc86d, .25).strokePoints(points, true);
+      graphics.lineStyle(5, 0xf5d58a, .98).strokePoints(points, true);
+      const minX = Math.min(...points.map(point => point.x!)), maxX = Math.max(...points.map(point => point.x!));
+      const minY = Math.min(...points.map(point => point.y!)), maxY = Math.max(...points.map(point => point.y!));
+      const inner = points.map(point => ({ x: point.x! + (point.x === minX ? 4 : point.x === maxX ? -4 : 0), y: point.y! + (point.y === minY ? 4 : point.y === maxY ? -4 : 0) }));
+      graphics.lineStyle(1, 0xffe8af, .8).strokePoints(inner, true);
       this.chronicleMarkers.set(region, graphics);
       if (!reducedMotion) this.scene.tweens.add({ targets: graphics, alpha: .65, duration: 1600, yoyo: true, repeat: -1, ease: "Sine.InOut" });
     });

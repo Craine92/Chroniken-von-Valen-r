@@ -500,6 +500,18 @@ io.on("connection", (socket) => {
   socket.on(SOCKET_EVENTS.roomJoin, joinRoom);
   socket.on(SOCKET_EVENTS.playerJoin, joinRoom);
 
+  socket.on(SOCKET_EVENTS.playerUpdateColor, (color, callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keinem Spieler verbunden.");
+      const room = rooms.updatePlayerColor(roomCode, playerId, color, socket.id);
+      io.to(roomCode).emit(SOCKET_EVENTS.roomUpdate, room);
+      callback({ ok: true, room });
+    } catch (error) {
+      callback({ ok: false, message: error instanceof Error ? error.message : "Die Farbe konnte nicht geändert werden." });
+    }
+  });
+
   socket.on(SOCKET_EVENTS.roomAddComputer, (callback) => {
     try {
       const roomCode = socket.data.roomCode;

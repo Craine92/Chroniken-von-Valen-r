@@ -1,11 +1,5 @@
 import type { Player } from "@valenor/shared";
-
-const COLOR_LABELS: Record<Player["color"], string> = {
-  violet: "Violett",
-  green: "Grün",
-  red: "Rot",
-  blue: "Blau"
-};
+import { PLAYER_COLOR_LABELS } from "../lib/player-colors";
 const ARCHETYPES = ["Runenritter", "Waldläuferin", "Runenmagier", "Schildkriegerin"];
 const ARCHETYPE_SIGILS = ["♞", "➶", "✧", "⚒"];
 
@@ -40,7 +34,7 @@ export function PlayerSlot({ player, index, onAddComputer, onRemoveComputer, dis
       <div className="player-slot__sigil" aria-hidden="true">{ARCHETYPE_SIGILS[index]}</div>
       <div className="player-slot__identity">
         <h3>{player.name}</h3>
-        <p>{ARCHETYPES[index]} · {player.type === "computer" ? "Computer" : "Mensch"} · {COLOR_LABELS[player.color]}</p>
+        <p>{ARCHETYPES[index]} · {player.type === "computer" ? "Computer" : "Mensch"} · {PLAYER_COLOR_LABELS[player.color]}</p>
       </div>
       {player.type === "computer" ? (
         <button

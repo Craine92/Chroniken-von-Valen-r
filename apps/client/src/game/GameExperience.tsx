@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BOARD_TILES, RELIC_DEFINITIONS, canBuildOnProperty, getActiveChronicleEvent, getPropertyGroup, getPropertyGroupTiles, type GameState, type PropertyGroupId } from "@valenor/shared";
 import { GameHud } from "./GameHud";
+import { getCurrentBoardContext } from "./board-context";
+import { RecentActions } from "../components/RecentActions";
 import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
 import { CardReveal } from "../components/CardReveal";
 import { GameResultPanel } from "../components/GameResultPanel";
@@ -15,11 +17,6 @@ const GameCanvas = lazy(() =>
 export const DOUBLE_BANNER_DURATION_MS = 2_200;
 export const CHRONICLE_NOTICE_DURATION_MS = 3_000;
 export const TAVERN_NOTICE_DURATION_MS = 4_000;
-
-const ACTION_SIGILS: Partial<Record<GameState["economyLog"][number]["kind"], string>> = {
-  purchase: "♜", rent: "✦", tax: "♛", auction: "⚖", building: "⌂", mortgage: "⛓",
-  trade: "⇄", bankruptcy: "⊘", start: "ᚱ", tavern: "⚄", dragon: "♞", relic: "✧", quest: "✓"
-};
 
 export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE }: { gameState: GameState; onNewChronicle?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined }) {
   const [introVisible, setIntroVisible] = useState(true);
@@ -129,6 +126,7 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
   const focusedOwnedTiles = focusedGroupTiles.filter((tile) => gameState.propertyOwnerships.some((ownership) => ownership.tileIndex === tile.index && (!focusedPropertyGroupPlayerId || ownership.ownerId === focusedPropertyGroupPlayerId)));
   const focusedMissingTiles = focusedGroupTiles.filter((tile) => !focusedOwnedTiles.includes(tile));
   const focusedBuildAvailable = Boolean(focusedPropertyGroupPlayerId && focusedGroupTiles.some((tile) => canBuildOnProperty(gameState, focusedPropertyGroupPlayerId, tile.index).allowed));
+  const context = getCurrentBoardContext(gameState);
   const hasContextEvent = hasTurnStatusContent(gameState)
     || Boolean(gameState.status === "playing" && gameState.quickGameClock?.expired)
     || Boolean(gameState.activeCard)
@@ -142,10 +140,7 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
     <main className={`board-page board-page--${boardPresentationMode} ${hasContextEvent ? "has-context-event" : "is-context-idle"}`} data-testid="valenor-game-view" data-context-state={hasContextEvent ? "active" : "idle"}>
       <aside className="game-sidebar" aria-label="Spielstatus">
         <GameHud gameState={gameState} />
-        <aside className="economy-log" aria-live="polite">
-          <strong>LETZTE AKTIONEN</strong>
-          {gameState.economyLog.slice(-4).reverse().map((entry) => <p key={entry.id} title={entry.message}><i aria-hidden="true">{ACTION_SIGILS[entry.kind] ?? "·"}</i><span>{entry.message}</span></p>)}
-        </aside>
+        <RecentActions state={gameState} />
       </aside>
       <section className="board-stage" aria-label="Brettbereich">
         <BoardTopHud state={gameState} />
@@ -196,7 +191,8 @@ export function GameExperience({ gameState, onNewChronicle, focusedPropertyGroup
           {tradeAction && (
             <aside className="building-notice">
               <small>{tradeAction.type === "created" ? `${gameState.players.find((player) => player.id === tradeAction.proposerId)?.name} unterbreitet ein Handelsangebot.` : "Ein Bündnis wird besiegelt."}</small>
-              <strong>Handel</strong>
+              <strong>{context.kind === "trade" ? context.title : "Handel"}</strong>
+              {context.kind === "trade" && <span>{context.lines.join(" · ")}</span>}
             </aside>
           )}
         </div>

@@ -1,5 +1,5 @@
 import type { AuctionBidIncrement } from "./economy";
-import type { GameConfig, GameRoom, GameState, MagicSignal, Player, TradeAssets, TavernChoice } from "./game";
+import type { GameConfig, GameRoom, GameState, MagicSignal, Player, PlayerColor, TradeAssets, TavernChoice } from "./game";
 import type { PropertyGroupId } from "./property-groups";
 import type { RelicId } from "./relics";
 
@@ -13,6 +13,7 @@ export const SOCKET_EVENTS = {
   playerJoin: "player:join",
   playerDisconnect: "player:disconnect",
   playerReconnect: "player:reconnect",
+  playerUpdateColor: "player:updateColor",
   playerMagicSignal: "player:magicSignal",
   propertyGroupFocus: "property:groupFocus",
   gameStart: "game:start",
@@ -111,6 +112,7 @@ export interface ClientToServerEvents {
   "room:updateConfig": (config: GameConfig, callback: (result: RoomMutationResult) => void) => void;
   "player:join": (request: JoinRoomRequest, callback: (result: JoinRoomResult) => void) => void;
   "player:magicSignal": (callback: (result: EventResult) => void) => void;
+  "player:updateColor": (color: PlayerColor, callback: (result: RoomMutationResult) => void) => void;
   "property:groupFocus": (groupId: PropertyGroupId, active: boolean, callback: (result: EventResult) => void) => void;
   "game:start": (callback: (result: StartGameResult) => void) => void;
   "game:rollOrder": (callback: (result: GameActionResult) => void) => void;

@@ -215,3 +215,33 @@ body:has(.controller-page) .audio-settings__toggles { grid-template-columns: 1fr
 }
 @keyframes controller-feedback-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes controller-feedback-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+.controller-page .mobile-live { display:grid; gap:.7rem; text-align:left; margin:.7rem 0; min-width:0; }
+.controller-page .mobile-live h2,.controller-page .player-color-picker h2 { margin:0; color:#e9ca85; font-size:.9rem; letter-spacing:.07em; }
+.controller-page .mobile-live__turn,.controller-page .mobile-live__world > aside { display:grid; gap:.25rem; padding:.75rem; border:1px solid #9b7d49; border-radius:5px; background:linear-gradient(135deg,#30241c,#141017); overflow-wrap:anywhere; }
+.controller-page .mobile-live small { color:#cfb882; font-size:.68rem; font-weight:700; letter-spacing:.06em; }
+.controller-page .mobile-live__turn > strong { color:#f4e5c4; font:700 1.15rem/1.3 Georgia,serif; }
+.controller-page .mobile-live p { margin:.15rem 0; color:#e8ddcb; font-size:.88rem; line-height:1.45; }
+.controller-page .mobile-live__context { display:grid; gap:.2rem; margin-top:.35rem; padding-top:.5rem; border-top:1px solid #9b7d4955; }
+.controller-page .mobile-live__world { display:grid; gap:.5rem; }
+.controller-page .mobile-live__world strong { color:#f1dbab; font-size:1rem; line-height:1.3; }
+.controller-page .mobile-live .weltenweg-pot strong { font:700 1.45rem/1.3 Georgia,serif; }
+.controller-page .mobile-live .active-chronicle span { color:#ded3bc; font-size:.82rem; line-height:1.35; }
+.controller-page .mobile-live__actions { display:grid; gap:.35rem; }
+.controller-page .mobile-live__actions > strong { color:#d9bf85; font-size:.75rem; }
+.controller-page .mobile-live__actions p { display:grid; grid-template-columns:1rem minmax(0,1fr); gap:.35rem; padding:.45rem .6rem; border-left:2px solid #aa8a50; background:#201920; font-size:.8rem; }
+.controller-page .mobile-live__actions p i { color:#d8b968; font-style:normal; }
+.controller-page .mobile-live__actions p span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; overflow-wrap:anywhere; }
+.controller-page .player-color-picker { display:grid; gap:.65rem; margin:1rem 0; text-align:left; }
+.controller-page .player-color-picker > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+.controller-page .color-swatch { display:grid; justify-items:center; align-content:center; gap:.3rem; min-height:100px; padding:.65rem; color:#f2e6ce; background:#1d1721; border:2px solid #6d5c45; border-radius:5px; cursor:pointer; overflow-wrap:anywhere; }
+.controller-page .color-swatch--violet { --swatch-color:var(--violet); }
+.controller-page .color-swatch--green { --swatch-color:var(--green); }
+.controller-page .color-swatch--red { --swatch-color:var(--red); }
+.controller-page .color-swatch--blue { --swatch-color:var(--blue); }
+.controller-page .color-swatch i { width:28px; height:28px; background:var(--swatch-color); border-radius:50%; box-shadow:0 0 12px color-mix(in srgb,var(--swatch-color),transparent 65%); }
+.controller-page .color-swatch strong { font-size:.9rem; }
+.controller-page .color-swatch small { color:#d6c7b1; font-size:.72rem; line-height:1.3; }
+.controller-page .color-swatch[aria-pressed="true"] { border-color:var(--swatch-color); background:#35283b; }
+.controller-page .color-swatch:disabled { opacity:.55; cursor:default; }
+.controller-page .color-swatch:focus-visible { outline:2px solid #ffe4a1; outline-offset:3px; }

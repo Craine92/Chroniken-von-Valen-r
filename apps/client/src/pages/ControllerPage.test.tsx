@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { GameState, Player } from "@valenor/shared";
+import { BOARD_TILES, getBloodMoonDefinition, type GameState, type Player } from "@valenor/shared";
+import { MobileLiveEvents } from "../components/MobileLiveEvents";
+import { PlayerColorPicker } from "../components/PlayerColorPicker";
 import {
   BANKRUPTCY_CONFIRMATION,
   BankruptcySpectator,
@@ -61,6 +63,36 @@ function spectatorState(): GameState {
     startedAt: 1
   };
 }
+
+test("mobile live events show shared context, active NPC, dice, globals and only three latest actions", () => {
+  const state = spectatorState();
+  state.players[0]!.isBankrupt = false; state.players[1]!.type = "computer";
+  state.turnPhase = "propertyDecision"; state.weltenwegPot = 200;
+  state.lastDiceRoll = { die1:3, die2:4, total:7, isDouble:false };
+  state.lastMovement = { kind:"normal", playerId:"p2", from:1, to:8, path:[2,3,4,5,6,7,8], passedStart:false, landedTile:BOARD_TILES[8]! };
+  state.wanderingDragon = { tileIndex:24, nextMoveRound:6, encounterSequence:0 };
+  state.activeChronicleEvent = { ...getBloodMoonDefinition("orcs"), startedAfterRound:3, startedAtRound:4, expiresAtRound:6, startedAt:1 };
+  state.economyLog = Array.from({length:5}, (_, index) => ({id:`log-${index}`,kind:"system",message:`Live-Aktion ${index}`,playerIds:[],createdAt:1}));
+  let markup = renderToStaticMarkup(<MobileLiveEvents state={state} playerId="p1" />);
+  for (const text of ["LIVE-GESCHEHEN", "Justine · NPC", "3 + 4", "200 GOLD", "Eisenöde", "Mieten: +25 %", "Noch 2 Runden", BOARD_TILES[24]!.name, "data-context-kind=\"landing\""]) assert.ok(markup.includes(text), text);
+  assert.deepEqual([...markup.matchAll(/<span>(Live-Aktion \d)<\/span>/g)].map(match=>match[1]),["Live-Aktion 4","Live-Aktion 3","Live-Aktion 2"]);
+  assert.equal(renderToStaticMarkup(<MobileLiveEvents state={state} playerId="p2" />), "");
+  state.currentPlayerId = "p1"; state.turnPhase = "waitingForRoll";
+  markup = renderToStaticMarkup(<MobileLiveEvents state={state} playerId="p2" />);
+  assert.match(markup,/Philipp · MENSCH/); assert.doesNotMatch(markup,/Justine · NPC|Wurf:|Landet auf:|data-context-kind="landing"/);
+  state.currentRound = 6;
+  assert.doesNotMatch(renderToStaticMarkup(<MobileLiveEvents state={state} playerId="p2" />), /AKTIVE CHRONIK/);
+});
+
+test("lobby color picker marks the current color, blocks human colors and offers NPC colors", () => {
+  const players: Player[] = [roomPlayer,{...roomPlayer,id:"p2",name:"Myrra",color:"red"},{...roomPlayer,id:"p3",name:"Brom",type:"computer",color:"blue"}];
+  const markup = renderToStaticMarkup(<PlayerColorPicker players={players} playerId="p1" connected pending={false} onSelect={()=>undefined} />);
+  assert.match(markup,/DEINE FARBE/); assert.equal([...markup.matchAll(/<button /g)].length,4);
+  assert.match(markup,/color-swatch--violet" aria-pressed="true"/);
+  assert.match(markup,/color-swatch--red"[^>]*disabled=""/); assert.match(markup,/Belegt von Myrra/);
+  assert.doesNotMatch(markup.match(/<button[^>]*color-swatch--blue"[^>]*>/)![0],/disabled/);
+  assert.equal([...renderToStaticMarkup(<PlayerColorPicker players={players} playerId="p1" connected={false} pending={false} onSelect={()=>undefined} />).matchAll(/disabled=""/g)].length,4);
+});
 
 test("paymentRequired explains mortgage resolution and offers bankruptcy", () => {
   const markup = renderToStaticMarkup(

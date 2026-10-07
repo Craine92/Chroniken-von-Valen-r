@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, getBloodMoonDefinition, getRegionalChronicleDefinition, type GameState, type RegionType } from "@valenor/shared";
 import { DOUBLE_BANNER_DURATION_MS, GameExperience } from "./GameExperience";
 import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
-import { GameHud, getCurrentBoardContext } from "./GameHud";
+import { GameHud } from "./GameHud";
+import { getCurrentBoardContext } from "./board-context";
 import { getBoardScreenLayout, getCardPresentationKey } from "./board-presentation";
 
 function startedGameState(playerCount: 2 | 4): GameState {
@@ -296,7 +297,19 @@ test("consecutive double actions receive distinct banner instances", () => {
   }
 });
 
-test("the action log renders up to four newest entries in reverse chronological order without changing history", () => {
+test("the TV sidebar contains only game status, four players and ordered global information", () => {
+  const state = startedGameState(4);
+  state.currentRound = 4; state.currentPlayerId = "p1"; state.turnPhase = "waitingForRoll";
+  state.wanderingDragon = { tileIndex: 8, nextMoveRound: 6, encounterSequence: 0 };
+  state.activeChronicleEvent = { ...getBloodMoonDefinition("orcs"), startedAfterRound:3, startedAtRound:4, expiresAtRound:6, startedAt:1 };
+  const markup = renderToStaticMarkup(<GameHud gameState={state} />);
+  assert.doesNotMatch(markup, /AKTUELLES GESCHEHEN|ist am Zug|würfelt|ist gelandet/);
+  assert.equal([...markup.matchAll(/<article /g)].length, 4);
+  assert.ok(markup.indexOf("WELTENWEG-POTT") < markup.indexOf("AKTIVE CHRONIK"));
+  assert.ok(markup.indexOf("AKTIVE CHRONIK") < markup.indexOf("WANDERNDER DRACHE"));
+});
+
+test("the action log renders up to three newest entries in reverse chronological order without changing history", () => {
   const state = startedGameState(2);
   for (const count of [0,1,2,3,4,7]) {
     state.economyLog = Array.from({length:count}, (_, index) => ({ id:`action-${index}`, kind:"system" as const, message:`Aktion ${index}: Myrra verkauft eine Baustufe auf Sternenlichtung und erhält 38 Gold.`, playerIds:[], createdAt:index }));
@@ -304,8 +317,8 @@ test("the action log renders up to four newest entries in reverse chronological 
     const markup = renderToStaticMarkup(<GameExperience gameState={state} />);
     const log=markup.match(/<aside class="economy-log"[^>]*>(.*?)<\/aside>/)![1]!;
     const messages=[...log.matchAll(/<p\b[^>]*>.*?<span>(.*?)<\/span><\/p>/g)].map(match=>match[1]);
-    assert.deepEqual(messages,state.economyLog.slice(-4).reverse().map(entry=>entry.message));
-    assert.equal(messages.length,Math.min(count,4));
+    assert.deepEqual(messages,state.economyLog.slice(-3).reverse().map(entry=>entry.message));
+    assert.equal(messages.length,Math.min(count,3));
     assert.equal(JSON.stringify(state.economyLog),before);
   }
 });

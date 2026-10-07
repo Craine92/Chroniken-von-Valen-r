@@ -9,6 +9,8 @@ import {
   RELIC_DEFINITIONS,
   SOCKET_EVENTS,
   type GameState,
+  type GameRoom,
+  type PlayerColor,
   type TavernChoice,
   type TavernState,
   type CreateTradeOfferRequest,
@@ -29,6 +31,8 @@ import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 import { GameResultPanel } from "../components/GameResultPanel";
 import { createValenorSocket } from "../lib/socket";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
+import { MobileLiveEvents } from "../components/MobileLiveEvents";
+import { PlayerColorPicker } from "../components/PlayerColorPicker";
 
 function normalizeRoomCode(value: string): string {
   const lettersAndNumbers = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -174,6 +178,8 @@ export function ControllerPage() {
   const [error, setError] = useState("");
   const [signalSent, setSignalSent] = useState(false);
   const [gameState, setGameState] = useState<GameState>();
+  const [room, setRoom] = useState<GameRoom>();
+  const [colorPending, setColorPending] = useState(false);
   const [selectedPropertyGroupId, setSelectedPropertyGroupId] = useState<PropertyGroupId>();
   const [controllerTab, setControllerTab] = useState("action");
   useEffect(() => {
@@ -218,6 +224,7 @@ export function ControllerPage() {
       localStorage.setItem(`valenor:player-name:${normalizedRoom}`, result.player.name);
       playerRef.current = result.player;
       setPlayer(result.player);
+      setRoom(result.room);
       if (result.room?.gameState) setGameState(result.room.gameState);
       setName(result.player.name);
       setConnected(true);
@@ -237,11 +244,21 @@ export function ControllerPage() {
       if (playerRef.current && nameRef.current) join(nameRef.current, true);
     };
     const handleDisconnect = () => setConnected(false);
+    const handleRoomUpdate = (updatedRoom: GameRoom) => {
+      setRoom(updatedRoom);
+      const updatedPlayer = updatedRoom.players.find(candidate => candidate.id === playerRef.current?.id);
+      if (updatedPlayer) {
+        playerRef.current = updatedPlayer;
+        setPlayer(updatedPlayer);
+      }
+      setGameState(updatedRoom.gameState);
+    };
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
     socket.on(SOCKET_EVENTS.gameStart, setGameState);
     socket.on(SOCKET_EVENTS.gameState, setGameState);
+    socket.on(SOCKET_EVENTS.roomUpdate, handleRoomUpdate);
     socket.connect();
 
     return () => {
@@ -261,6 +278,21 @@ export function ControllerPage() {
       return;
     }
     join(cleanedName);
+  };
+
+  const chooseColor = (color: PlayerColor) => {
+    setColorPending(true);
+    setError("");
+    socket.emit(SOCKET_EVENTS.playerUpdateColor, color, result => {
+      setColorPending(false);
+      if (!result.ok || !result.room) {
+        setError(result.message ?? "Die Farbe konnte nicht geändert werden.");
+        return;
+      }
+      setRoom(result.room);
+      const updated = result.room.players.find(candidate => candidate.id === playerRef.current?.id);
+      if (updated) { playerRef.current = updated; setPlayer(updated); }
+    });
   };
 
   const sendMagicSignal = () => {
@@ -496,6 +528,7 @@ export function ControllerPage() {
           {gameState.quickGameClock?.expired && <p className="controller-last-round">DIE LETZTE RUNDE</p>}
           <ConnectionBadge connected={connected} />
           <div id="controller-action" hidden={controllerTab !== "action"}>
+          {!isCurrent && <MobileLiveEvents state={gameState} playerId={player.id} />}
           <div className="controller-divider"><span>✦</span></div>
           {isCurrent && gameState.turnPhase === "dungeonDecision" ? (
             <DungeonDecisionPanel
@@ -519,7 +552,7 @@ export function ControllerPage() {
             </div>
           ) : (
             <div className="turn-controls">
-              <p className="waiting-copy">{isCurrent ? "Du bist am Zug" : `${current?.name ?? "Ein Gefährte"} ist am Zug`}</p>
+              {isCurrent && <p className="waiting-copy">Du bist am Zug</p>}
               {canRoll && (
                 <button className="turn-action-button" type="button" disabled={!connected} onClick={() => performGameAction(SOCKET_EVENTS.gameRollDice)}>
                   <span aria-hidden="true">⚄ ⚄</span> Würfeln
@@ -616,6 +649,7 @@ export function ControllerPage() {
         </div>
         <ConnectionBadge connected={connected} />
 
+        {room?.phase === "lobby" && <PlayerColorPicker players={room.players} playerId={player.id} connected={connected} pending={colorPending} onSelect={chooseColor} />}
         <div className="controller-divider"><span>✦</span></div>
         <button
           className={`magic-button magic-button--${player.color} ${signalSent ? "is-casting" : ""}`}

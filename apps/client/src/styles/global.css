@@ -2102,3 +2102,11 @@ body {
   .game-sidebar .game-hud__context[data-context-kind="neutral"] dd { font-size:16px; white-space:nowrap; }
   .game-sidebar .game-hud__context[data-context-kind="neutral"] .game-hud__context-stats div:first-child dd { font-size:18px; }
 }
+
+/* Global TV information fits beside a four-player board without scrolling. */
+@media (min-width:721px) {
+  .game-sidebar .game-hud { flex:0 0 auto; }
+  .game-sidebar .game-hud__players { overflow:visible; }
+  .game-sidebar .game-hud__status { padding:.65rem .7rem; }
+  .game-sidebar .economy-log { margin-top:auto; flex:0 0 auto; }
+}

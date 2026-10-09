@@ -173,7 +173,7 @@ test("a dungeon double releases and moves the player but never grants an extra r
   assert.equal(game.turnContext.consecutiveDoubles, 0);
 });
 
-test("the third failed attempt charges fifty gold and moves with the existing roll", () => {
+test("the third failed attempt always creates a visible fee before moving with the existing roll", () => {
   const game = state(DUNGEON_TILE_INDEX);
   game.turnPhase = "dungeonDecision";
   game.players[0]!.gold = 200;
@@ -181,10 +181,17 @@ test("the third failed attempt charges fifty gold and moves with the existing ro
   const engine = new TurnEngine(new DiceService(new SequenceRandomSource([2, 5])));
   engine.rollDungeon(game, "p1", "human");
   engine.resolveDungeonRoll(game);
-  assert.equal(game.players[0]!.gold, 200 - DUNGEON_RELEASE_COST);
+  assert.equal(game.players[0]!.gold, 200);
+  assert.equal(game.pendingPayment?.amount, DUNGEON_RELEASE_COST);
+  assert.equal(game.pendingPayment?.reasonType, "dungeonRelease");
+  assert.deepEqual(game.turnContext.pendingDungeonMovement, { die1: 2, die2: 5, total: 7, isDouble: false });
+  assert.equal(game.turnPhase, "paymentRequired");
+  assert.equal(game.turnContext.pendingExtraRoll, false);
+  new EconomyService().settlePendingPayment(game, "p1");
+  engine.continueAfterDungeonPayment(game, "p1");
+  assert.equal(game.players[0]!.gold, 150);
   assert.equal(game.lastMovement?.to, 20);
   assert.equal(game.turnPhase, "moving");
-  assert.equal(game.turnContext.pendingExtraRoll, false);
 });
 
 test("an unaffordable third failure preserves the roll through paymentRequired", () => {

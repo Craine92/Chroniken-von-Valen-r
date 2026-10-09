@@ -1,7 +1,7 @@
 import type { AuctionBidIncrement } from "./economy";
 import type { GameConfig, GameRoom, GameState, MagicSignal, Player, PlayerColor, PlayerCharacterId, TradeAssets, TavernChoice } from "./game";
+import type { WorldImpulseChoice } from "./world-impulses";
 import type { PropertyGroupId } from "./property-groups";
-import type { RelicId } from "./relics";
 
 export const SOCKET_EVENTS = {
   roomCreate: "room:create",
@@ -22,11 +22,11 @@ export const SOCKET_EVENTS = {
   propertyGroupFocus: "property:groupFocus",
   gameStart: "game:start",
   gameState: "game:state",
+  gameRequestState: "game:requestState",
   gameRollOrder: "game:rollOrder",
   gameRollDice: "game:rollDice",
   gameUseRuneStone: "game:useRuneStone",
   gameKeepRoll: "game:keepRoll",
-  relicActivate: "relic:activate",
   gameRollDungeon: "game:rollDungeon",
   gamePayDungeonRelease: "game:payDungeonRelease",
   gameUseDungeonCard: "game:useDungeonCard",
@@ -36,11 +36,14 @@ export const SOCKET_EVENTS = {
   gameBuyProperty: "game:buyProperty",
   gameDeclineProperty: "game:declineProperty",
   gameChooseTavern: "game:chooseTavern",
+  gameChooseWorldImpulse: "game:chooseWorldImpulse",
   propertyBuild: "property:build",
   propertySellBuilding: "property:sellBuilding",
   paymentSettle: "payment:settle",
   propertyMortgage: "property:mortgage",
   propertyRedeemMortgage: "property:redeemMortgage",
+  financeAutoMortgageForPayment: "finance:autoMortgageForPayment",
+  financeRedeemAllMortgages: "finance:redeemAllMortgages",
   tradeCreate: "trade:create",
   tradeAccept: "trade:accept",
   tradeReject: "trade:reject",
@@ -123,11 +126,11 @@ export interface ClientToServerEvents {
   "player:updateReady": (ready: boolean, callback: (result: RoomMutationResult) => void) => void;
   "property:groupFocus": (groupId: PropertyGroupId, active: boolean, callback: (result: EventResult) => void) => void;
   "game:start": (callback: (result: StartGameResult) => void) => void;
+  "game:requestState": (callback: (result: GameActionResult) => void) => void;
   "game:rollOrder": (callback: (result: GameActionResult) => void) => void;
   "game:rollDice": (callback: (result: GameActionResult) => void) => void;
   "game:useRuneStone": (callback: (result: GameActionResult) => void) => void;
   "game:keepRoll": (callback: (result: GameActionResult) => void) => void;
-  "relic:activate": (relicId: RelicId, callback: (result: GameActionResult) => void) => void;
   "game:rollDungeon": (callback: (result: GameActionResult) => void) => void;
   "game:payDungeonRelease": (callback: (result: GameActionResult) => void) => void;
   "game:useDungeonCard": (callback: (result: GameActionResult) => void) => void;
@@ -137,11 +140,14 @@ export interface ClientToServerEvents {
   "game:buyProperty": (callback: (result: GameActionResult) => void) => void;
   "game:declineProperty": (callback: (result: GameActionResult) => void) => void;
   "game:chooseTavern": (choice: TavernChoice, callback: (result: GameActionResult) => void) => void;
+  "game:chooseWorldImpulse": (choice: WorldImpulseChoice, callback: (result: GameActionResult) => void) => void;
   "property:build": (tileIndex: number, callback: (result: GameActionResult) => void) => void;
   "property:sellBuilding": (tileIndex: number, callback: (result: GameActionResult) => void) => void;
   "payment:settle": (callback: (result: GameActionResult) => void) => void;
   "property:mortgage": (tileIndex: number, callback: (result: GameActionResult) => void) => void;
   "property:redeemMortgage": (tileIndex: number, callback: (result: GameActionResult) => void) => void;
+  "finance:autoMortgageForPayment": (callback: (result: GameActionResult) => void) => void;
+  "finance:redeemAllMortgages": (callback: (result: GameActionResult) => void) => void;
   "trade:create": (request: CreateTradeOfferRequest, callback: (result: GameActionResult) => void) => void;
   "trade:accept": (tradeId: string, callback: (result: GameActionResult) => void) => void;
   "trade:reject": (tradeId: string, callback: (result: GameActionResult) => void) => void;

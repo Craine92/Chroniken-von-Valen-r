@@ -9,12 +9,6 @@ export const RELIC_DEFINITIONS: Readonly<Record<RelicId, { id: RelicId; name: st
   "golden-feather": { id: "golden-feather", name: "Goldene Feder", description: "Beim nächsten Passieren des Runentors erhältst du zusätzlich 100 Gold, auch während des Chronik-Segens.", shortDescription: "Nächstes Runentor +100 Gold", symbol: "➶" }
 };
 
-export const RELIC_ACTIONS: Readonly<Record<Exclude<RelicId, "runestone">, { label: string; status: string }>> = {
-  "merchant-seal": { label: "Für nächsten Kauf aktivieren", status: "AKTIV · wartet auf deinen nächsten Kauf" },
-  "dungeon-amulet": { label: "Kerkeramulett aktivieren", status: "AKTIV · schützt vor dem nächsten Kerker-Eintritt" },
-  "golden-feather": { label: "Für nächstes Runentor aktivieren", status: "AKTIV · +100 Gold beim nächsten Runentor" }
-};
-
 export const RELIC_USE_MESSAGES: Readonly<Record<RelicId, string>> = {
   runestone: "Das Schicksal wird neu geworfen.",
   "merchant-seal": "25 % Händlerrabatt genutzt.",
@@ -23,11 +17,11 @@ export const RELIC_USE_MESSAGES: Readonly<Record<RelicId, string>> = {
 };
 
 export function isRelicArmed(player: GamePlayerState | undefined, id: RelicId): boolean {
-  return Boolean(player?.relics?.includes(id) && player.armedRelics?.includes(id));
+  return Boolean(player?.relics?.includes(id));
 }
 
-export function isRelicTradeBound(state: import("./game").GameState, player: GamePlayerState, id: RelicId): boolean {
-  return isRelicArmed(player, id) || (id === "runestone" && state.currentPlayerId === player.id && Boolean(state.turnContext.awaitingRuneStoneDecision));
+export function isRelicTradeBound(_state: import("./game").GameState, player: GamePlayerState, id: RelicId): boolean {
+  return Boolean(player.relics?.includes(id));
 }
 
 export function consumeRelic(player: GamePlayerState, id: RelicId): boolean {

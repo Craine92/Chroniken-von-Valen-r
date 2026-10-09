@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { BOARD_TILES, getPropertyGroupTiles, DUNGEON_TILE_INDEX, MAX_RELICS, RELIC_DEFINITIONS, isRelicArmed, type GameState, type PropertyGroupId, type RegionType } from "@valenor/shared";
 import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, getTileInnerAnchor, getTilePlacement, getTileWorldPosition, getTokenLabelOffset, getTokenSlotOffset } from "../board-layout";
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
+import { MortgageOverlayLayer } from "../layers/MortgageOverlayLayer";
 import { PropertyGroupLayer } from "../layers/PropertyGroupLayer";
 import { BoardArtLayer } from "../layers/BoardArtLayer";
 import { getCharacterAsset, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
@@ -61,6 +62,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   private boardReady = false;
   private pendingState: GameState | undefined;
   private developmentLayer: PropertyDevelopmentLayer | undefined;
+  private mortgageOverlayLayer: MortgageOverlayLayer | undefined;
   private artLayer: BoardArtLayer | undefined;
   private tileLayer: Phaser.GameObjects.Layer | undefined;
   private propertyGroupLayer: PropertyGroupLayer | undefined;
@@ -71,6 +73,11 @@ export class ValenorBoardScene extends Phaser.Scene {
   private dragonSprite: Phaser.GameObjects.Sprite | undefined;
   private dragonTileIndex: number | undefined;
   private dragonPlacementSignature = "";
+  private lastWorldImpulseStartedAt = 0;
+  private lastWorldImpulseResolvedAt = 0;
+  private worldImpulseEffectSignature = "";
+  private readonly worldImpulseMarkers: Phaser.GameObjects.Graphics[] = [];
+  private lastCelebrationId = "";
   private readonly reducedMotion = prefersReducedMotion();
   private readonly visualQuality = VISUAL_QUALITY[DEFAULT_GRAPHICS_QUALITY];
   private lastDiagnosticAt = 0;
@@ -112,11 +119,15 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.drawPlayerTokens();
     this.syncTokenRelics(this.state);
     this.syncDragon(this.state);
+    this.syncWorldImpulse(this.state);
+    this.syncMomentumCelebration(this.state);
     this.syncActivePlayer(this.state.currentPlayerId);
     this.syncFieldFeedback();
     this.drawOwnershipMarkers();
     this.developmentLayer = new PropertyDevelopmentLayer(this);
     this.developmentLayer.sync(this.state, false);
+    this.mortgageOverlayLayer = new MortgageOverlayLayer(this);
+    this.mortgageOverlayLayer.sync(this.state);
     this.fitCamera();
     this.syncRealmNames();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize);
@@ -143,9 +154,11 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.boardReady = false;
       this.game.canvas.dataset.boardReady = "false";
       this.developmentLayer?.destroy();
+      this.mortgageOverlayLayer?.destroy();
       this.propertyGroupLayer?.destroy();
       this.artLayer?.destroy();
       this.developmentLayer = undefined;
+      this.mortgageOverlayLayer = undefined;
       this.propertyGroupLayer = undefined;
       this.artLayer = undefined;
       this.tileLayer = undefined;
@@ -154,6 +167,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.dragonTileIndex = undefined;
       this.dragonVisuals.length = 0;
       this.dragonPlacementSignature="";
+      this.clearWorldImpulseMarkers();
       this.tokenRelics.clear();
       this.relicSignature = "";
     });
@@ -199,7 +213,10 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.syncDungeonMarkers(next);
     this.syncTokenRelics(next);
     this.syncDragon(next);
+    this.syncWorldImpulse(next);
+    this.syncMomentumCelebration(next);
     this.developmentLayer?.sync(next, true);
+    this.mortgageOverlayLayer?.sync(next);
     const ownershipSignature = next.propertyOwnerships.map((entry) => `${entry.tileIndex}:${entry.ownerId}:${entry.mortgaged}`).join("|");
     if (ownershipSignature !== this.ownershipSignature) this.drawOwnershipMarkers();
     if (next.lastMovement?.playerId === next.currentPlayerId && !["moving","cardMoving","rolling","dungeonRolling","dungeonTransfer","waitingForRoll","determiningOrder","turnTransition"].includes(next.turnPhase)) {
@@ -546,19 +563,25 @@ export class ValenorBoardScene extends Phaser.Scene {
       const miniatureAsset = getCharacterAsset(player.characterId);
       const miniatureVisual = this.add.container(0, 0).setName("token-character");
       if (miniatureAsset && this.artLayer?.hasAsset(miniatureAsset)) {
-        const outline = fitImage(
+        const goldOutline = fitImage(
+          this.add.image(0, -13, miniatureAsset.key),
+          TOKEN_VISUAL_CONFIG.assetWidth + TOKEN_VISUAL_CONFIG.outlineExpansion + 5,
+          TOKEN_VISUAL_CONFIG.assetHeight + TOKEN_VISUAL_CONFIG.outlineExpansion + 7,
+          "contain"
+        ).setOrigin(.5, .82).setTintFill(0xd9b95f).setAlpha(.98);
+        const darkSeparator = fitImage(
           this.add.image(0, -13, miniatureAsset.key),
           TOKEN_VISUAL_CONFIG.assetWidth + TOKEN_VISUAL_CONFIG.outlineExpansion,
           TOKEN_VISUAL_CONFIG.assetHeight + TOKEN_VISUAL_CONFIG.outlineExpansion,
           "contain"
-        ).setOrigin(.5, .82).setTint(0x050507).setAlpha(.9);
+        ).setOrigin(.5, .82).setTintFill(0x050507).setAlpha(.96);
         const miniature = fitImage(
           this.add.image(0, -13, miniatureAsset.key),
           TOKEN_VISUAL_CONFIG.assetWidth,
           TOKEN_VISUAL_CONFIG.assetHeight,
           "contain"
         ).setOrigin(.5, .82);
-        miniatureVisual.add([outline, miniature]);
+        miniatureVisual.add([goldOutline, darkSeparator, miniature]);
       } else {
         const silhouette = this.add.ellipse(0, -15, 36, 55, 0x050507, .46);
         miniatureVisual.add([silhouette, this.createMiniature(PLAYER_CHARACTERS.findIndex(character=>character.id===player.characterId), color).setScale(TOKEN_VISUAL_CONFIG.miniatureScale)]);
@@ -1014,6 +1037,104 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.game.canvas.dataset.dragonTileIndex = String(tileIndex);
       this.game.canvas.dataset.dragonVisualTiles = JSON.stringify(definitions.map(definition => definition.tileIndex));
     }
+  }
+
+  private clearWorldImpulseMarkers(): void {
+    this.worldImpulseMarkers.forEach(marker => { this.tweens.killTweensOf(marker); marker.destroy(); });
+    this.worldImpulseMarkers.length = 0;
+  }
+
+  private syncWorldImpulse(state: GameState): void {
+    const effects = state.worldImpulseEffects;
+    const persistentSignature = `${effects?.runeSpark ? 1 : 0}:${effects?.harborWindUntilRound === state.currentRound ? state.currentRound : 0}`;
+    if (persistentSignature !== this.worldImpulseEffectSignature) {
+      this.worldImpulseEffectSignature = persistentSignature;
+      this.clearWorldImpulseMarkers();
+      const indices = [
+        ...(effects?.runeSpark ? [0] : []),
+        ...(effects?.harborWindUntilRound === state.currentRound ? BOARD_TILES.filter(tile => tile.type === "harbor").map(tile => tile.index) : [])
+      ];
+      indices.forEach(tileIndex => {
+        const tile = getTilePlacement(tileIndex);
+        const harbor = BOARD_TILES[tileIndex]?.type === "harbor";
+        const marker = this.add.graphics().setName(harbor ? "harbor-wind-aura" : "rune-spark-aura").setDepth(BOARD_DEPTHS.effects);
+        marker.lineStyle(5, harbor ? 0x63bfe8 : 0xc58cff, .7).strokeRoundedRect(tile.x - tile.width / 2 + 5, tile.y - tile.height / 2 + 5, tile.width - 10, tile.height - 10, 10);
+        marker.fillStyle(harbor ? 0x5ab6dd : 0xd2a4ff, .06).fillRoundedRect(tile.x - tile.width / 2 + 5, tile.y - tile.height / 2 + 5, tile.width - 10, tile.height - 10, 10);
+        this.worldImpulseMarkers.push(marker);
+        if (!this.reducedMotion) this.tweens.add({ targets: marker, alpha: .35, duration: 1100, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+      });
+    }
+    const impulse = state.activeWorldImpulse;
+    const resolution = state.lastWorldImpulseResolution;
+    if (resolution?.resolvedAt && resolution.resolvedAt !== this.lastWorldImpulseResolvedAt) {
+      this.lastWorldImpulseResolvedAt = resolution.resolvedAt;
+      const token = resolution.targetPlayerId ? this.tokens.get(resolution.targetPlayerId) : undefined;
+      if (token && resolution.resultGold !== undefined) {
+        const popup = this.add.text(token.x, token.y - 68, `${resolution.resultGold > 0 ? "+" : ""}${resolution.resultGold} GOLD`, {
+          color: resolution.resultGold > 0 ? "#ffe18a" : "#a9a49a", fontFamily: "Arial", fontSize: "22px", fontStyle: "bold",
+          stroke: "#24160a", strokeThickness: 5
+        }).setOrigin(.5).setDepth(BOARD_DEPTHS.ui);
+        this.tweens.add({ targets: popup, y: popup.y - 34, alpha: 0, duration: this.reducedMotion ? 250 : 1250, ease: "Sine.Out", onComplete: () => popup.destroy() });
+      }
+    }
+    if (!impulse || impulse.startedAt === this.lastWorldImpulseStartedAt) return;
+    this.lastWorldImpulseStartedAt = impulse.startedAt;
+    const flash = this.add.rectangle(0, 0, BOARD_WIDTH, BOARD_HEIGHT, 0xe8ba55, .12).setDepth(BOARD_DEPTHS.ui - 1);
+    this.tweens.add({ targets: flash, alpha: 0, duration: this.reducedMotion ? 150 : 650, ease: "Sine.Out", onComplete: () => flash.destroy() });
+    if (impulse.id === "dragonCall") {
+      const shade = this.add.rectangle(0, 0, BOARD_WIDTH, BOARD_HEIGHT, 0x09070a, .12).setDepth(BOARD_DEPTHS.ui - 2);
+      this.tweens.add({ targets: shade, alpha: 0, duration: this.reducedMotion ? 150 : 700, ease: "Sine.Out", onComplete: () => shade.destroy() });
+    }
+    const targetToken = impulse.targetPlayerId ? this.tokens.get(impulse.targetPlayerId) : undefined;
+    if (targetToken) {
+      const beam = this.add.circle(targetToken.x, targetToken.y, 28, 0xf0c663, .13).setDepth(BOARD_DEPTHS.effects + 2).setStrokeStyle(5, 0xf7da86, .9);
+      this.tweens.add({ targets: beam, scale: 1.55, alpha: 0, duration: this.reducedMotion ? 180 : 900, ease: "Sine.Out", onComplete: () => beam.destroy() });
+    }
+    const targetIndex = impulse.targetTileIndex ?? (impulse.id === "dragonCall" ? state.wanderingDragon?.tileIndex : undefined);
+    if (targetIndex === undefined) return;
+    const tile = getTilePlacement(targetIndex);
+    const pulse = this.add.graphics().setDepth(BOARD_DEPTHS.effects + 2);
+    pulse.lineStyle(7, impulse.id === "dragonCall" ? 0xef784d : 0xf3ca67, .9).strokeRoundedRect(tile.x - tile.width / 2 + 3, tile.y - tile.height / 2 + 3, tile.width - 6, tile.height - 6, 10);
+    this.tweens.add({ targets: pulse, alpha: 0, scaleX: 1.06, scaleY: 1.06, duration: this.reducedMotion ? 180 : 850, yoyo: !this.reducedMotion, repeat: this.reducedMotion ? 0 : 1, onComplete: () => pulse.destroy() });
+  }
+
+  private syncMomentumCelebration(state: GameState): void {
+    const celebration = state.lastMomentumCelebration;
+    if (!celebration || celebration.id === this.lastCelebrationId) return;
+    this.lastCelebrationId = celebration.id;
+    let indices: number[] = [];
+    let color = 0xe8c66e;
+    if (celebration.type === "completeGroup") {
+      indices = getPropertyGroupTiles(celebration.groupId).map(tile => tile.index);
+      const player = state.players.find(entry => entry.id === celebration.playerId);
+      if (player) color = PLAYER_COLORS[player.color];
+      const token = this.tokens.get(celebration.playerId);
+      if (token) {
+        const aura = this.add.circle(token.x, token.y, 31, color, .12)
+          .setDepth(BOARD_DEPTHS.effects + 2)
+          .setStrokeStyle(5, 0xf4d784, .95);
+        this.tweens.add({
+          targets: aura,
+          scale: this.reducedMotion ? 1.08 : 1.45,
+          alpha: 0,
+          duration: this.reducedMotion ? 220 : 1100,
+          ease: "Sine.Out",
+          onComplete: () => aura.destroy()
+        });
+      }
+    } else if (celebration.type === "maxBuilding") indices = [celebration.tileIndex];
+    indices.forEach(tileIndex => {
+      const tile = getTilePlacement(tileIndex);
+      const glow = this.add.graphics().setDepth(BOARD_DEPTHS.effects + 2);
+      glow.lineStyle(8, color, .9).strokeRoundedRect(tile.x - tile.width / 2 + 3, tile.y - tile.height / 2 + 3, tile.width - 6, tile.height - 6, 10);
+      glow.lineStyle(3, 0xf4d784, 1).strokeRoundedRect(tile.x - tile.width / 2 + 9, tile.y - tile.height / 2 + 9, tile.width - 18, tile.height - 18, 8);
+      this.tweens.add({ targets: glow, alpha: 0, duration: this.reducedMotion ? 200 : 1400, ease: "Sine.Out", onComplete: () => glow.destroy() });
+      if (!this.reducedMotion) for (let index = 0; index < 8; index += 1) {
+        const mote = this.add.circle(tile.x, tile.y, 2, 0xf4d784, .9).setDepth(BOARD_DEPTHS.effects + 3);
+        const angle = Math.PI * 2 * index / 8;
+        this.tweens.add({ targets: mote, x: tile.x + Math.cos(angle) * 50, y: tile.y + Math.sin(angle) * 38, alpha: 0, duration: 700, onComplete: () => mote.destroy() });
+      }
+    });
   }
 
   private animateLanding(tileIndex: number, color: number) {

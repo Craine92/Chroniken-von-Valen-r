@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { type GameState, type TradeAssets, type CreateTradeOfferRequest } from "@valenor/shared";
 import { TradeService } from "../game/trade-service";
-import { EconomicAi, AI_RELIC_TRADE_VALUES, AI_DUNGEON_CARD_TRADE_VALUE } from "./economic-ai";
+import { EconomicAi, AI_ECONOMY_PROFILES, AI_DUNGEON_CARD_TRADE_VALUE } from "./economic-ai";
 
 const ai=new EconomicAi(),trades=new TradeService();
 function game(): GameState {
-  return {roomId:'NPC-TRADE',status:'playing',config:{mode:'chronicles'},
+  return {roomId:'NPC-TRADE',status:'playing',config:{mode:'chronicles',aiDifficulty:'hard'},
     players:['human','npc','other'].map((id,index)=>({id,name:id,type:index===1?'computer':'human',color:'violet',characterId: "elvenSpellweaver" as const, connectionState:index===1?'disconnected':'connected',gold:1500,position:0,isBankrupt:false,dungeon:{inDungeon:false,failedAttempts:0},heldCards:[],relics:[],armedRelics:[]})),
     turnOrder:['human','npc','other'],orderRolls:[],orderContenders:[],orderRollTargetCount:1,currentPlayerId:'human',currentTurnIndex:0,currentRound:4,turnNumber:10,turnPhase:'waitingForRoll',
     turnContext:{consecutiveDoubles:0,pendingExtraRoll:false,rollSequence:0},propertyOwnerships:[],buildingBank:{settlementUnitsAvailable:32,grandStructuresAvailable:12},economyLog:[],trades:[],startedAt:1};
@@ -14,6 +14,18 @@ function game(): GameState {
 const assets=(gold=0,propertyTileIndices:number[]=[]):TradeAssets=>({gold,propertyTileIndices});
 const offer=(state:GameState,incoming:TradeAssets,outgoing:TradeAssets)=>trades.create(state,'human',{recipientId:'npc',offer:incoming,request:outgoing});
 const own=(state:GameState,id:string,indices:number[])=>{state.propertyOwnerships.push(...indices.map(tileIndex=>({tileIndex,ownerId:id,mortgaged:false,buildingLevel:0 as const})));};
+
+test('difficulty profiles preserve the previous AI as hard and scale reserves and phase limits',()=>{
+  assert.deepEqual(AI_ECONOMY_PROFILES.hard,{purchaseGoldReserve:200,buildingGoldReserve:250,maxBuildingActionsPerPhase:2,tradeGoldReserve:200,tradeProposalCooldownRounds:3,auctionPriceMultiplier:1.25,tradeAcceptRatio:.95,tradeCounterFloor:.70,mortgageRedemptionReserve:250,maxMortgageRedemptionsPerPhase:2});
+  assert.ok(AI_ECONOMY_PROFILES.easy.purchaseGoldReserve>AI_ECONOMY_PROFILES.normal.purchaseGoldReserve);
+  assert.equal(AI_ECONOMY_PROFILES.easy.maxMortgageRedemptionsPerPhase,1);assert.equal(AI_ECONOMY_PROFILES.normal.maxMortgageRedemptionsPerPhase,1);
+});
+
+test('emergency mortgage ordering changes deterministically with difficulty',()=>{
+  const state=game();state.turnPhase='paymentRequired';state.pendingPayment={payerId:'npc',amount:500,reason:'Miete'};own(state,'npc',[1,5]);
+  state.config.aiDifficulty='easy';assert.equal(ai.decideEmergencyMortgage(state,'npc'),1);
+  state.config.aiDifficulty='hard';assert.equal(ai.decideEmergencyMortgage(state,'npc'),5);
+});
 
 test('human, NPC and human trades work; only human connections are required',()=>{
   for(const [from,to] of [['human','other'],['human','npc'],['npc','human']]){
@@ -50,13 +62,13 @@ test('fair trades accept, poor trades reject and close trades counter determinis
   }
 });
 
-test('counter preserves property/cards/relics and balances through gold before using the existing atomic creation',()=>{
-  const state=game();own(state,'npc',[1]);state.players[0]!.heldCards=[{cardId:'adv_024',deck:'adventure'}];state.players[1]!.relics=['merchant-seal'];
-  const trade=offer(state,{...assets(80),cardIds:['adv_024']},{...assets(0,[1]),relicIds:['merchant-seal']});
+test('counter preserves property and cards and balances through gold before using the existing atomic creation',()=>{
+  const state=game();own(state,'npc',[6,8]);state.players[0]!.heldCards=[{cardId:'adv_024',deck:'adventure'}];
+  const trade=offer(state,{...assets(0),cardIds:['adv_024']},assets(0,[8]));
   const decision=ai.decideTradeResponse(state,'npc',trade);assert.equal(decision.type,'counter');if(decision.type!=='counter')return;
-  assert.deepEqual(decision.request.offer.propertyTileIndices,[1]);assert.deepEqual(decision.request.offer.relicIds,['merchant-seal']);assert.deepEqual(decision.request.request.cardIds,['adv_024']);assert.equal(decision.request.request.gold,125);
+  assert.deepEqual(decision.request.offer.propertyTileIndices,[8]);assert.deepEqual(decision.request.offer.relicIds,[]);assert.deepEqual(decision.request.request.cardIds,['adv_024']);assert.equal(decision.request.request.gold,25);
   const counter=trades.create(state,'npc',decision.request);assert.equal(trade.status,'countered');assert.equal(counter.status,'pending');assert.equal(counter.recipientId,'human');
-  trades.accept(state,'human',counter.id);assert.equal(state.propertyOwnerships[0]!.ownerId,'human');assert.deepEqual(state.players[0]!.relics,['merchant-seal']);assert.deepEqual(state.players[1]!.heldCards,[{cardId:'adv_024',deck:'adventure'}]);
+  trades.accept(state,'human',counter.id);assert.equal(state.propertyOwnerships.find(entry=>entry.tileIndex===8)!.ownerId,'human');assert.deepEqual(state.players[1]!.heldCards,[{cardId:'adv_024',deck:'adventure'}]);
 });
 
 test('reserve, locked complete groups and unaffordable gold counters reject',()=>{
@@ -82,8 +94,8 @@ test('package valuation uses final ownership so giving away a group member does 
   assert.equal(ai.evaluateTrade(state,'npc',trade).receivedValue,297); // 135% of 100 + 120, not 190%.
 });
 
-test('central fixed values cover all relics, held cards and gold',()=>{
-  const state=game();for(const [id,value] of Object.entries(AI_RELIC_TRADE_VALUES))assert.equal(ai.evaluateTradeAssets(state,'npc',{...assets(),relicIds:[id as keyof typeof AI_RELIC_TRADE_VALUES]}),value);
+test('AI trade values ignore relic payloads and value held cards and gold',()=>{
+  const state=game();assert.equal(ai.evaluateTradeAssets(state,'npc',{...assets(),relicIds:['runestone']}),0);
   assert.equal(ai.evaluateTradeAssets(state,'npc',{...assets(25),cardIds:['adv_024']}),25+AI_DUNGEON_CARD_TRADE_VALUE);
 });
 

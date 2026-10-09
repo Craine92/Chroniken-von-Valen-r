@@ -241,20 +241,20 @@ test("queue shows one toast, runs each effect once, then removes it after its du
   const time = clock(), shown: string[] = [], queue = new MobileFeedbackQueue((event) => shown.push(event.id), time);
   queue.showMobileFeedback(notice("first")); queue.showMobileFeedback(notice("second")); queue.showMobileFeedback(notice("first"));
   assert.equal(queue.getSnapshot().current?.id, "first"); assert.deepEqual(shown, ["first"]);
-  time.advance(3500); assert.ok(queue.getSnapshot().exiting);
+  time.advance(2800); assert.ok(queue.getSnapshot().exiting);
   time.advance(TOAST_FADE_MS); assert.equal(queue.getSnapshot().current?.id, "second");
   assert.deepEqual(shown, ["first", "second"]);
-  time.advance(3500 + TOAST_FADE_MS); assert.equal(queue.getSnapshot().current, undefined);
+  time.advance(2800 + TOAST_FADE_MS); assert.equal(queue.getSnapshot().current, undefined);
   assert.equal(time.count(), 0);
 });
 
-test("trade priority interrupts a normal toast and actionable duration is six seconds", () => {
+test("trade priority interrupts a normal toast and actionable duration is capped at four seconds", () => {
   const time = clock(), queue = new MobileFeedbackQueue(() => undefined, time);
   queue.showMobileFeedback(notice("normal")); queue.showMobileFeedback(notice("later"));
   queue.showMobileFeedback({ ...notice("urgent", "tradeOffer"), action: () => undefined });
   assert.ok(queue.getSnapshot().exiting);
   time.advance(TOAST_FADE_MS); assert.equal(queue.getSnapshot().current?.id, "urgent");
-  time.advance(5999); assert.equal(queue.getSnapshot().exiting, false);
+  time.advance(3999); assert.equal(queue.getSnapshot().exiting, false);
   time.advance(1 + TOAST_FADE_MS); assert.equal(queue.getSnapshot().current?.id, "later");
   queue.clear(); assert.equal(time.count(), 0); assert.equal(queue.getSnapshot().current, undefined);
 });

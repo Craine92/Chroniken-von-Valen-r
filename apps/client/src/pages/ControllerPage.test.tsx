@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BOARD_TILES, getBloodMoonDefinition, type GameState, type Player } from "@valenor/shared";
+import { BOARD_TILES, getBloodMoonDefinition, getWorldImpulseDefinition, type GameRoom, type GameState, type Player } from "@valenor/shared";
 import { MobileLiveEvents } from "../components/MobileLiveEvents";
 import { PlayerColorPicker } from "../components/PlayerColorPicker";
 import { PlayerCharacterPicker } from "../components/PlayerCharacterPicker";
@@ -16,8 +16,20 @@ import {
   MobileTradeNotice,
   MobileTurnNotice,
   PaymentManagement,
+  resolveRoomGameState,
   TavernDecisionPanel
 } from "./ControllerPage";
+
+test("room updates cannot overwrite an authoritative live game state", () => {
+  const live = spectatorState();
+  live.currentRound = 8; live.stateRevision = 102;
+  const stale = structuredClone(live); stale.currentRound = 7; stale.stateRevision = 101;
+  const room: GameRoom = { code: "VAL-TEST", players: [roomPlayer], phase: "playing", config: live.config, gameState: stale, createdAt: 1 };
+  assert.equal(resolveRoomGameState(live, room)?.currentRound, 8);
+  assert.equal(resolveRoomGameState(undefined, room)?.currentRound, 7);
+  const lobby: GameRoom = { ...room, phase: "lobby" }; delete lobby.gameState;
+  assert.equal(resolveRoomGameState(live, lobby), undefined);
+});
 
 test("tavern decision exposes only the two server choices and readable independent outcomes",()=>{
   const tavern={id:'tavern',playerId:'p1',turnNumber:1,movementSequence:1,pot:400,status:'decision' as const,startedAt:1};
@@ -66,7 +78,7 @@ function spectatorState(): GameState {
   };
 }
 
-test("mobile live events show shared context, active NPC, dice, globals and only three latest actions", () => {
+test("mobile live events stay compact and show current player, dice, landing, impulse and pot", () => {
   const state = spectatorState();
   state.players[0]!.isBankrupt = false; state.players[1]!.type = "computer";
   state.turnPhase = "propertyDecision"; state.weltenwegPot = 200;
@@ -74,14 +86,15 @@ test("mobile live events show shared context, active NPC, dice, globals and only
   state.lastMovement = { kind:"normal", playerId:"p2", from:1, to:8, path:[2,3,4,5,6,7,8], passedStart:false, landedTile:BOARD_TILES[8]! };
   state.wanderingDragon = { tileIndex:24, nextMoveRound:6, encounterSequence:0 };
   state.activeChronicleEvent = { ...getBloodMoonDefinition("orcs"), startedAfterRound:3, startedAtRound:4, expiresAtRound:6, startedAt:1 };
+  state.activeWorldImpulse = { ...getWorldImpulseDefinition("harborWind"), startedAfterRound:3, startedAtRound:4, startedAt:1, status:"active" };
   state.economyLog = Array.from({length:5}, (_, index) => ({id:`log-${index}`,kind:"system",message:`Live-Aktion ${index}`,playerIds:[],createdAt:1}));
   let markup = renderToStaticMarkup(<MobileLiveEvents state={state} playerId="p1" />);
-  for (const text of ["LIVE-GESCHEHEN", "Justine · NPC", "3 + 4", "200 GOLD", "Eisenöde", "Mieten: +25 %", "Noch 2 Runden", BOARD_TILES[24]!.name, "data-context-kind=\"landing\""]) assert.ok(markup.includes(text), text);
-  assert.deepEqual([...markup.matchAll(/<span>(Live-Aktion \d)<\/span>/g)].map(match=>match[1]),["Live-Aktion 4","Live-Aktion 3","Live-Aktion 2"]);
+  for (const text of ["LIVE", "Justine ist am Zug", "3 + 4 = 7", "200 Gold", "Hafenwind", BOARD_TILES[8]!.name]) assert.ok(markup.includes(text), text);
+  assert.doesNotMatch(markup, /Live-Aktion|AKTIVE CHRONIK|data-context-kind/);
   assert.equal(renderToStaticMarkup(<MobileLiveEvents state={state} playerId="p2" />), "");
   state.currentPlayerId = "p1"; state.turnPhase = "waitingForRoll";
   markup = renderToStaticMarkup(<MobileLiveEvents state={state} playerId="p2" />);
-  assert.match(markup,/Philipp · MENSCH/); assert.doesNotMatch(markup,/Justine · NPC|Wurf:|Landet auf:|data-context-kind="landing"/);
+  assert.match(markup,/Philipp ist am Zug/); assert.doesNotMatch(markup,/Justine ist am Zug|3 \+ 4 = 7/);
   state.currentRound = 6;
   assert.doesNotMatch(renderToStaticMarkup(<MobileLiveEvents state={state} playerId="p2" />), /AKTIVE CHRONIK/);
 });
@@ -135,6 +148,23 @@ test("paymentRequired exposes settlement once liquid gold is sufficient", () => 
     />
   );
   assert.match(markup, /Forderung begleichen/);
+});
+
+test("mandatory third-attempt dungeon payment is explicit and visible", () => {
+  const markup = renderToStaticMarkup(
+    <PaymentManagement
+      payment={{ payerId: "p1", amount: 50, reason: "Kerkergebühr", creditorType: "bank", reasonType: "dungeonRelease" }}
+      playerGold={500}
+      hasLegalPaymentAction={false}
+      connected
+      onSettle={() => undefined}
+      onDeclareBankruptcy={() => undefined}
+    />
+  );
+  assert.match(markup, /DUNKLER KERKER/);
+  assert.match(markup, /Drei Fluchtversuche gescheitert/);
+  assert.match(markup, /Kerkergebühr/);
+  assert.match(markup, /50 GOLD ZAHLEN/);
 });
 
 test("bankruptcy always requires the explicit safety confirmation", () => {

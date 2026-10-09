@@ -1,9 +1,10 @@
-import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BOARD_TILES,
   DUNGEON_RELEASE_COST,
   canSellBuilding,
   canMortgageProperty,
+  getAutoMortgagePlan,
   getCardDefinition,
   getEffectivePurchasePrice,
   RELIC_DEFINITIONS,
@@ -20,23 +21,28 @@ import {
   type Player,
   type PropertyGroupId
 } from "@valenor/shared";
-import type { RelicId } from "@valenor/shared";
+import type { WorldImpulseChoice } from "@valenor/shared";
 import { Ambience } from "../components/Ambience";
 import { BrandMark } from "../components/BrandMark";
 import { ConnectionBadge } from "../components/ConnectionBadge";
 import { PropertyCard } from "../components/PropertyCard";
 import { ControllerPossessions } from "../components/ControllerPossessions";
-import { ControllerQuestLog } from "../components/ControllerQuestLog";
-import { TradePanel } from "../components/TradePanel";
+import { ControllerJournal } from "../components/ControllerJournal";
+import { TradePanel, type TradeDraftIntent } from "../components/TradePanel";
 import { CardReveal } from "../components/CardReveal";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 import { GameResultPanel } from "../components/GameResultPanel";
 import { createValenorSocket } from "../lib/socket";
+import { resolveRoomGameState, shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
 import { MobileLiveEvents } from "../components/MobileLiveEvents";
 import { PlayerColorPicker } from "../components/PlayerColorPicker";
 import { PlayerCharacterPicker } from "../components/PlayerCharacterPicker";
 import { PlayerPortrait } from "../components/PlayerPortrait";
+import { MobileWorldImpulseToast, WorldImpulseDecisionPanel } from "../components/WorldImpulseUi";
+import { ControllerActionBar, type ControllerAction } from "../components/ControllerActionBar";
+
+export { resolveRoomGameState } from "../lib/authoritative-game-state";
 
 function normalizeRoomCode(value: string): string {
   const lettersAndNumbers = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -47,12 +53,12 @@ function normalizeRoomCode(value: string): string {
 
 export const BANKRUPTCY_CONFIRMATION = "Wirklich aufgeben? Dein Besitz wird übertragen und du scheidest aus der Chronik aus.";
 
-export function TavernDecisionPanel({ tavern, connected, onChoose }: { tavern: TavernState; connected: boolean; onChoose: (choice: TavernChoice) => void }) {
+export function TavernDecisionPanel({ tavern, connected, onChoose, showActions = true }: { tavern: TavernState; connected: boolean; onChoose: (choice: TavernChoice) => void; showActions?: boolean }) {
   return <section className={`controller-tavern controller-tavern--${tavern.status}`} aria-live="polite">
     <small>TAVERNE AM WELTENWEG</small>
     {tavern.status === "decision" ? <><h2>Der Weltenweg-Pott</h2><p>Im Pott liegen</p><strong>{tavern.pot} GOLD</strong><p>Sicher mitnehmen oder alles aufs Spiel setzen?</p>
-      <button type="button" className="controller-primary-action" disabled={!connected} onClick={() => onChoose("take")}>{tavern.pot} GOLD NEHMEN</button>
-      <button type="button" className="controller-tavern__risk" disabled={!connected} onClick={() => onChoose("gamble")}>🎲 DOPPELT ODER NIX</button>
+      {showActions && <><button type="button" className="controller-primary-action" disabled={!connected} onClick={() => onChoose("take")}>{tavern.pot} GOLD NEHMEN</button>
+      <button type="button" className="controller-tavern__risk" disabled={!connected} onClick={() => onChoose("gamble")}>🎲 DOPPELT ODER NIX</button></>}
       <p className="controller-tavern__odds">1–3: kein Gewinn · 4–6: doppelter Pott</p></>
       : tavern.status === "rolling" ? <><h2>Doppelt oder Nix!</h2><span className="tavern-die tavern-die--rolling" aria-label="Tavernenwürfel rollt">⚄</span><p>{tavern.pot} Gold stehen auf dem Spiel.</p></>
         : <><h2>{tavern.choice === "take" ? "Pott gesichert!" : tavern.payout ? "DOPPELT!" : "VERZOCKT!"}</h2>{tavern.die && <span className="tavern-die" aria-label={`Tavernenwürfel ${tavern.die}`}>{["","⚀","⚁","⚂","⚃","⚄","⚅"][tavern.die]}</span>}
@@ -70,26 +76,36 @@ export function PaymentManagement({
   hasLegalPaymentAction,
   connected,
   onSettle,
-  onDeclareBankruptcy
+  autoMortgagePlan,
+  onAutoMortgage,
+  onDeclareBankruptcy,
+  showActions = true
 }: {
   payment: NonNullable<GameState["pendingPayment"]>;
   playerGold: number;
   hasLegalPaymentAction: boolean;
   connected: boolean;
   onSettle: () => void;
+  autoMortgagePlan?: ReturnType<typeof getAutoMortgagePlan> | undefined;
+  onAutoMortgage?: () => void;
   onDeclareBankruptcy: () => void;
+  showActions?: boolean;
 }) {
   const missingGold = Math.max(0, payment.amount - playerGold);
+  const isDungeonRelease = payment.reasonType === "dungeonRelease";
   return (
     <section className="payment-management">
-      <small>OFFENE FORDERUNG</small>
-      <strong>{payment.amount} Gold · {payment.reason}</strong>
+      <small>{isDungeonRelease ? "DUNKLER KERKER" : "OFFENE FORDERUNG"}</small>
+      {isDungeonRelease && <p>Drei Fluchtversuche gescheitert.</p>}
+      <strong>{isDungeonRelease ? "Kerkergebühr:" : payment.reason}<br />{payment.amount} Gold</strong>
       {missingGold > 0 ? (
-        <p>Dir fehlen {missingGold} Gold. {hasLegalPaymentAction ? "Verkaufe Bauwerke oder beleihe Besitz, um Gold zu erhalten." : "Dein verfügbares Gold reicht weiterhin nicht aus."}</p>
-      ) : (
-        <button className="turn-action-button" type="button" disabled={!connected} onClick={onSettle}>Forderung begleichen</button>
-      )}
-      <button className="bankruptcy-button" type="button" disabled={!connected} onClick={onDeclareBankruptcy}>Bankrott erklären</button>
+        <><p>Dir fehlen {missingGold} Gold. {hasLegalPaymentAction ? "Verkaufe Bauwerke oder beleihe Besitz, um Gold zu erhalten." : "Dein verfügbares Gold reicht weiterhin nicht aus."}</p>
+        {autoMortgagePlan && <p className="payment-management__preview">Sofort beleihen: {autoMortgagePlan.tileIndices.length} Besitzkarte{autoMortgagePlan.tileIndices.length === 1 ? "" : "n"}, +{autoMortgagePlan.goldRaised} Gold{!autoMortgagePlan.covered ? ` · danach fehlen ${autoMortgagePlan.remainingShortfall} Gold` : ""}.</p>}
+        {showActions && autoMortgagePlan?.covered && <button className="turn-action-button" type="button" disabled={!connected} onClick={onAutoMortgage}>SOFORT BELEIHEN</button>}</>
+      ) : showActions ? (
+        <button className="turn-action-button" type="button" disabled={!connected} onClick={onSettle}>{isDungeonRelease ? `${payment.amount} GOLD ZAHLEN` : "Forderung begleichen"}</button>
+      ) : <p>Die Forderung kann jetzt beglichen werden.</p>}
+      {showActions && <button className="bankruptcy-button" type="button" disabled={!connected} onClick={onDeclareBankruptcy}>Bankrott erklären</button>}
     </section>
   );
 }
@@ -118,7 +134,8 @@ export function DungeonDecisionPanel({
   onRoll,
   onPay,
   hasDungeonCard = false,
-  onUseCard
+  onUseCard,
+  showActions = true
 }: {
   failedAttempts: number;
   gold: number;
@@ -127,6 +144,7 @@ export function DungeonDecisionPanel({
   onPay: () => void;
   hasDungeonCard?: boolean;
   onUseCard?: () => void;
+  showActions?: boolean;
 }) {
   const attempt = Math.min(3, failedAttempts + 1);
   const canPay = gold >= DUNGEON_RELEASE_COST;
@@ -136,9 +154,9 @@ export function DungeonDecisionPanel({
       <h2>Die Tore sind verschlossen.</h2>
       <strong>Versuch {attempt} / 3</strong>
       <span>Dein Gold: {gold}</span>
-      <button className="turn-action-button dungeon-roll-button" type="button" disabled={!connected} onClick={onRoll}>Pasch versuchen</button>
+      {showActions && <><button className="turn-action-button dungeon-roll-button" type="button" disabled={!connected} onClick={onRoll}>Pasch versuchen</button>
       {hasDungeonCard && <button className="turn-action-button" type="button" disabled={!connected} onClick={onUseCard}>Kerkersiegel verwenden</button>}
-      <button className="economy-secondary" type="button" disabled={!connected || !canPay} onClick={onPay}>{DUNGEON_RELEASE_COST} Gold zahlen</button>
+      <button className="economy-secondary" type="button" disabled={!connected || !canPay} onClick={onPay}>{DUNGEON_RELEASE_COST} Gold zahlen</button></>}
       {!canPay && <em>Nicht genügend Gold.</em>}
       <small>Ein Pasch öffnet die Tore. Nach dem dritten Fehlversuch wird die Gebühr fällig.</small>
     </section>
@@ -162,12 +180,12 @@ export function MobileTradeNotice({ proposerName }: { proposerName: string }) {
   return <aside className="mobile-trade-notice" role="alert"><strong>HANDELSANGEBOT VON {proposerName.toUpperCase()}</strong><a href="#controller-trade">Ansehen</a></aside>;
 }
 
-export function RuneStoneDecisionPanel({ connected, onReroll, onKeep }: { connected: boolean; onReroll: () => void; onKeep: () => void }) {
+export function RuneStoneDecisionPanel({ connected, onReroll, onKeep, showActions = true }: { connected: boolean; onReroll: () => void; onKeep: () => void; showActions?: boolean }) {
   return <section className="controller-rune-decision" aria-label="Runenstein-Entscheidung">
-    <strong>{RELIC_DEFINITIONS.runestone.name.toUpperCase()} VERWENDEN</strong>
+    <strong>{RELIC_DEFINITIONS.runestone.name.toUpperCase()}</strong>
     <p>Der neue Wurf ersetzt diesen Wurf vollständig.</p>
-    <button className="controller-primary-action" type="button" disabled={!connected} onClick={onReroll}>Neu würfeln</button>
-    <button type="button" disabled={!connected} onClick={onKeep}>Wurf behalten</button>
+    {showActions && <><button className="controller-primary-action" type="button" disabled={!connected} onClick={onReroll}>NEU WÜRFELN</button>
+    <button type="button" disabled={!connected} onClick={onKeep}>WURF BEHALTEN</button></>}
   </section>;
 }
 
@@ -182,10 +200,14 @@ export function ControllerPage() {
   const [error, setError] = useState("");
   const [signalSent, setSignalSent] = useState(false);
   const [gameState, setGameState] = useState<GameState>();
+  const gameStateRef = useRef<GameState | undefined>(undefined);
+  const latestAppliedRevision = useRef(-1);
   const [room, setRoom] = useState<GameRoom>();
   const [colorPending, setColorPending] = useState(false);
   const [selectedPropertyGroupId, setSelectedPropertyGroupId] = useState<PropertyGroupId>();
   const [controllerTab, setControllerTab] = useState("action");
+  const [tradeDraftIntent, setTradeDraftIntent] = useState<TradeDraftIntent>();
+  const tradeDraftSequence = useRef(0);
   useEffect(() => {
     if (gameState?.turnPhase === "tavernDecision" && gameState.tavern?.playerId === player?.id) setControllerTab("action");
   }, [gameState?.turnPhase, gameState?.tavern?.id, player?.id]);
@@ -204,8 +226,17 @@ export function ControllerPage() {
   const playerRef = useRef<Player | undefined>(undefined);
   const nameRef = useRef("");
   const roomRef = useRef(roomCode);
+  const roomPhaseRef = useRef<GameRoom["phase"] | undefined>(undefined);
   const signalTimer = useRef<number | undefined>(undefined);
+  const lastResyncAt = useRef(0);
   const incomingTradeCount = gameState?.trades.filter((trade) => trade.recipientId === player?.id && trade.status === "pending").length ?? 0;
+  const applyAuthoritativeGameState = useCallback((nextState: GameState) => {
+    if (!shouldApplyAuthoritativeGameState(latestAppliedRevision.current, nextState)) return false;
+    latestAppliedRevision.current = nextState.stateRevision ?? 0;
+    gameStateRef.current = nextState;
+    setGameState(nextState);
+    return true;
+  }, []);
 
   const join = (requestedName: string, reconnecting = false) => {
     const normalizedRoom = roomRef.current.trim().toUpperCase();
@@ -229,10 +260,14 @@ export function ControllerPage() {
       playerRef.current = result.player;
       setPlayer(result.player);
       setRoom(result.room);
-      if (result.room?.gameState) setGameState(result.room.gameState);
+      roomPhaseRef.current = result.room?.phase;
+      if (result.room?.gameState) applyAuthoritativeGameState(result.room.gameState);
       setName(result.player.name);
       setConnected(true);
       setError("");
+      if (result.room?.phase === "playing") socket.emit(SOCKET_EVENTS.gameRequestState, (stateResult) => {
+        if (stateResult.ok && stateResult.gameState) applyAuthoritativeGameState(stateResult.gameState);
+      });
     });
   };
 
@@ -252,34 +287,60 @@ export function ControllerPage() {
       const code = roomRef.current.trim().toUpperCase();
       localStorage.removeItem(`valenor:player-token:${code}`);
       playerRef.current = undefined;
+      roomPhaseRef.current = undefined;
+      latestAppliedRevision.current = -1; gameStateRef.current = undefined;
       setPlayer(undefined); setRoom(undefined); setGameState(undefined);
       setColorPending(false); setSignalSent(false); setJoining(false);
       setSelectedPropertyGroupId(undefined); setControllerTab("action"); setError(message);
     };
     const handleRoomUpdate = (updatedRoom: GameRoom) => {
       setRoom(updatedRoom);
+      roomPhaseRef.current = updatedRoom.phase;
       const updatedPlayer = updatedRoom.players.find(candidate => candidate.id === playerRef.current?.id);
       if (updatedPlayer) {
         playerRef.current = updatedPlayer;
         setPlayer(updatedPlayer);
       }
-      setGameState(updatedRoom.gameState);
+      if (updatedRoom.phase === "lobby") {
+        latestAppliedRevision.current = -1;
+        gameStateRef.current = undefined;
+        setGameState(undefined);
+      } else if (updatedRoom.gameState) applyAuthoritativeGameState(updatedRoom.gameState);
     };
+    const handleGameState = (state: GameState) => { applyAuthoritativeGameState(state); };
+    const requestGameState = () => {
+      if (!socket.connected || !playerRef.current || (gameStateRef.current?.status !== "playing" && roomPhaseRef.current !== "playing")) return;
+      const now = Date.now();
+      if (now - lastResyncAt.current < 750) return;
+      lastResyncAt.current = now;
+      socket.emit(SOCKET_EVENTS.gameRequestState, (result) => { if (result.ok && result.gameState) handleGameState(result.gameState); });
+    };
+    const handleVisibility = () => { if (document.visibilityState === "visible") requestGameState(); };
+    const handleFocus = () => requestGameState();
 
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
-    socket.on(SOCKET_EVENTS.gameStart, setGameState);
-    socket.on(SOCKET_EVENTS.gameState, setGameState);
+    socket.on(SOCKET_EVENTS.gameStart, handleGameState);
+    socket.on(SOCKET_EVENTS.gameState, handleGameState);
     socket.on(SOCKET_EVENTS.roomUpdate, handleRoomUpdate);
     socket.on(SOCKET_EVENTS.roomRemoved, handleRemoved);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleFocus);
     socket.connect();
 
     return () => {
       window.clearTimeout(signalTimer.current);
-      socket.removeAllListeners();
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off(SOCKET_EVENTS.gameStart, handleGameState);
+      socket.off(SOCKET_EVENTS.gameState, handleGameState);
+      socket.off(SOCKET_EVENTS.roomUpdate, handleRoomUpdate);
+      socket.off(SOCKET_EVENTS.roomRemoved, handleRemoved);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleFocus);
       socket.disconnect();
     };
-  }, [socket]);
+  }, [applyAuthoritativeGameState, socket]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -347,7 +408,7 @@ export function ControllerPage() {
         setError(result.message ?? "Diese Aktion ist gerade nicht möglich.");
         return;
       }
-      setGameState(result.gameState);
+      applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -355,15 +416,23 @@ export function ControllerPage() {
     setError("");
     socket.emit(SOCKET_EVENTS.gameChooseTavern, choice, result => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Diese Tavernenentscheidung ist gerade nicht möglich.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
-  const activateRelic = (id: RelicId) => {
+  const offerPropertyTrade = (recipientId: string, requestedTileIndex: number) => {
+    const recipient = gameState?.players.find(entry => entry.id === recipientId && entry.id !== player?.id && !entry.isBankrupt);
+    const ownership = gameState?.propertyOwnerships.find(entry => entry.tileIndex === requestedTileIndex && entry.ownerId === recipientId);
+    if (!recipient || !ownership) { setError("Für dieses Grundstück kann kein Handel gestartet werden."); return; }
+    setTradeDraftIntent({ id: ++tradeDraftSequence.current, recipientId, requestedPropertyTileIndices: [requestedTileIndex] });
+    setControllerTab("trade"); window.location.hash = "#controller-trade"; window.scrollTo({ top: 0, behavior: "auto" });
+  };
+
+  const chooseWorldImpulse = (choice: WorldImpulseChoice) => {
     setError("");
-    socket.emit(SOCKET_EVENTS.relicActivate, id, result => {
-      if (!result.ok || !result.gameState) setError(result.message ?? "Reliktaktivierung nicht erlaubt.");
-      else setGameState(result.gameState);
+    socket.emit(SOCKET_EVENTS.gameChooseWorldImpulse, choice, result => {
+      if (!result.ok || !result.gameState) setError(result.message ?? "Diese Weltimpuls-Entscheidung ist gerade nicht möglich.");
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -371,7 +440,7 @@ export function ControllerPage() {
     setError("");
     socket.emit(event, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Diese Entscheidung ist gerade nicht möglich.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -379,7 +448,7 @@ export function ControllerPage() {
     setError("");
     socket.emit(SOCKET_EVENTS.auctionBid, increment, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Dieses Gebot ist gerade nicht möglich.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -387,7 +456,7 @@ export function ControllerPage() {
     setError("");
     socket.emit(SOCKET_EVENTS.auctionWithdraw, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Du kannst gerade nicht aussteigen.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -395,7 +464,7 @@ export function ControllerPage() {
     setError("");
     socket.emit(event, tileIndex, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Die Grundstücksverwaltung ist gerade nicht möglich.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -403,7 +472,7 @@ export function ControllerPage() {
     setError("");
     socket.emit(SOCKET_EVENTS.paymentSettle, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Die Forderung konnte nicht beglichen werden.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -411,7 +480,15 @@ export function ControllerPage() {
     setError("");
     socket.emit(event, tileIndex, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Die Hypothekenaktion ist gerade nicht möglich.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
+    });
+  };
+
+  const manageFinance = (event: "finance:autoMortgageForPayment" | "finance:redeemAllMortgages") => {
+    setError("");
+    socket.emit(event, (result) => {
+      if (!result.ok || !result.gameState) setError(result.message ?? "Die Finanzaktion ist gerade nicht möglich.");
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -419,7 +496,7 @@ export function ControllerPage() {
     setError("");
     socket.emit(SOCKET_EVENTS.tradeCreate, request, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Das Angebot konnte nicht gesendet werden.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -428,7 +505,7 @@ export function ControllerPage() {
     setError("");
     socket.emit(event, tradeId, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Die Handelsaktion ist nicht möglich.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -436,7 +513,7 @@ export function ControllerPage() {
     if (!confirmBankruptcy()) return;
     socket.emit(SOCKET_EVENTS.playerDeclareBankruptcy, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Der Bankrott konnte nicht erklärt werden.");
-      else setGameState(result.gameState);
+      else applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -520,37 +597,71 @@ export function ControllerPage() {
 
 
     const payment = gameState.pendingPayment?.payerId === player.id ? gameState.pendingPayment : undefined;
+    const autoMortgagePlan = payment ? getAutoMortgagePlan(gameState, player.id) : undefined;
+    const ownWorldImpulseDecision = gameState.pendingWorldImpulseDecision?.playerId === player.id;
     const hasLegalPaymentSale = payment && ownedTiles.some(({ tile }) => canSellBuilding(gameState, player.id, tile.index).allowed || canMortgageProperty(gameState, player.id, tile.index).allowed);
+    let primaryAction: ControllerAction | undefined;
+    let secondaryAction: ControllerAction | undefined;
+    const action = (label: string, onClick: () => void, disabled = !connected, tone: ControllerAction["tone"] = "primary"): ControllerAction => ({ label, onClick, disabled, tone });
+    const pendingImpulse = ownWorldImpulseDecision ? gameState.pendingWorldImpulseDecision : undefined;
+    if (pendingImpulse?.status === "decision") {
+      if (pendingImpulse.impulseId === "twistOfFate") {
+        primaryAction = action("Wurf behalten", () => chooseWorldImpulse("keep"));
+        secondaryAction = action("Neu würfeln", () => chooseWorldImpulse("reroll"), !connected, "secondary");
+      } else {
+        primaryAction = action("50 Gold sicher", () => chooseWorldImpulse("safe"));
+        secondaryAction = action("Risiko", () => chooseWorldImpulse("risk"), !connected, "secondary");
+      }
+    } else if (payment) {
+      if (activePlayer.gold >= payment.amount) primaryAction = action(payment.reasonType === "dungeonRelease" ? `${payment.amount} GOLD ZAHLEN` : "Forderung begleichen", settlePayment);
+      else if (autoMortgagePlan?.covered) primaryAction = action(`Sofort beleihen · +${autoMortgagePlan.goldRaised} Gold`, () => manageFinance(SOCKET_EVENTS.financeAutoMortgageForPayment));
+      secondaryAction = action("Bankrott erklären", declareBankruptcy, !connected, "danger");
+    } else if (isCurrent && gameState.turnPhase === "dungeonDecision") {
+      primaryAction = action("Pasch versuchen", () => performGameAction(SOCKET_EVENTS.gameRollDungeon));
+      secondaryAction = (activePlayer.heldCards?.length ?? 0) > 0
+        ? action("Kerkersiegel", () => performGameAction(SOCKET_EVENTS.gameUseDungeonCard), !connected, "secondary")
+        : action(`${DUNGEON_RELEASE_COST} Gold zahlen`, () => performGameAction(SOCKET_EVENTS.gamePayDungeonRelease), !connected || activePlayer.gold < DUNGEON_RELEASE_COST, "secondary");
+    } else if (needsOrderRoll) {
+      primaryAction = action("Startwurf", () => performGameAction(SOCKET_EVENTS.gameRollOrder));
+    } else if (canRoll) {
+      primaryAction = action("Würfeln", () => performGameAction(SOCKET_EVENTS.gameRollDice));
+    } else if (isCurrent && gameState.tavern?.playerId === player.id && gameState.tavern.turnNumber === gameState.turnNumber && gameState.turnPhase === "tavernDecision") {
+      primaryAction = action(`${gameState.tavern.pot} Gold nehmen`, () => chooseTavern("take"));
+      secondaryAction = action("Doppelt oder nix", () => chooseTavern("gamble"), !connected, "secondary");
+    } else if (isCurrent && gameState.turnPhase === "awaitingCardDraw") {
+      primaryAction = action("Karte ziehen", () => performGameAction(SOCKET_EVENTS.gameDrawCard));
+    } else if (isCurrent && gameState.turnPhase === "cardAcknowledgement" && gameState.activeCard) {
+      primaryAction = action(getCardDefinition(gameState.activeCard.cardId).keepable ? "Karte behalten" : "Weiter", () => performGameAction(SOCKET_EVENTS.gameAcknowledgeCard));
+    } else if (isCurrent && gameState.turnContext.awaitingRuneStoneDecision) {
+      primaryAction = action("Wurf behalten", () => performGameAction(SOCKET_EVENTS.gameKeepRoll));
+      secondaryAction = action("Neu würfeln", () => performGameAction(SOCKET_EVENTS.gameUseRuneStone), !connected, "secondary");
+    } else if (canDecide && landed) {
+      primaryAction = action(`Kaufen · ${purchasePrice} Gold`, () => performPropertyAction(SOCKET_EVENTS.gameBuyProperty), !connected || !canBuy);
+      secondaryAction = action("Auktion starten", () => performPropertyAction(SOCKET_EVENTS.gameDeclineProperty), !connected, "secondary");
+    } else if (gameState.turnPhase === "auction" && auction && participates && !withdrew && !auctionPaused) {
+      primaryAction = action("Bieten · +10", () => bid(10), !connected || activePlayer.gold < auction.currentBid + 10);
+      secondaryAction = action("Aussteigen", withdraw, !connected || auction.highestBidderId === player.id, "secondary");
+    } else if (canEnd) {
+      primaryAction = action("Zug beenden", () => performGameAction(SOCKET_EVENTS.gameEndTurn));
+    }
     return (
       <main className={`controller-page controller-page--active player-theme--${player.color}`}
         style={{ "--mobile-feedback-space": feedbackHeight ? `${feedbackHeight + 24}px` : "0px" } as CSSProperties}>
         <Ambience />
         <MobileFeedbackToast snapshot={mobileFeedback.snapshot} onDismiss={mobileFeedback.dismiss} onHeightChange={setFeedbackHeight} />
-        <section className="controller-card controller-card--started">
-          <BrandMark compact />
+        <MobileWorldImpulseToast impulse={gameState.activeWorldImpulse} />
+        <section className={`controller-card controller-card--started${controllerTab === "action" && (primaryAction || secondaryAction) ? " has-action-bar" : ""}`}>
           <header className={`controller-player-bar controller-player-bar--${player.color}`}>
             <PlayerPortrait characterId={activePlayer.characterId} />
             <div><strong>{activePlayer.name}</strong><small>RUNDE {gameState.currentRound} · {activePlayer.dungeon.inDungeon ? "IM KERKER" : gameState.currentPlayerId === player.id ? "AM ZUG" : "BEREIT"}</small></div>
-            <b><i className="valenor-coin" aria-hidden="true">V</i>{activePlayer.gold.toLocaleString("de-DE")}</b>
+            <b><i className="valenor-coin" aria-hidden="true">V</i>{activePlayer.gold.toLocaleString("de-DE")}<i className={`controller-connection-dot${connected ? " is-connected" : ""}`} aria-label={connected ? "Verbunden" : "Verbindung getrennt"} /></b>
           </header>
-          <div className={`player-orb player-orb--${player.color}`} aria-hidden="true">
-            <PlayerPortrait characterId={activePlayer.characterId} />
-          </div>
-          <div className="controller-card__intro">
-            <p className="eyebrow">Das Runentor ist geöffnet</p>
-            <h1>Das Abenteuer hat begonnen.</h1>
-            <p className="started-player-name">{activePlayer.name}</p>
-          </div>
-          <div className="controller-gold">
-            <span>DEIN VERMÖGEN</span>
-            <strong>{activePlayer.gold.toLocaleString("de-DE")}</strong>
-            <small>Goldstücke</small>
-          </div>
+          {!connected && <p className="controller-reconnecting" role="status">VERBINDUNG WIRD WIEDERHERGESTELLT</p>}
           <QuickGameClockDisplay clock={gameState.quickGameClock} compact />
           {gameState.quickGameClock?.expired && <p className="controller-last-round">DIE LETZTE RUNDE</p>}
-          <ConnectionBadge connected={connected} />
           <div id="controller-action" hidden={controllerTab !== "action"}>
-          {!isCurrent && <MobileLiveEvents state={gameState} playerId={player.id} />}
+          {!isCurrent && !ownWorldImpulseDecision && <MobileLiveEvents state={gameState} playerId={player.id} />}
+          {ownWorldImpulseDecision && <WorldImpulseDecisionPanel state={gameState} playerId={player.id} connected={connected} onChoose={chooseWorldImpulse} showActions={false} />}
           <div className="controller-divider"><span>✦</span></div>
           {isCurrent && gameState.turnPhase === "dungeonDecision" ? (
             <DungeonDecisionPanel
@@ -561,67 +672,43 @@ export function ControllerPage() {
               onPay={() => performGameAction(SOCKET_EVENTS.gamePayDungeonRelease)}
               hasDungeonCard={(activePlayer.heldCards?.length ?? 0) > 0}
               onUseCard={() => performGameAction(SOCKET_EVENTS.gameUseDungeonCard)}
+              showActions={false}
             />
           ) : gameState.turnPhase === "determiningOrder" ? (
             <div className="turn-controls">
               <p className="waiting-copy">{needsOrderRoll ? "Bestimme dein Schicksal" : "Die anderen Gefährten bestimmen ihr Schicksal …"}</p>
-              {needsOrderRoll && (
-                <button className="turn-action-button" type="button" disabled={!connected} onClick={() => performGameAction(SOCKET_EVENTS.gameRollOrder)}>
-                  <span aria-hidden="true">⚄ ⚄</span> Startwurf
-                </button>
-              )}
               {orderEntry?.rolls.at(-1) && <p className="personal-roll">Dein Wurf: <strong>{orderEntry.rolls.at(-1)!.total}</strong></p>}
             </div>
           ) : (
             <div className="turn-controls">
               {isCurrent && <p className="waiting-copy">Du bist am Zug</p>}
-              {canRoll && (
-                <button className="turn-action-button" type="button" disabled={!connected} onClick={() => performGameAction(SOCKET_EVENTS.gameRollDice)}>
-                  <span aria-hidden="true">⚄ ⚄</span> Würfeln
-                </button>
-              )}
-              {isCurrent && gameState.tavern?.playerId === player.id && gameState.tavern.turnNumber === gameState.turnNumber && ["tavernDecision", "tavernRolling", "waitingForEndTurn"].includes(gameState.turnPhase) && <TavernDecisionPanel tavern={gameState.tavern} connected={connected} onChoose={chooseTavern} />}
+              {isCurrent && gameState.tavern?.playerId === player.id && gameState.tavern.turnNumber === gameState.turnNumber && ["tavernDecision", "tavernRolling", "waitingForEndTurn"].includes(gameState.turnPhase) && <TavernDecisionPanel tavern={gameState.tavern} connected={connected} onChoose={chooseTavern} showActions={false} />}
               {isCurrent && gameState.turnPhase === "awaitingCardDraw" && (landed?.type === "adventure" || landed?.type === "fate") && (
                 <section className={`card-draw-prompt card-draw-prompt--${landed.type}`}>
                   <small>{landed.type === "adventure" ? "ABENTEUER" : "SCHICKSAL"}</small>
                   <h2>{landed.type === "adventure" ? "Das nächste Kapitel wartet." : "Die Fäden des Schicksals bewegen sich."}</h2>
-                  <button className="turn-action-button" type="button" disabled={!connected} onClick={() => performGameAction(SOCKET_EVENTS.gameDrawCard)}>Karte ziehen</button>
                 </section>
               )}
               {isCurrent && gameState.activeCard && (
                 <section className="controller-card-event">
                   <CardReveal activeCard={gameState.activeCard} compact={["paymentRequired", "propertyDecision", "auction", "cardMoving"].includes(gameState.turnPhase)} />
-                  {gameState.turnPhase === "cardAcknowledgement" && (
-                    <button className="turn-action-button" type="button" disabled={!connected} onClick={() => performGameAction(SOCKET_EVENTS.gameAcknowledgeCard)}>
-                      {getCardDefinition(gameState.activeCard.cardId).keepable ? "Karte behalten" : "Weiter"}
-                    </button>
-                  )}
                 </section>
               )}
               {canRoll && gameState.lastTurnAction?.kind === "double" && gameState.lastTurnAction.playerId === player.id && <p className="double-copy"><strong>Pasch!</strong> Du darfst erneut würfeln.</p>}
               {isCurrent && gameState.turnContext.awaitingRuneStoneDecision && <RuneStoneDecisionPanel connected={connected}
-                onReroll={() => performGameAction(SOCKET_EVENTS.gameUseRuneStone)} onKeep={() => performGameAction(SOCKET_EVENTS.gameKeepRoll)} />}
+                onReroll={() => performGameAction(SOCKET_EVENTS.gameUseRuneStone)} onKeep={() => performGameAction(SOCKET_EVENTS.gameKeepRoll)} showActions={false} />}
               {gameState.lastTurnAction && gameState.lastTurnAction.playerId === player.id && gameState.lastTurnAction.kind !== "double" && <DungeonOutcomeNotice action={gameState.lastTurnAction} />}
               {isCurrent && gameState.turnPhase === "dungeonRolling" && <p className="dungeon-fate-copy">Die Würfel entscheiden über deine Freiheit …</p>}
               {isCurrent && gameState.lastDiceRoll && !canRoll && (
-                <div className="personal-turn-result">
-                  <span>Gewürfelt: {gameState.lastDiceRoll.die1} + {gameState.lastDiceRoll.die2} = <strong>{gameState.lastDiceRoll.total}</strong></span>
-                  {landed && <span>Gelandet: <strong>{landed.name}</strong></span>}
+                <div className="personal-turn-result" aria-label="Letztes Würfelergebnis">
+                  <span>🎲 {gameState.lastDiceRoll.die1} + {gameState.lastDiceRoll.die2} = <strong>{gameState.lastDiceRoll.total}</strong></span>
+                  {landed && <span>→ <strong>{landed.name}</strong></span>}
                   {landed?.type === "dungeon" && !activePlayer.dungeon.inDungeon && <span>Nur zu Besuch · Du bist frei.</span>}
                 </div>
-              )}
-              {canEnd && (
-                <button className="turn-action-button turn-action-button--end" type="button" disabled={!connected} onClick={() => performGameAction(SOCKET_EVENTS.gameEndTurn)}>
-                  Zug beenden
-                </button>
               )}
               {canDecide && landed && (
                 <div className="controller-economy">
                   <PropertyCard tile={landed} state={gameState} compact />
-                  <button className="turn-action-button" type="button" disabled={!connected || !canBuy} onClick={() => performPropertyAction(SOCKET_EVENTS.gameBuyProperty)}>
-                    Kaufen · {purchasePrice} Gold
-                  </button>
-                  <button className="economy-secondary" type="button" disabled={!connected} onClick={() => performPropertyAction(SOCKET_EVENTS.gameDeclineProperty)}>Ablehnen &amp; versteigern</button>
                 </div>
               )}
               {gameState.turnPhase === "auction" && auction && auctionTile && participates && (
@@ -631,7 +718,6 @@ export function ControllerPage() {
                   {auctionPaused ? <p className="controller-hint">Auktion pausiert – ein Gefährte verbindet sich neu.</p> : withdrew ? <p className="controller-hint">Du bist aus der Auktion ausgestiegen.</p> : (
                     <>
                       <div className="bid-buttons">{([10, 50, 100] as const).map((amount) => <button key={amount} type="button" disabled={!connected || activePlayer.gold < auction.currentBid + amount} onClick={() => bid(amount)}>+{amount}</button>)}</div>
-                      <button className="economy-secondary" type="button" disabled={!connected || auction.highestBidderId === player.id} onClick={withdraw}>Aussteigen</button>
                     </>
                   )}
                 </div>
@@ -639,17 +725,18 @@ export function ControllerPage() {
               {isCurrent && ["rolling", "moving", "landed"].includes(gameState.turnPhase) && <p className="controller-hint">Blick zum gemeinsamen Bildschirm …</p>}
             </div>
           )}
-          {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} onDeclareBankruptcy={declareBankruptcy} />}
+          {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} autoMortgagePlan={autoMortgagePlan} onAutoMortgage={() => manageFinance(SOCKET_EVENTS.financeAutoMortgageForPayment)} onDeclareBankruptcy={declareBankruptcy} showActions={false} />}
           </div>
-          <div hidden={controllerTab !== "property"}><ControllerPossessions state={gameState} playerId={player.id} connected={connected} selectedGroupId={selectedPropertyGroupId} onSelectGroup={selectPropertyGroup} onBuild={manageBuilding} onMortgage={manageMortgage} onActivateRelic={activateRelic} onUseRuneStone={() => performGameAction(SOCKET_EVENTS.gameUseRuneStone)} /></div>
-          <div id="controller-trade" hidden={controllerTab !== "trade"}><TradePanel state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onDecision={decideTrade} /></div>
-          <section id="controller-journal" hidden={controllerTab !== "journal"}><ControllerQuestLog state={gameState} playerId={player.id} /><h2>Journal</h2>{gameState.economyLog.at(-1) ? <p className="controller-log">{gameState.economyLog.at(-1)!.message}</p> : <p>Noch keine Einträge.</p>}</section>
+          <div hidden={controllerTab !== "property"}><ControllerPossessions state={gameState} playerId={player.id} connected={connected} selectedGroupId={selectedPropertyGroupId} onSelectGroup={selectPropertyGroup} onBuild={manageBuilding} onMortgage={manageMortgage} onRedeemAllMortgages={() => manageFinance(SOCKET_EVENTS.financeRedeemAllMortgages)} onOfferTrade={offerPropertyTrade} /></div>
+          <div id="controller-trade" hidden={controllerTab !== "trade"}><TradePanel state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onDecision={decideTrade} draftIntent={tradeDraftIntent} onDraftIntentHandled={() => setTradeDraftIntent(undefined)} /></div>
+          <div hidden={controllerTab !== "journal"}><ControllerJournal state={gameState} playerId={player.id} /></div>
           <nav className="controller-nav" aria-label="Controller-Bereiche">
             <a href="#controller-action" aria-current={controllerTab === "action" ? "page" : undefined}><span>✦</span>Aktion</a>
             <a href="#controller-property" aria-current={controllerTab === "property" ? "page" : undefined}><span>♜</span>Besitz</a>
             <a href="#controller-trade" aria-current={controllerTab === "trade" ? "page" : undefined}><span>◇</span>Handel{incomingTradeCount > 0 && <b className="controller-trade-badge" aria-label={`${incomingTradeCount} offene Handelsangebote`}>{incomingTradeCount}</b>}</a>
             <a href="#controller-journal" aria-current={controllerTab === "journal" ? "page" : undefined}><span>☷</span>Journal</a>
           </nav>
+          {controllerTab === "action" && <ControllerActionBar primary={primaryAction} secondary={secondaryAction} />}
           {error && <p className="form-error" role="alert">{error}</p>}
         </section>
       </main>

@@ -60,9 +60,12 @@ export function getEffectivePurchasePrice(state: GameState, tile: BoardTile, buy
   const unsold = !state.propertyOwnerships.some((entry) => entry.tileIndex === tile.index);
   if (!unsold) return price;
   const event = getActiveChronicleEvent(state);
-  const chronicleDiscount = !state.auction && state.turnPhase !== "auction" && event?.effectType === "purchaseDiscount" && isChronicleTileAffected(event, tile) ? .8 : 1;
-  const sealDiscount = state.turnPhase !== "auction" && isRelicArmed(state.players.find(player => player.id === buyerId), "merchant-seal") ? .75 : 1;
-  return Math.round(price * chronicleDiscount * sealDiscount);
+  const directPurchase = !state.auction && state.turnPhase !== "auction";
+  let effective = price;
+  if (directPurchase && event?.effectType === "purchaseDiscount" && isChronicleTileAffected(event, tile)) effective = Math.round(effective * .8);
+  if (directPurchase && isRelicArmed(state.players.find(player => player.id === buyerId), "merchant-seal")) effective = Math.round(effective * .75);
+  if (directPurchase && state.worldImpulseEffects?.merchantLuck) effective = Math.round(effective * .85);
+  return effective;
 }
 
 export function applyChronicleRentModifier(state: GameState, tile: BoardTile, rent: number): number {
@@ -83,7 +86,9 @@ export function getEffectiveRent(state: GameState, tile: BoardTile, ownerId: str
     if (tile.type === "harbor") rent = ECONOMY_CONFIG.harborRents[Math.max(0, count - 1)] ?? 0;
     if (tile.type === "utility") rent = ECONOMY_CONFIG.utilityMultipliers[count >= 2 ? 1 : 0] * (state.lastDiceRoll?.total ?? 0);
   }
-  return applyChronicleRentModifier(state, tile, rent);
+  rent = applyChronicleRentModifier(state, tile, rent);
+  if (tile.type === "harbor" && state.worldImpulseEffects?.harborWindUntilRound === state.currentRound) rent = Math.round(rent * 1.5);
+  return rent;
 }
 
 export function getStartPassReward(state: GameState, playerId = state.currentPlayerId): number {

@@ -9,6 +9,7 @@ import {
   getRegionalChronicleDefinition,
   getEffectiveMortgageRedemptionCost,
   getMortgageValue,
+  getAutoMortgagePlan,
   type BuildingLevel,
   type GameState
 } from "@valenor/shared";
@@ -98,6 +99,41 @@ test("mortgages redeem for principal plus ten percent and never overdraft", () =
   state.propertyOwnerships[0]!.mortgaged = true;
   assert.throws(() => mortgages.redeem(state, "p1", 1), /Nicht genügend/);
   assert.throws(() => mortgages.redeem(state, "p2", 1), /gehört dir nicht/);
+});
+
+test("automatic payment mortgages are minimal, deterministic and never sell buildings", () => {
+  const state = game();
+  state.players[0]!.gold = 10;
+  own(state, "p1", [1, 5, 11]);
+  state.turnPhase = "paymentRequired";
+  state.pendingPayment = { payerId: "p1", amount: 100, reason: "Miete" };
+  assert.deepEqual(getAutoMortgagePlan(state, "p1").tileIndices, [1, 11]);
+  mortgages.autoMortgageForPayment(state, "p1");
+  assert.equal(state.players[0]!.gold, 115);
+  assert.deepEqual(state.propertyOwnerships.filter((entry) => entry.mortgaged).map((entry) => entry.tileIndex), [1, 11]);
+});
+
+test("automatic payment mortgages reject incomplete coverage without partial mutation", () => {
+  const state = game();
+  state.players[0]!.gold = 0;
+  own(state, "p1", [1]);
+  state.turnPhase = "paymentRequired";
+  state.pendingPayment = { payerId: "p1", amount: 100, reason: "Steuer" };
+  assert.throws(() => mortgages.autoMortgageForPayment(state, "p1"), /decken die Forderung nicht/);
+  assert.equal(state.players[0]!.gold, 0);
+  assert.equal(state.propertyOwnerships[0]!.mortgaged, false);
+});
+
+test("redeeming every mortgage is atomic and uses effective chronicle costs", () => {
+  const state = game(); own(state, "p1", [[1, 0, true], [15, 0, true]]); state.currentRound = 4;
+  state.activeChronicleEvent = { ...getRegionalChronicleDefinition(CHRONICLE_EVENTS[6]!, ["elves"]), startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 1 };
+  state.players[0]!.gold = 134;
+  assert.throws(() => mortgages.redeemAll(state, "p1"), /135 Gold/);
+  assert.ok(state.propertyOwnerships.every((entry) => entry.mortgaged));
+  state.players[0]!.gold = 135;
+  mortgages.redeemAll(state, "p1");
+  assert.equal(state.players[0]!.gold, 0);
+  assert.ok(state.propertyOwnerships.every((entry) => !entry.mortgaged));
 });
 
 test("a mortgage suspends rent, complete-region bonus and all building in that group", () => {

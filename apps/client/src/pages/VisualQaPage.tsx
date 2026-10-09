@@ -1,12 +1,19 @@
-import { useEffect, useState } from "react";
-import { BOARD_TILES, DUNGEON_TILE_INDEX, type BuildingLevel, type GamePlayerState, type GameState, type PropertyOwnership } from "@valenor/shared";
+import { useEffect, useState, type ReactNode } from "react";
+import { BOARD_TILES, DUNGEON_TILE_INDEX, getAutoMortgagePlan, getWorldImpulseDefinition, type BuildingLevel, type GamePlayerState, type GameState, type PropertyOwnership } from "@valenor/shared";
 import { BrandMark } from "../components/BrandMark";
 import { PropertyCard } from "../components/PropertyCard";
 import { PropertyGroupOverview } from "../components/PropertyGroupOverview";
 import { TradePanel } from "../components/TradePanel";
 import { GameExperience } from "../game/GameExperience";
 import type { BoardPresentationMode } from "../game/board-presentation";
-import { MobileTradeNotice, MobileTurnNotice } from "./ControllerPage";
+import { MobileTradeNotice, MobileTurnNotice, PaymentManagement, RuneStoneDecisionPanel } from "./ControllerPage";
+import { MobileWorldImpulseToast, WorldImpulseDecisionPanel } from "../components/WorldImpulseUi";
+import { MobileLiveEvents } from "../components/MobileLiveEvents";
+import { CardReveal } from "../components/CardReveal";
+import { ControllerActionBar } from "../components/ControllerActionBar";
+import { ControllerPossessions, ControllerPropertyDetails } from "../components/ControllerPossessions";
+import { ControllerJournal } from "../components/ControllerJournal";
+import { PlayerPortrait } from "../components/PlayerPortrait";
 
 const PLAYERS: GamePlayerState[] = [
   { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1_725, position: 7, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
@@ -44,7 +51,7 @@ function createShowcaseState(scenario: string): GameState {
     startedAt: Date.now() - 1_800_000
   };
 
-  if (scenario === "buildings" || scenario === "groups" || scenario === "order") {
+  if (scenario === "buildings" || scenario === "groups" || scenario === "order" || scenario === "mortgages") {
     state.propertyOwnerships = [
       ownership(1, "p1", 2), ownership(3, "p1", 4), ownership(6, "p1", 5),
       ownership(10, "p2", 1), ownership(12, "p2", 3), ownership(14, "p2", 2),
@@ -123,6 +130,25 @@ function createShowcaseState(scenario: string): GameState {
     state.turnPhase = "waitingForEndTurn";
     state.players[0]!.position = tileIndex;
     state.lastMovement = { kind: "normal", sequence: 16, playerId: "p1", from: scenario === "tax" ? 1 : 39, to: tileIndex, path: [tileIndex], passedStart: scenario === "start", landedTile: BOARD_TILES[tileIndex]! };
+  }
+
+  if (scenario === "mortgages") {
+    state.propertyOwnerships = [ownership(1, "p1"), ownership(5, "p1"), ownership(11, "p2"), ownership(15, "p3")];
+    state.propertyOwnerships.forEach((entry) => { entry.mortgaged = true; });
+  }
+
+  if (scenario === "impulse") {
+    const definition = getWorldImpulseDefinition("harborWind");
+    state.propertyOwnerships = BOARD_TILES.filter(tile => tile.type === "harbor").slice(0, 2).map(tile => ownership(tile.index, "p1"));
+    state.worldImpulseEffects = { harborWindUntilRound: state.currentRound };
+    state.activeWorldImpulse = { ...definition, startedAfterRound: 6, startedAtRound: 7, startedAt: Date.now() + 60_000, status: "active", expiresAtRound: 8 };
+    state.worldImpulseHistory = [{ ...state.activeWorldImpulse }];
+    state.weltenwegPot = 1_000;
+  }
+
+  if (scenario === "momentum") {
+    state.propertyOwnerships = [ownership(1, "p1"), ownership(3, "p1")];
+    state.lastMomentumCelebration = { id: "qa-group", type: "completeGroup", playerId: "p1", groupId: "group_mondhain", title: "Philipp vereint Mondhain", subtitle: "Die Baugruppe ist vollständig.", createdAt: Date.now() + 60_000 };
   }
 
   return state;
@@ -209,6 +235,153 @@ function ControllerFeedbackShowcase({ foreign = false }: { foreign?: boolean }) 
   );
 }
 
+function ControllerQaNav({ active = "action" }: { active?: "action" | "property" | "trade" | "journal" }) {
+  return <nav className="controller-nav" aria-label="Controller-Bereiche">
+    <a href="#controller-action" aria-current={active === "action" ? "page" : undefined}><span>✦</span>Aktion</a>
+    <a href="#controller-property" aria-current={active === "property" ? "page" : undefined}><span>♜</span>Besitz</a>
+    <a href="#controller-trade" aria-current={active === "trade" ? "page" : undefined}><span>◇</span>Handel</a>
+    <a href="#controller-journal" aria-current={active === "journal" ? "page" : undefined}><span>☷</span>Journal</a>
+  </nav>;
+}
+
+function MobileQaShell({ children, active = "action", primary, secondary }: {
+  children: ReactNode;
+  active?: "action" | "property" | "trade" | "journal";
+  primary?: { label: string; onClick: () => void };
+  secondary?: { label: string; onClick: () => void };
+}) {
+  const player = PLAYERS[0]!;
+  return <main className="controller-page controller-page--active player-theme--violet visual-qa-controller">
+    <section className="controller-card controller-card--started">
+      <header className="controller-player-bar controller-player-bar--violet">
+        <PlayerPortrait characterId={player.characterId} />
+        <div><strong>{player.name}</strong><small>RUNDE 21 · AM ZUG</small></div>
+        <b><i className="valenor-coin">V</i>1.948<i className="controller-connection-dot is-connected" /></b>
+      </header>
+      {children}
+      <ControllerQaNav active={active} />
+      <ControllerActionBar primary={primary} secondary={secondary} />
+    </section>
+  </main>;
+}
+
+function MobileActionQa({ variant }: { variant: "fate" | "buy" }) {
+  const state = createShowcaseState(variant === "fate" ? "fate-card" : "purchase");
+  if (variant === "fate") return <MobileQaShell primary={{ label: "Weiter", onClick: () => undefined }}><section className="controller-card-event"><CardReveal activeCard={state.activeCard!} /></section></MobileQaShell>;
+  return <MobileQaShell primary={{ label: "Kaufen · 100 Gold", onClick: () => undefined }} secondary={{ label: "Auktion starten", onClick: () => undefined }}><div className="personal-turn-result"><span>🎲 3 + 2 = <strong>5</strong></span><span>→ <strong>{BOARD_TILES[6]!.name}</strong></span></div><div className="controller-economy"><PropertyCard tile={BOARD_TILES[6]!} state={state} compact /></div></MobileQaShell>;
+}
+
+function MobilePossessionsQa({ detail = false, trade = false }: { detail?: boolean; trade?: boolean }) {
+  const state = createShowcaseState("four");
+  state.players[0]!.relics = ["golden-feather", "runestone"];
+  if (trade) state.players[1]!.name = "Myrra mit einem sehr langen Namen";
+  state.propertyOwnerships = trade
+    ? [ownership(6, "p1", 2), ownership(8, "p2", 3)]
+    : [ownership(1, "p1", 1), ownership(3, "p1", 1), ownership(6, "p1", 2), ownership(8, "p2", 1)];
+  const callbacks = { onSelectGroup: () => undefined, onBuild: () => undefined, onMortgage: () => undefined };
+  useEffect(() => {
+    if (!detail) document.querySelector<HTMLDetailsElement>(".controller-property-group")?.setAttribute("open", "");
+  }, [detail]);
+  return <MobileQaShell active="property">{detail
+    ? <><button className="controller-back">← Zur Gruppe</button><h2 className="controller-detail-heading">Grundstück</h2><ControllerPropertyDetails state={state} playerId="p1" connected tile={BOARD_TILES[1]!} {...callbacks} /></>
+    : <ControllerPossessions state={state} playerId="p1" connected {...callbacks} onOfferTrade={() => undefined} />}</MobileQaShell>;
+}
+
+function MobileFinanceQa() {
+  const state = createShowcaseState("four");
+  state.players[0]!.gold = 20;
+  state.propertyOwnerships = [ownership(1, "p1"), ownership(3, "p1"), ownership(5, "p1"), ownership(11, "p1")];
+  state.propertyOwnerships[3]!.mortgaged = true;
+  state.turnPhase = "paymentRequired";
+  state.pendingPayment = { payerId: "p1", payeeId: "p2", creditorType: "player", reasonType: "rent", amount: 150, reason: "Miete für die Eisenfeste" };
+  const callbacks = { onSelectGroup: () => undefined, onBuild: () => undefined, onMortgage: () => undefined, onRedeemAllMortgages: () => undefined };
+  return <MobileQaShell active="property" primary={{ label: "Sofort beleihen", onClick: () => undefined }}>
+    <PaymentManagement payment={state.pendingPayment} playerGold={state.players[0]!.gold} hasLegalPaymentAction connected onSettle={() => undefined} autoMortgagePlan={getAutoMortgagePlan(state, "p1")} onAutoMortgage={() => undefined} onDeclareBankruptcy={() => undefined} />
+    <ControllerPossessions state={state} playerId="p1" connected {...callbacks} />
+  </MobileQaShell>;
+}
+
+function MobileDungeonPaymentQa() {
+  const state = createShowcaseState("dungeon");
+  state.players[0]!.gold = 20;
+  state.players[0]!.dungeon = { inDungeon: true, failedAttempts: 3 };
+  state.turnPhase = "paymentRequired";
+  state.pendingPayment = { payerId: "p1", creditorType: "bank", reasonType: "dungeonRelease", amount: 50, reason: "Kerkergebühr" };
+  state.propertyOwnerships = [ownership(1, "p1"), ownership(3, "p1")];
+  return <MobileQaShell primary={{ label: "SOFORT BELEIHEN", onClick: () => undefined }}>
+    <PaymentManagement payment={state.pendingPayment} playerGold={20} hasLegalPaymentAction connected onSettle={() => undefined}
+      autoMortgagePlan={getAutoMortgagePlan(state, "p1")} onAutoMortgage={() => undefined} onDeclareBankruptcy={() => undefined} />
+  </MobileQaShell>;
+}
+
+function MobileRuneStoneQa() {
+  return <MobileQaShell primary={{ label: "WURF BEHALTEN", onClick: () => undefined }} secondary={{ label: "NEU WÜRFELN", onClick: () => undefined }}>
+    <RuneStoneDecisionPanel connected onReroll={() => undefined} onKeep={() => undefined} showActions={false} />
+    <div className="personal-turn-result"><span>🎲 2 + 3 = <strong>5</strong></span></div>
+  </MobileQaShell>;
+}
+
+function MobileTradeQa({ mode }: { mode: "partner" | "composer" | "assets" | "review" | "incoming" }) {
+  const state = createShowcaseState("four");
+  state.players[0]!.relics = ["runestone"];
+  state.players[1]!.relics = ["golden-feather"];
+  state.propertyOwnerships = [ownership(1, "p1"), ownership(3, "p1"), ownership(10, "p2"), ownership(12, "p2")];
+  if (mode === "incoming") state.trades = [{ id: "qa-counter", counterToTradeId: "qa-old", proposerId: "p2", recipientId: "p1", offer: { gold: 0, propertyTileIndices: [10] }, request: { gold: 390, propertyTileIndices: [1] }, status: "pending", createdAt: Date.now() }];
+  useEffect(() => {
+    if (mode !== "assets" && mode !== "review") return;
+    const timer = window.setTimeout(() => {
+      if (mode === "assets") {
+        document.querySelector<HTMLButtonElement>('.trade-compose-side[data-side="offer"] .trade-add-assets')?.click();
+        return;
+      }
+      const input = document.querySelector<HTMLInputElement>('input[aria-label="Du gibst Gold direkt"]');
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      if (input && setter) {
+        setter.call(input, "300");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      window.setTimeout(() => document.querySelector<HTMLButtonElement>(".controller-action-bar .is-primary")?.click(), 30);
+    }, 30);
+    return () => window.clearTimeout(timer);
+  }, [mode]);
+  const draftIntent = mode === "composer" || mode === "assets" || mode === "review" ? { id: 1, recipientId: "p2", requestedPropertyTileIndices: [10] } : undefined;
+  return <MobileQaShell active="trade"><TradePanel state={state} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} {...(draftIntent ? { draftIntent } : {})} /></MobileQaShell>;
+}
+
+function MobileJournalQa() {
+  const state = createShowcaseState("impulse");
+  state.economyLog = [
+    { id: "qa-purchase", kind: "purchase", message: "Philipp kaufte Mondpfad für 100 Gold.", playerIds: ["p1"], createdAt: Date.now() - 2_000 },
+    { id: "qa-quest", kind: "quest", message: "Auftrag Reisender abgeschlossen · +100 Gold.", playerIds: ["p1"], createdAt: Date.now() - 1_000 }
+  ];
+  state.trades = [{ id: "qa-done", proposerId: "p1", recipientId: "p2", offer: { gold: 390, propertyTileIndices: [1] }, request: { gold: 0, propertyTileIndices: [10] }, status: "accepted", createdAt: Date.now() }];
+  return <MobileQaShell active="journal"><ControllerJournal state={state} playerId="p1" /></MobileQaShell>;
+}
+
+function ControllerImpulseShowcase({ variant = "golden" }: { variant?: "golden" | "twist" | "live" }) {
+  const state = createShowcaseState("four");
+  const impulseId = variant === "twist" ? "twistOfFate" : variant === "live" ? "harborWind" : "goldenMoment";
+  const definition = getWorldImpulseDefinition(impulseId);
+  state.turnPhase = "worldImpulseDecision";
+  state.activeWorldImpulse = { ...definition, startedAfterRound: 6, startedAtRound: 7, startedAt: Date.now() + 60_000, status: "active", targetPlayerId: "p1" };
+  state.worldImpulseHistory = [{ ...state.activeWorldImpulse }];
+  if (variant !== "live") state.pendingWorldImpulseDecision = { impulseId: variant === "twist" ? "twistOfFate" : "goldenMoment", playerId: "p1", status: "decision" };
+  if (variant === "live") {
+    state.turnPhase = "waitingForEndTurn";
+    state.worldImpulseEffects = { harborWindUntilRound: state.currentRound };
+  }
+  return <main className="controller-page controller-page--active player-theme--violet visual-qa-controller">
+    <MobileWorldImpulseToast impulse={state.activeWorldImpulse} />
+    <section className="controller-card controller-card--started"><BrandMark compact />
+      <div className="controller-player-bar controller-player-bar--violet"><span aria-hidden="true">♞</span><div><small>RUNDE 7</small><strong>Philipp</strong></div><b><i className="valenor-coin">V</i>1.725</b></div>
+      {variant === "live"
+        ? <MobileLiveEvents state={state} playerId="p2" />
+        : <WorldImpulseDecisionPanel state={state} playerId="p1" connected onChoose={() => undefined} />}
+      <ControllerQaNav />
+    </section>
+  </main>;
+}
+
 function createResultState(): GameState {
   const state = createShowcaseState("buildings");
   const scores = [
@@ -284,8 +457,25 @@ export function VisualQaPage() {
   if (scenario === "movement-corner") return <MovementShowcase kind="corner" />;
   if (scenario === "movement-multi") return <MovementShowcase kind="multi" />;
   if (scenario === "movement-wrap") return <MovementShowcase kind="wrap" />;
+  if (scenario === "mobile-action-fate") return <MobileActionQa variant="fate" />;
+  if (scenario === "mobile-action-buy") return <MobileActionQa variant="buy" />;
+  if (scenario === "mobile-possessions-groups") return <MobilePossessionsQa />;
+  if (scenario === "mobile-possessions-trade") return <MobilePossessionsQa trade />;
+  if (scenario === "mobile-property-detail") return <MobilePossessionsQa detail />;
+  if (scenario === "mobile-finance") return <MobileFinanceQa />;
+  if (scenario === "mobile-dungeon-payment") return <MobileDungeonPaymentQa />;
+  if (scenario === "mobile-runestone") return <MobileRuneStoneQa />;
+  if (scenario === "mobile-trade-partner") return <MobileTradeQa mode="partner" />;
+  if (scenario === "mobile-trade-composer") return <MobileTradeQa mode="composer" />;
+  if (scenario === "mobile-trade-assets") return <MobileTradeQa mode="assets" />;
+  if (scenario === "mobile-trade-review") return <MobileTradeQa mode="review" />;
+  if (scenario === "mobile-trade-counter") return <MobileTradeQa mode="incoming" />;
+  if (scenario === "mobile-journal") return <MobileJournalQa />;
   if (scenario === "controller-turn") return <ControllerTurnShowcase />;
   if (scenario === "controller-feedback") return <ControllerFeedbackShowcase />;
+  if (scenario === "controller-impulse") return <ControllerImpulseShowcase />;
+  if (scenario === "controller-impulse-twist") return <ControllerImpulseShowcase variant="twist" />;
+  if (scenario === "controller-impulse-live") return <ControllerImpulseShowcase variant="live" />;
   if (scenario === "controller-foreign") return <ControllerFeedbackShowcase foreign />;
   if (scenario === "controller-property") return <ControllerPropertyShowcase />;
   if (scenario === "result") return <GameExperience gameState={createResultState()} boardPresentationMode={boardPresentationMode} />;
@@ -306,5 +496,8 @@ export function VisualQaPage() {
     return <GameExperience gameState={state} boardPresentationMode={boardPresentationMode} />;
   }
   if (scenario === "groups") return <GameExperience gameState={createShowcaseState(scenario)} focusedPropertyGroupId="group_amethystwald" focusedPropertyGroupPlayerId="p1" boardPresentationMode={boardPresentationMode} />;
+  if (scenario === "mortgages") return <GameExperience gameState={createShowcaseState(scenario)} boardPresentationMode={boardPresentationMode} suppressIntro />;
+  if (scenario === "buildings") return <GameExperience gameState={createShowcaseState(scenario)} boardPresentationMode={boardPresentationMode} suppressIntro />;
+  if (scenario === "impulse" || scenario === "momentum") return <GameExperience gameState={createShowcaseState(scenario)} boardPresentationMode={boardPresentationMode} suppressIntro />;
   return <GameExperience gameState={createShowcaseState(scenario)} boardPresentationMode={boardPresentationMode} />;
 }

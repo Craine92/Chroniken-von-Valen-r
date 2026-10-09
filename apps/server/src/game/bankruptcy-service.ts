@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { BOARD_TILES, getEffectiveBuildingSaleValue, type GameState } from "@valenor/shared";
 import { advanceChronicleEvents, advanceWanderingDragon } from "./chronicle-event-service";
+import { advanceWorldImpulses } from "./world-impulse-service";
+import { recordNewCompleteGroups } from "./momentum-celebration-service";
 
 export function completeBankruptcyTurn(state: GameState): void {
   delete state.pendingPayment;
@@ -26,9 +28,11 @@ export function completeBankruptcyTurn(state: GameState): void {
   let nextIndex = currentIndex;
   do nextIndex = (nextIndex + 1) % state.turnOrder.length;
   while (state.players.find((player) => player.id === state.turnOrder[nextIndex])?.isBankrupt);
-  if (nextIndex <= currentIndex) {
+  const wrappedRound = nextIndex <= currentIndex;
+  let chronicleStarted = false;
+  if (wrappedRound) {
     state.currentRound += 1;
-    advanceChronicleEvents(state);
+    chronicleStarted = advanceChronicleEvents(state);
     advanceWanderingDragon(state);
   }
   state.currentTurnIndex = nextIndex;
@@ -42,6 +46,7 @@ export function completeBankruptcyTurn(state: GameState): void {
   delete state.turnContext.pendingDungeonMovement;
   const nextPlayer = state.players.find((player) => player.id === state.currentPlayerId);
   state.turnPhase = nextPlayer?.dungeon.inDungeon ? "dungeonDecision" : "waitingForRoll";
+  if (wrappedRound && advanceWorldImpulses(state, chronicleStarted) && state.pendingWorldImpulseActivation) state.turnPhase = "turnTransition";
 }
 
 export function startNextBankruptcyAuction(state: GameState): boolean {
@@ -105,6 +110,7 @@ export class BankruptcyService {
       creditor.gold += debtor.gold;
       debtor.gold = 0;
       possessions.forEach((ownership) => { ownership.ownerId = creditor.id; });
+      recordNewCompleteGroups(state, creditor.id);
       if (state.cardResolution && state.currentPlayerId !== debtor.id) {
         delete state.pendingPayment;
         state.turnPhase = "cardResolving";

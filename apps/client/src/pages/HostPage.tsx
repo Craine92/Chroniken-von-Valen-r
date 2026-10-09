@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   SOCKET_EVENTS,
@@ -17,6 +17,7 @@ import { ConnectionBadge } from "../components/ConnectionBadge";
 import { GameModeSelector } from "../components/GameModeSelector";
 import { PlayerSlot } from "../components/PlayerSlot";
 import { createValenorSocket } from "../lib/socket";
+import { shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { audioManager } from "../audio/AudioManager";
 
 const GameExperience = lazy(() =>
@@ -39,6 +40,12 @@ export function HostPage() {
   const signalTimer = useRef<number | undefined>(undefined);
   const propertyGroupFocusTimer = useRef<number | undefined>(undefined);
   const lastRoomPhase = useRef<GameRoom["phase"] | undefined>(undefined);
+  const latestAppliedRevision = useRef(-1);
+  const applyAuthoritativeGameState = useCallback((nextState: GameState) => {
+    if (!shouldApplyAuthoritativeGameState(latestAppliedRevision.current, nextState)) return;
+    latestAppliedRevision.current = nextState.stateRevision ?? 0;
+    setGameState(nextState);
+  }, []);
 
   useEffect(() => {
     if (error) audioManager.play("UI_ERROR");
@@ -62,7 +69,7 @@ export function HostPage() {
         localStorage.setItem(HOST_TOKEN_KEY, result.hostToken);
         setRoom(result.room);
         lastRoomPhase.current = result.room.phase;
-        setGameState(result.room.gameState);
+        if (result.room.gameState) applyAuthoritativeGameState(result.room.gameState);
         setControllerUrl(result.controllerUrl);
         setError("");
       });
@@ -79,9 +86,8 @@ export function HostPage() {
       if (nextFocus.active) propertyGroupFocusTimer.current = window.setTimeout(() => setPropertyGroupFocus(undefined), 8_000);
     };
 
-    socket.on("connect", establishRoom);
-    socket.on("disconnect", () => setConnected(false));
-    socket.on(SOCKET_EVENTS.roomUpdate, (nextRoom) => {
+    const handleDisconnect = () => setConnected(false);
+    const handleRoomUpdate = (nextRoom: GameRoom) => {
       setRoom(nextRoom);
       if (nextRoom.phase === "lobby" && lastRoomPhase.current && lastRoomPhase.current !== "lobby") {
         audioManager.resetMusic();
@@ -89,10 +95,17 @@ export function HostPage() {
         setPropertyGroupFocus(undefined);
       }
       lastRoomPhase.current = nextRoom.phase;
-      setGameState(nextRoom.gameState);
-    });
-    socket.on(SOCKET_EVENTS.gameStart, setGameState);
-    socket.on(SOCKET_EVENTS.gameState, setGameState);
+      if (nextRoom.phase === "lobby") {
+        latestAppliedRevision.current = -1;
+        setGameState(undefined);
+      } else if (nextRoom.gameState) applyAuthoritativeGameState(nextRoom.gameState);
+    };
+    const handleGameState = (nextState: GameState) => applyAuthoritativeGameState(nextState);
+    socket.on("connect", establishRoom);
+    socket.on("disconnect", handleDisconnect);
+    socket.on(SOCKET_EVENTS.roomUpdate, handleRoomUpdate);
+    socket.on(SOCKET_EVENTS.gameStart, handleGameState);
+    socket.on(SOCKET_EVENTS.gameState, handleGameState);
     socket.on(SOCKET_EVENTS.playerMagicSignal, handleSignal);
     socket.on(SOCKET_EVENTS.propertyGroupFocus, handlePropertyGroupFocus);
     socket.connect();
@@ -100,10 +113,16 @@ export function HostPage() {
     return () => {
       window.clearTimeout(signalTimer.current);
       window.clearTimeout(propertyGroupFocusTimer.current);
-      socket.removeAllListeners();
+      socket.off("connect", establishRoom);
+      socket.off("disconnect", handleDisconnect);
+      socket.off(SOCKET_EVENTS.roomUpdate, handleRoomUpdate);
+      socket.off(SOCKET_EVENTS.gameStart, handleGameState);
+      socket.off(SOCKET_EVENTS.gameState, handleGameState);
+      socket.off(SOCKET_EVENTS.playerMagicSignal, handleSignal);
+      socket.off(SOCKET_EVENTS.propertyGroupFocus, handlePropertyGroupFocus);
       socket.disconnect();
     };
-  }, [socket]);
+  }, [applyAuthoritativeGameState, socket]);
 
   const mutateRoom = (action: "add" | "remove" | "config", value?: string | GameConfig) => {
     setBusy(true);
@@ -134,7 +153,7 @@ export function HostPage() {
         setError(result.message ?? "Das Abenteuer konnte nicht begonnen werden.");
         return;
       }
-      setGameState(result.gameState);
+      applyAuthoritativeGameState(result.gameState);
     });
   };
 
@@ -145,6 +164,7 @@ export function HostPage() {
         return;
       }
       setRoom(result.room);
+      latestAppliedRevision.current = -1;
       setGameState(undefined);
       audioManager.resetMusic();
     });
@@ -158,6 +178,7 @@ export function HostPage() {
         return;
       }
       audioManager.resetMusic();
+      latestAppliedRevision.current = -1;
       setRoom(result.room); setGameState(undefined);
     });
   };

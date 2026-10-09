@@ -3,6 +3,20 @@ import type { GameState, PropertyOwnership } from "./game";
 import { getActiveChronicleEvent, isChronicleTileAffected } from "./chronicle-events";
 
 export interface FinanceEligibility { allowed: boolean; reason?: string }
+export interface AutoMortgagePlan {
+  tileIndices: number[];
+  goldRaised: number;
+  shortfall: number;
+  remainingShortfall: number;
+  covered: boolean;
+}
+
+export interface MortgageRedemptionPlan {
+  tileIndices: number[];
+  totalCost: number;
+  affordable: boolean;
+  allowed: boolean;
+}
 const FINANCE_SAFE_PHASES = ["waitingForRoll", "waitingForEndTurn"] as const;
 const getPropertyOwnership = (state: Pick<GameState, "propertyOwnerships">, tileIndex: number) => state.propertyOwnerships.find((entry) => entry.tileIndex === tileIndex);
 
@@ -63,4 +77,47 @@ export function canRedeemMortgage(state: GameState, playerId: string, tileIndex:
   if (!ownership.mortgaged) return { allowed: false, reason: "Dieses Feld ist nicht verpfändet." };
   if (player.gold < getEffectiveMortgageRedemptionCost(state, tile)) return { allowed: false, reason: "Nicht genügend Gold." };
   return { allowed: true };
+}
+
+function mortgagePriority(state: GameState, playerId: string, tile: BoardTile): number {
+  if (tile.type === "property" && tile.propertyGroup) {
+    const complete = getPropertyGroupTiles(tile.propertyGroup).every((member) =>
+      state.propertyOwnerships.some((entry) => entry.tileIndex === member.index && entry.ownerId === playerId)
+    );
+    return complete ? 3 : 0;
+  }
+  if (tile.type === "harbor" || tile.type === "utility") return 2;
+  return 1;
+}
+
+export function getAutoMortgagePlan(state: GameState, playerId: string): AutoMortgagePlan {
+  const player = state.players.find((entry) => entry.id === playerId);
+  const payment = state.pendingPayment?.payerId === playerId ? state.pendingPayment : undefined;
+  const shortfall = Math.max(0, (payment?.amount ?? 0) - (player?.gold ?? 0));
+  const candidates = state.propertyOwnerships
+    .filter((entry) => entry.ownerId === playerId && canMortgageProperty(state, playerId, entry.tileIndex).allowed)
+    .map((entry) => BOARD_TILES[entry.tileIndex])
+    .filter((tile): tile is BoardTile => Boolean(tile?.economy))
+    .sort((left, right) => mortgagePriority(state, playerId, left) - mortgagePriority(state, playerId, right)
+      || getMortgageValue(left) - getMortgageValue(right)
+      || left.index - right.index);
+  const tileIndices: number[] = [];
+  let goldRaised = 0;
+  for (const tile of candidates) {
+    if (goldRaised >= shortfall) break;
+    tileIndices.push(tile.index);
+    goldRaised += getMortgageValue(tile);
+  }
+  return { tileIndices, goldRaised, shortfall, remainingShortfall: Math.max(0, shortfall - goldRaised), covered: shortfall > 0 && goldRaised >= shortfall };
+}
+
+export function getMortgageRedemptionPlan(state: GameState, playerId: string): MortgageRedemptionPlan {
+  const player = state.players.find((entry) => entry.id === playerId);
+  const tileIndices = state.propertyOwnerships
+    .filter((entry) => entry.ownerId === playerId && entry.mortgaged)
+    .map((entry) => entry.tileIndex)
+    .sort((left, right) => left - right);
+  const totalCost = tileIndices.reduce((sum, tileIndex) => sum + getEffectiveMortgageRedemptionCost(state, BOARD_TILES[tileIndex]!), 0);
+  const affordable = tileIndices.length > 0 && (player?.gold ?? 0) >= totalCost;
+  return { tileIndices, totalCost, affordable, allowed: affordable && tileIndices.every((tileIndex) => canRedeemMortgage(state, playerId, tileIndex).allowed) };
 }

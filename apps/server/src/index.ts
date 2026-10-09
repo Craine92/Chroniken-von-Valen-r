@@ -7,7 +7,6 @@ import path from "node:path";
 import { Server } from "socket.io";
 import {
   SOCKET_EVENTS,
-  canMortgageProperty,
   getPropertyGroup,
   type ClientToServerEvents,
   type InterServerEvents,
@@ -16,8 +15,9 @@ import {
 } from "@valenor/shared";
 import { createControllerUrl, findLocalAddress } from "./network";
 import { RoomManager } from "./room-manager";
-import { AI_ECONOMY_CONFIG, EconomicAi } from "./ai/economic-ai";
+import { EconomicAi, getAiEconomyProfile } from "./ai/economic-ai";
 import { chooseNpcTavernAction } from "./game/economy-service";
+import { chooseNpcGoldenMoment } from "./game/world-impulse-service";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS ?? 5 * 60 * 1000);
@@ -32,10 +32,13 @@ const economicAi = new EconomicAi();
 const removalTimers = new Map<string, NodeJS.Timeout>();
 const gameTimers = new Map<string, NodeJS.Timeout>();
 const aiBuildingCounts = new Map<string, number>();
+const aiRedemptionCounts = new Map<string, number>();
 const aiTradeOfferRounds = new Map<string, number>();
 
 function publishGameState(roomCode: string, state: ReturnType<RoomManager["getGameState"]>) {
-  if (state) io.to(roomCode).emit(SOCKET_EVENTS.gameState, state);
+  if (!state) return;
+  state.stateRevision = rooms.advanceStateRevision(roomCode);
+  io.to(roomCode).emit(SOCKET_EVENTS.gameState, state);
 }
 
 function scheduleGameAction(roomCode: string, key: string, delay: number, action: () => void) {
@@ -59,6 +62,7 @@ function clearRoomGameTimers(roomCode: string) {
   }
   for (const key of aiTradeOfferRounds.keys()) if (key.startsWith(prefix)) aiTradeOfferRounds.delete(key);
   for (const key of aiBuildingCounts.keys()) if (key.startsWith(prefix)) aiBuildingCounts.delete(key);
+  for (const key of aiRedemptionCounts.keys()) if (key.startsWith(prefix)) aiRedemptionCounts.delete(key);
 }
 
 function isTradePhase(state: NonNullable<ReturnType<RoomManager["getGameState"]>>) {
@@ -109,6 +113,37 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
     return;
   }
 
+  if (state.turnPhase === "worldImpulseDecision" && state.pendingWorldImpulseDecision) {
+    const pending = state.pendingWorldImpulseDecision;
+    const player = state.players.find(entry => entry.id === pending.playerId);
+    if (player?.type === "computer") {
+      scheduleGameAction(roomCode, `computer-world-impulse-${pending.impulseId}-${state.turnNumber}`, randomInt(500, 901), () => {
+        try {
+          const live = rooms.getGameState(roomCode);
+          const decision = live?.pendingWorldImpulseDecision;
+          const actor = live?.players.find(entry => entry.id === decision?.playerId);
+          if (!live || !decision || !actor || actor.type !== "computer") return;
+          const choice = decision.impulseId === "goldenMoment"
+            ? chooseNpcGoldenMoment(actor.gold)
+            : (live.lastDiceRoll?.total ?? 12) < 7 ? "reroll" : "keep";
+          const next = rooms.chooseWorldImpulse(roomCode, actor.id, "computer", choice);
+          publishGameState(roomCode, next); orchestrateGame(roomCode, next);
+        } catch { /* Eine neuere Entscheidung hat den Weltimpuls überholt. */ }
+      });
+    }
+    return;
+  }
+
+  if (state.turnPhase === "worldImpulseRolling" && state.pendingWorldImpulseDecision?.impulseId === "goldenMoment") {
+    scheduleGameAction(roomCode, `golden-moment-roll-${state.activeWorldImpulse?.startedAt ?? state.turnNumber}`, 900, () => {
+      try {
+        const next = rooms.resolveGoldenMoment(roomCode);
+        publishGameState(roomCode, next); orchestrateGame(roomCode, next);
+      } catch { /* Der Risikowurf wurde bereits aufgelöst. */ }
+    });
+    return;
+  }
+
   if (state.turnPhase === "paymentRequired" && state.pendingPayment) {
     const payer = state.players.find((player) => player.id === state.pendingPayment?.payerId);
     if (payer?.type === "computer") {
@@ -131,9 +166,7 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
             } catch { /* A newer state made this action obsolete. */ }
           });
         } else {
-          const mortgageTile = state.propertyOwnerships.find((ownership) =>
-            ownership.ownerId === payer.id && canMortgageProperty(state, payer.id, ownership.tileIndex).allowed
-          )?.tileIndex;
+          const mortgageTile = economicAi.decideEmergencyMortgage(state, payer.id);
           if (mortgageTile !== undefined) {
             scheduleGameAction(roomCode, `computer-emergency-mortgage-${state.turnNumber}-${state.economyLog.length}`, 450, () => {
               try {
@@ -159,7 +192,7 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
 
   if (state.turnPhase === "waitingForRoll" || state.turnPhase === "waitingForEndTurn") {
     const trade = isTradePhase(state) ? oldestNpcTrade(state) : undefined;
-    if (trade) scheduleGameAction(roomCode, `computer-trade-${trade.id}`, randomInt(900, 1601), () => {
+    if (trade) scheduleGameAction(roomCode, `computer-trade-${trade.id}`, randomInt(900, 1401), () => {
       try {
         const live = rooms.getGameState(roomCode);
         if (!live || !isTradePhase(live)) return;
@@ -174,9 +207,25 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
       } catch { /* Ein neuerer Zustand hat diese Handelsentscheidung überholt. */ }
     });
     for (const computer of state.players.filter((player) => player.type === "computer")) {
+      const profile = getAiEconomyProfile(state);
+      const redemptionKey = `${roomCode}:${state.turnNumber}:${state.turnPhase}:${computer.id}`;
+      const redemptionCount = aiRedemptionCounts.get(redemptionKey) ?? 0;
+      if (redemptionCount < profile.maxMortgageRedemptionsPerPhase) {
+        const redemptionTile = economicAi.decideMortgageRedemption(state, computer.id);
+        if (redemptionTile !== undefined) {
+          scheduleGameAction(roomCode, `computer-redeem-${state.turnNumber}-${state.turnPhase}-${computer.id}-${redemptionCount}`, randomInt(350, 601), () => {
+            try {
+              aiRedemptionCounts.set(redemptionKey, redemptionCount + 1);
+              const next = rooms.redeemMortgage(roomCode, computer.id, redemptionTile);
+              publishGameState(roomCode, next); orchestrateGame(roomCode, next);
+            } catch { /* A newer state made this action obsolete. */ }
+          });
+          return;
+        }
+      }
       const countKey = `${roomCode}:${state.turnNumber}:${state.turnPhase}:${computer.id}`;
       const count = aiBuildingCounts.get(countKey) ?? 0;
-      if (count >= AI_ECONOMY_CONFIG.maxBuildingActionsPerPhase) continue;
+      if (count >= profile.maxBuildingActionsPerPhase) continue;
       const tileIndex = economicAi.decideBuildingAction(state, computer.id);
       if (tileIndex === undefined) continue;
       scheduleGameAction(roomCode, `computer-build-${state.turnNumber}-${state.turnPhase}-${computer.id}-${count}`, randomInt(350, 601), () => {
@@ -242,7 +291,7 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
   }
 
   if (state.turnPhase === "cardAcknowledgement" && current?.type === "computer") {
-    scheduleGameAction(roomCode, `computer-card-ack-${state.activeCard?.cardId}-${state.turnContext.movementSequence ?? 0}`, randomInt(1_200, 1_801), () => {
+    scheduleGameAction(roomCode, `computer-card-ack-${state.activeCard?.cardId}-${state.turnContext.movementSequence ?? 0}`, randomInt(1_000, 1_401), () => {
       try {
         const next = rooms.acknowledgeCard(roomCode, current.id, "computer");
         publishGameState(roomCode, next);
@@ -275,7 +324,7 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
   }
 
   if (state.turnPhase === "waitingForRoll" && current?.type === "computer") {
-    scheduleGameAction(roomCode, `computer-roll-${state.turnNumber}`, randomInt(700, 1301), () => {
+    scheduleGameAction(roomCode, `computer-roll-${state.turnNumber}`, randomInt(550, 901), () => {
       try {
         const next = rooms.rollTurn(roomCode, current.id, "computer");
         publishGameState(roomCode, next);
@@ -378,7 +427,7 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
   }
 
   if (state.turnPhase === "waitingForEndTurn" && current?.type === "computer") {
-    scheduleGameAction(roomCode, `computer-end-${state.turnNumber}`, state.tavern?.status === "resolved" ? 4_000 : randomInt(1_000, 1_601), () => {
+    scheduleGameAction(roomCode, `computer-end-${state.turnNumber}`, state.tavern?.status === "resolved" ? 2_500 : randomInt(550, 901), () => {
       try {
         const live = rooms.getGameState(roomCode);
         if (!live || !isTradePhase(live) || live.turnPhase !== "waitingForEndTurn" || live.currentPlayerId !== current.id || live.turnNumber !== state.turnNumber) return;
@@ -400,7 +449,8 @@ function orchestrateGame(roomCode: string, state: NonNullable<ReturnType<RoomMan
   }
 
   if (state.turnPhase === "turnTransition") {
-    scheduleGameAction(roomCode, `next-turn-${state.turnNumber}`, 500, () => {
+    const impulseDelay = state.activeWorldImpulse && Date.now() - state.activeWorldImpulse.startedAt < 3_500 ? 2_800 : 500;
+    scheduleGameAction(roomCode, `next-turn-${state.turnNumber}`, impulseDelay, () => {
       try {
         const next = rooms.beginNextTurn(roomCode);
         publishGameState(roomCode, next);
@@ -440,6 +490,15 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 io.on("connection", (socket) => {
+  socket.on(SOCKET_EVENTS.gameChooseWorldImpulse, (choice, callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
+      const state = rooms.chooseWorldImpulse(roomCode, playerId, "human", choice);
+      publishGameState(roomCode, state); orchestrateGame(roomCode, state);
+      callback({ ok: true, gameState: state });
+    } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Weltimpuls-Entscheidung nicht möglich." }); }
+  });
   socket.on(SOCKET_EVENTS.gameChooseTavern, (choice, callback) => {
     try {
       const { roomCode, playerId, role } = socket.data;
@@ -501,6 +560,13 @@ io.on("connection", (socket) => {
 
   socket.on(SOCKET_EVENTS.roomJoin, joinRoom);
   socket.on(SOCKET_EVENTS.playerJoin, joinRoom);
+
+  socket.on(SOCKET_EVENTS.gameRequestState, (callback) => {
+    const { roomCode } = socket.data;
+    const state = roomCode ? rooms.getGameState(roomCode) : undefined;
+    if (!state) { callback({ ok: false, message: "Es ist kein laufender Spielstand verfügbar." }); return; }
+    callback({ ok: true, gameState: state });
+  });
 
   socket.on(SOCKET_EVENTS.playerUpdateColor, (color, callback) => {
     try {
@@ -680,16 +746,6 @@ io.on("connection", (socket) => {
     });
   }
 
-  socket.on(SOCKET_EVENTS.relicActivate, (relicId, callback) => {
-    try {
-      const { roomCode, playerId, role } = socket.data;
-      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
-      const state = rooms.activateRelic(roomCode, playerId, relicId);
-      publishGameState(roomCode, state);
-      callback({ ok: true, gameState: state });
-    } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Reliktaktivierung nicht erlaubt." }); }
-  });
-
   socket.on(SOCKET_EVENTS.gamePayDungeonRelease, (callback) => {
     try {
       const { roomCode, playerId, role } = socket.data;
@@ -834,6 +890,26 @@ io.on("connection", (socket) => {
       orchestrateGame(roomCode, state);
       callback({ ok: true, gameState: state });
     } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Hypothek konnte nicht ausgelöst werden." }); }
+  });
+
+  socket.on(SOCKET_EVENTS.financeAutoMortgageForPayment, (callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
+      const state = rooms.autoMortgageForPayment(roomCode, playerId);
+      publishGameState(roomCode, state); orchestrateGame(roomCode, state);
+      callback({ ok: true, gameState: state });
+    } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Automatisches Beleihen nicht möglich." }); }
+  });
+
+  socket.on(SOCKET_EVENTS.financeRedeemAllMortgages, (callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
+      const state = rooms.redeemAllMortgages(roomCode, playerId);
+      publishGameState(roomCode, state); orchestrateGame(roomCode, state);
+      callback({ ok: true, gameState: state });
+    } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Hypotheken konnten nicht ausgelöst werden." }); }
   });
 
   socket.on(SOCKET_EVENTS.tradeCreate, (request, callback) => {

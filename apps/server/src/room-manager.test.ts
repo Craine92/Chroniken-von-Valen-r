@@ -164,7 +164,7 @@ test("computer players receive distinct colors and no socket", () => {
 test("stores chronicles mode without a quick duration", () => {
   const { manager, roomCode } = roomWithHuman();
   const room = manager.updateConfig(roomCode, { mode: "chronicles" }, "host-1");
-  assert.deepEqual(room.config, { mode: "chronicles" });
+  assert.deepEqual(room.config, { mode: "chronicles", aiDifficulty: "normal" });
 });
 
 test("stores quick mode with 75 minutes", () => {
@@ -174,7 +174,7 @@ test("stores quick mode with 75 minutes", () => {
     { mode: "quick", quickGameDurationMinutes: 75 },
     "host-1"
   );
-  assert.deepEqual(room.config, { mode: "quick", quickGameDurationMinutes: 75 });
+  assert.deepEqual(room.config, { mode: "quick", quickGameDurationMinutes: 75, aiDifficulty: "normal" });
 });
 
 test("rejects an invalid quick duration", () => {
@@ -356,6 +356,15 @@ test("step six socket contract uses intent-only event names", () => {
     [SOCKET_EVENTS.propertyMortgage, SOCKET_EVENTS.propertyRedeemMortgage, SOCKET_EVENTS.tradeCreate, SOCKET_EVENTS.tradeAccept, SOCKET_EVENTS.playerDeclareBankruptcy],
     ["property:mortgage", "property:redeemMortgage", "trade:create", "trade:accept", "player:declareBankruptcy"]
   );
+});
+
+test("authoritative game state revisions start at zero and advance monotonically", () => {
+  const { manager, roomCode } = roomWithHuman();
+  manager.addComputer(roomCode, "host-1"); startReadyGame(manager, roomCode, "host-1");
+  assert.equal(manager.getGameState(roomCode)?.stateRevision, 0);
+  assert.equal(manager.advanceStateRevision(roomCode), 1);
+  assert.equal(manager.advanceStateRevision(roomCode), 2);
+  assert.equal(manager.getGameState(roomCode)?.stateRevision, 2);
 });
 
 test("step seven socket contract exposes only dungeon intentions", () => {

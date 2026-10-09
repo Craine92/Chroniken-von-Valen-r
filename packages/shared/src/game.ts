@@ -19,6 +19,7 @@ export type PlayerCharacterId = (typeof PLAYER_CHARACTERS)[number]["id"];
 export type PlayerType = "human" | "computer";
 export type ConnectionState = "connected" | "disconnected";
 export type GameMode = "chronicles" | "quick";
+export type AiDifficulty = "easy" | "normal" | "hard";
 export type QuickGameDuration = 60 | 75 | 90;
 export type GameStatus = "lobby" | "starting" | "playing" | "finished";
 export type TurnPhase =
@@ -44,7 +45,9 @@ export type TurnPhase =
   | "cardAcknowledgement"
   | "paymentRequired"
   | "waitingForEndTurn"
-  | "turnTransition";
+  | "turnTransition"
+  | "worldImpulseDecision"
+  | "worldImpulseRolling";
 
 export interface DiceRoll {
   die1: number;
@@ -87,9 +90,10 @@ export interface MovementResult {
 export interface GameConfig {
   mode: GameMode;
   quickGameDurationMinutes?: QuickGameDuration;
+  aiDifficulty?: AiDifficulty;
 }
 
-export const DEFAULT_GAME_CONFIG: GameConfig = { mode: "chronicles" };
+export const DEFAULT_GAME_CONFIG: GameConfig = { mode: "chronicles", aiDifficulty: "normal" };
 export { STARTING_GOLD as NORMAL_STARTING_GOLD } from "./economy";
 
 export type BuildingLevel = 0 | 1 | 2 | 3 | 4 | 5;
@@ -127,7 +131,7 @@ export interface AuctionState {
   withdrawnPlayerIds: string[];
   pausedForPlayerIds: string[];
   revision: number;
-  source?: "property" | "bankruptcy";
+  source?: "property" | "bankruptcy" | "worldImpulse";
 }
 
 export interface PendingPayment {
@@ -324,6 +328,8 @@ export interface GamePlayerState {
 }
 
 export interface GameState {
+  /** Monotone server-owned revision. Legacy fixtures without a revision are treated as revision 0. */
+  stateRevision?: number;
   roomId: string;
   status: GameStatus;
   config: GameConfig;
@@ -337,6 +343,14 @@ export interface GameState {
   currentRound: number;
   activeChronicleEvent?: import("./chronicle-events").ActiveChronicleEvent;
   chronicleEventHistory?: import("./chronicle-events").ActiveChronicleEvent[];
+  activeWorldImpulse?: import("./world-impulses").ActiveWorldImpulse;
+  worldImpulseHistory?: import("./world-impulses").ActiveWorldImpulse[];
+  worldImpulseEffects?: import("./world-impulses").WorldImpulseEffects;
+  pendingWorldImpulseDecision?: import("./world-impulses").PendingWorldImpulseDecision;
+  pendingWorldImpulseActivation?: true;
+  lastWorldImpulseResolution?: import("./world-impulses").WorldImpulseResolution;
+  celebratedPropertyGroups?: string[];
+  lastMomentumCelebration?: import("./world-impulses").MomentumCelebration;
   weltenwegPot?: number;
   tavern?: TavernState;
   wanderingDragon?: { tileIndex: number; nextMoveRound: number; encounterSequence: number };

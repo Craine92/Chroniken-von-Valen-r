@@ -9,6 +9,7 @@ import { GameResultPanel } from "../components/GameResultPanel";
 import { DEFAULT_BOARD_PRESENTATION_MODE, getCardPresentationKey, type BoardPresentationMode } from "./board-presentation";
 import { audioManager } from "../audio/AudioManager";
 import { GameAudioEventTracker } from "../audio/game-audio-events";
+import { MomentumCelebrationBanner, WorldImpulseBanner } from "../components/WorldImpulseUi";
 
 const GameCanvas = lazy(() =>
   import("./GameCanvas").then((module) => ({ default: module.GameCanvas }))
@@ -18,8 +19,8 @@ export const DOUBLE_BANNER_DURATION_MS = 2_200;
 export const CHRONICLE_NOTICE_DURATION_MS = 3_000;
 export const TAVERN_NOTICE_DURATION_MS = 4_000;
 
-export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE }: { gameState: GameState; onNewChronicle?: () => void; onReturnToLobby?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined }) {
-  const [introVisible, setIntroVisible] = useState(true);
+export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE, suppressIntro = false }: { gameState: GameState; onNewChronicle?: () => void; onReturnToLobby?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined; suppressIntro?: boolean | undefined }) {
+  const [introVisible, setIntroVisible] = useState(!suppressIntro);
   const [buildingNoticeId, setBuildingNoticeId] = useState<string>();
   const [tradeNoticeId, setTradeNoticeId] = useState<string>();
   const [tavernNoticeId, setTavernNoticeId] = useState<string>();
@@ -159,6 +160,8 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
         </div>
         <div className="board-event-layer" aria-live="polite">
           <TurnStatus state={gameState} />
+          <WorldImpulseBanner impulse={gameState.activeWorldImpulse} />
+          <MomentumCelebrationBanner celebration={gameState.lastMomentumCelebration} state={gameState} />
           {chronicleNotice && !tavernNotice && !dragonNotice && <aside className="building-notice chronicle-notice" role="status">
             <small>CHRONIKEREIGNIS</small>
             <strong>{chronicleNotice.title}</strong>

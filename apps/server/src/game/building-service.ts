@@ -10,6 +10,8 @@ import {
   type GameState
 } from "@valenor/shared";
 import { completeQuests } from "./quest-service";
+import { recordMaxBuilding } from "./momentum-celebration-service";
+import { resolveWorldImpulse } from "./world-impulse-service";
 
 const MAX_LOG_ENTRIES = 12;
 
@@ -21,6 +23,7 @@ export class BuildingService {
     const ownership = state.propertyOwnerships.find((entry) => entry.tileIndex === tileIndex)!;
     const tile = BOARD_TILES[tileIndex]!;
     const cost = getEffectiveBuildCost(state, tile);
+    const usedBuildingFervor = Boolean(state.worldImpulseEffects?.buildingFervor);
     const fromLevel = ownership.buildingLevel;
     const toLevel = (fromLevel + 1) as BuildingLevel;
 
@@ -32,6 +35,11 @@ export class BuildingService {
       : `${player.name} erweitert ${tile.name} zum ${buildingName} für ${cost} Gold.`;
     this.record(state, "build", playerId, tileIndex, fromLevel, toLevel, buildingName, cost, message, -cost);
     completeQuests(state, playerId, state.lastBuildingAction!.id, ["build"]);
+    if (usedBuildingFervor) {
+      delete state.worldImpulseEffects!.buildingFervor;
+      resolveWorldImpulse(state, `${player.name} baut 20 % günstiger.`, "buildingFervor");
+    }
+    if (toLevel === 5) recordMaxBuilding(state, playerId, tileIndex);
   }
 
   sell(state: GameState, playerId: string, tileIndex: number): void {

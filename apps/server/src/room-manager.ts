@@ -17,8 +17,8 @@ import {
   type AuctionBidIncrement,
   type CardDeckType
 } from "@valenor/shared";
-import type { RelicId } from "@valenor/shared";
 import type { TavernChoice } from "@valenor/shared";
+import type { WorldImpulseChoice } from "@valenor/shared";
 import { DiceService } from "./game/dice-service";
 import { EconomyService } from "./game/economy-service";
 import { BuildingService } from "./game/building-service";
@@ -26,12 +26,13 @@ import { MortgageService } from "./game/mortgage-service";
 import { TradeService, type CreateTradeRequest } from "./game/trade-service";
 import { BankruptcyService } from "./game/bankruptcy-service";
 import { TurnEngine } from "./game/turn-engine";
-import { activateRelic, initializeWanderingDragon, resolveDragonEncounter } from "./game/chronicle-event-service";
+import { initializeWanderingDragon, resolveDragonEncounter } from "./game/chronicle-event-service";
 import { initializePlayerQuests } from "./game/quest-service";
 import { CardService, type PrivateCardRuntime } from "./game/card-service";
 import type { CardShuffleSource } from "./game/card-deck";
 import { QuickGameClockService, type TimeSource } from "./game/quick-game-clock-service";
 import { QuickGameScoringService } from "./game/quick-game-scoring-service";
+import { chooseGoldenMoment, resolveGoldenMomentRisk } from "./game/world-impulse-service";
 
 const AI_NAMES = ["Aelor", "Myrra", "Tharok", "Kaela", "Varun", "Nyra", "Bromir", "Sylwen"];
 const QUICK_DURATIONS = new Set([60, 75, 90]);
@@ -271,6 +272,7 @@ export class RoomManager {
     if (connectedHumans.some(player => !player.ready)) throw new Error("Alle verbundenen Menschen müssen bereit sein.");
 
     const gameState: GameState = {
+      stateRevision: 0,
       roomId: room.code,
       status: "playing",
       config: { ...room.config },
@@ -290,6 +292,9 @@ export class RoomManager {
       currentTurnIndex: 0,
       currentRound: 1,
       chronicleEventHistory: [],
+      worldImpulseHistory: [],
+      worldImpulseEffects: {},
+      celebratedPropertyGroups: [],
       weltenwegPot: 0,
       turnNumber: 0,
       turnPhase: "determiningOrder",
@@ -326,7 +331,6 @@ export class RoomManager {
     const player = state.players.find(player => player.id === playerId);
     // Computer players make the same activation choice before their normal roll.
     if (actorType === "computer" && player?.type === "computer" && state.currentPlayerId === playerId && state.turnPhase === "waitingForRoll") {
-      for (const id of player.relics ?? []) if (id !== "runestone" && !player.armedRelics?.includes(id)) activateRelic(state, playerId, id);
     }
     this.turns.rollTurn(state, playerId, actorType);
     delete state.tavern;
@@ -345,9 +349,22 @@ export class RoomManager {
     return this.cloneGameState(state);
   }
 
-  activateRelic(roomCode: string, playerId: string, relicId: RelicId): GameState {
+  chooseWorldImpulse(roomCode: string, playerId: string, actorType: PlayerType, choice: WorldImpulseChoice): GameState {
     const state = this.requireGameState(roomCode);
-    activateRelic(state, playerId, relicId);
+    const player = state.players.find(entry => entry.id === playerId);
+    if (!player || player.type !== actorType || player.isBankrupt || (player.type === "human" && player.connectionState !== "connected")) {
+      throw new Error("Diese Weltimpuls-Entscheidung steht dir nicht zu.");
+    }
+    if (state.pendingWorldImpulseDecision?.impulseId === "twistOfFate") {
+      if (choice !== "keep" && choice !== "reroll") throw new Error("Diese Wahl gehört nicht zur Schicksalswende.");
+      this.turns.decideTwistOfFate(state, playerId, actorType, choice === "reroll");
+    } else chooseGoldenMoment(state, playerId, choice);
+    return this.cloneGameState(state);
+  }
+
+  resolveGoldenMoment(roomCode: string): GameState {
+    const state = this.requireGameState(roomCode);
+    resolveGoldenMomentRisk(state, () => this.tavernDice.rollSingleDie());
     return this.cloneGameState(state);
   }
 
@@ -510,6 +527,18 @@ export class RoomManager {
     return this.cloneGameState(state);
   }
 
+  autoMortgageForPayment(roomCode: string, playerId: string): GameState {
+    const state = this.requireGameState(roomCode);
+    this.mortgages.autoMortgageForPayment(state, playerId);
+    return this.cloneGameState(state);
+  }
+
+  redeemAllMortgages(roomCode: string, playerId: string): GameState {
+    const state = this.requireGameState(roomCode);
+    this.mortgages.redeemAll(state, playerId);
+    return this.cloneGameState(state);
+  }
+
   createTrade(roomCode: string, playerId: string, request: CreateTradeRequest): GameState {
     const state = this.requireGameState(roomCode);
     this.trades.create(state, playerId, request);
@@ -610,6 +639,12 @@ export class RoomManager {
     return state ? this.cloneGameState(state) : undefined;
   }
 
+  advanceStateRevision(roomCode: string): number {
+    const state = this.requireGameState(roomCode);
+    state.stateRevision = (state.stateRevision ?? 0) + 1;
+    return state.stateRevision;
+  }
+
   getRoom(roomCode: string): GameRoom | undefined {
     const room = this.rooms.get(this.normalizeCode(roomCode));
     return room ? this.toPublicRoom(room) : undefined;
@@ -625,11 +660,12 @@ export class RoomManager {
   }
 
   private validateConfig(config: GameConfig): GameConfig {
-    if (config.mode === "chronicles") return { mode: "chronicles" };
+    const aiDifficulty = ["easy", "normal", "hard"].includes(config.aiDifficulty ?? "normal") ? config.aiDifficulty ?? "normal" : "normal";
+    if (config.mode === "chronicles") return { mode: "chronicles", aiDifficulty };
     if (config.mode !== "quick" || !QUICK_DURATIONS.has(config.quickGameDurationMinutes ?? -1)) {
       throw new Error("Schnelle Abenteuer dauern 60, 75 oder 90 Minuten.");
     }
-    return { mode: "quick", quickGameDurationMinutes: config.quickGameDurationMinutes! };
+    return { mode: "quick", quickGameDurationMinutes: config.quickGameDurationMinutes!, aiDifficulty };
   }
 
   private syncConnectionState(room: InternalRoom, playerId: string, state: Player["connectionState"]) {
@@ -758,6 +794,13 @@ export class RoomManager {
       buildingBank: { ...gameState.buildingBank },
       economyLog: gameState.economyLog.map((entry) => ({ ...entry, playerIds: [...entry.playerIds] })),
       chronicleEventHistory: (gameState.chronicleEventHistory ?? []).map((event) => ({ ...event, ...(event.targetRegions ? { targetRegions: [...event.targetRegions] } : {}), ...(event.affectedTileTypes ? { affectedTileTypes: [...event.affectedTileTypes] } : {}) })),
+      worldImpulseHistory: (gameState.worldImpulseHistory ?? []).map((impulse) => ({ ...impulse })),
+      worldImpulseEffects: { ...(gameState.worldImpulseEffects ?? {}) },
+      celebratedPropertyGroups: [...(gameState.celebratedPropertyGroups ?? [])],
+      ...(gameState.activeWorldImpulse ? { activeWorldImpulse: { ...gameState.activeWorldImpulse } } : {}),
+      ...(gameState.pendingWorldImpulseDecision ? { pendingWorldImpulseDecision: { ...gameState.pendingWorldImpulseDecision } } : {}),
+      ...(gameState.lastWorldImpulseResolution ? { lastWorldImpulseResolution: { ...gameState.lastWorldImpulseResolution } } : {}),
+      ...(gameState.lastMomentumCelebration ? { lastMomentumCelebration: { ...gameState.lastMomentumCelebration } } : {}),
       ...(gameState.activeChronicleEvent ? { activeChronicleEvent: { ...gameState.activeChronicleEvent,
         ...(gameState.activeChronicleEvent.targetRegions ? { targetRegions: [...gameState.activeChronicleEvent.targetRegions] } : {}),
         ...(gameState.activeChronicleEvent.affectedTileTypes ? { affectedTileTypes: [...gameState.activeChronicleEvent.affectedTileTypes] } : {}) } } : {}),

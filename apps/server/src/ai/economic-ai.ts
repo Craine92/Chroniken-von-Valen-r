@@ -6,6 +6,8 @@ import {
   getEffectiveBuildCost,
   getEffectiveBuildingSaleValue,
   getEffectiveMortgageRedemptionCost,
+  canMortgageProperty,
+  canRedeemMortgage,
   getPropertyGroupTiles,
   PROPERTY_GROUPS,
   type CreateTradeOfferRequest,
@@ -13,19 +15,24 @@ import {
   type TradeAssets,
   type TradeOffer,
   type AuctionBidIncrement,
-  type GameState
+  type GameState,
+  type AiDifficulty
 } from "@valenor/shared";
 import { NPC_TRADE_GOLD_RESERVE, TradeService } from "../game/trade-service";
 
-export const AI_ECONOMY_CONFIG = {
-  purchaseGoldReserve: 200,
-  buildingGoldReserve: 250,
-  maxBuildingActionsPerPhase: 2,
-  tradeGoldReserve: NPC_TRADE_GOLD_RESERVE,
-  tradeProposalCooldownRounds: 3
-} as const;
+export interface AiEconomyProfile {
+  purchaseGoldReserve: number; buildingGoldReserve: number; maxBuildingActionsPerPhase: number;
+  tradeGoldReserve: number; tradeProposalCooldownRounds: number; auctionPriceMultiplier: number;
+  tradeAcceptRatio: number; tradeCounterFloor: number; mortgageRedemptionReserve: number; maxMortgageRedemptionsPerPhase: number;
+}
+export const AI_ECONOMY_PROFILES: Record<AiDifficulty, AiEconomyProfile> = {
+  easy: { purchaseGoldReserve: 400, buildingGoldReserve: 450, maxBuildingActionsPerPhase: 1, tradeGoldReserve: 400, tradeProposalCooldownRounds: 6, auctionPriceMultiplier: .95, tradeAcceptRatio: .825, tradeCounterFloor: .525, mortgageRedemptionReserve: 500, maxMortgageRedemptionsPerPhase: 1 },
+  normal: { purchaseGoldReserve: 300, buildingGoldReserve: 350, maxBuildingActionsPerPhase: 1, tradeGoldReserve: 300, tradeProposalCooldownRounds: 4, auctionPriceMultiplier: 1.10, tradeAcceptRatio: .90, tradeCounterFloor: .625, mortgageRedemptionReserve: 350, maxMortgageRedemptionsPerPhase: 1 },
+  hard: { purchaseGoldReserve: 200, buildingGoldReserve: 250, maxBuildingActionsPerPhase: 2, tradeGoldReserve: NPC_TRADE_GOLD_RESERVE, tradeProposalCooldownRounds: 3, auctionPriceMultiplier: 1.25, tradeAcceptRatio: .95, tradeCounterFloor: .70, mortgageRedemptionReserve: 250, maxMortgageRedemptionsPerPhase: 2 }
+};
+export const AI_ECONOMY_CONFIG = AI_ECONOMY_PROFILES.hard;
+export const getAiEconomyProfile = (state: Pick<GameState, "config">): AiEconomyProfile => AI_ECONOMY_PROFILES[state.config.aiDifficulty ?? "normal"];
 
-export const AI_RELIC_TRADE_VALUES = { runestone: 150, "merchant-seal": 175, "dungeon-amulet": 140, "golden-feather": 125 } as const;
 export const AI_DUNGEON_CARD_TRADE_VALUE = 110;
 export type TradeDecision = { type: "accept" | "reject" } | { type: "counter"; request: CreateTradeOfferRequest };
 export interface TradeEvaluation { receivedValue: number; givenValue: number; goldAfterTrade: number; breaksCompleteGroup: boolean }
@@ -54,8 +61,7 @@ export class EconomicAi {
 
   evaluateTradeAssets(state: GameState, playerId: string, assets: TradeAssets, ownerships: readonly PropertyOwnership[] = state.propertyOwnerships): number {
     return assets.gold + assets.propertyTileIndices.reduce((value, index) => value + this.evaluatePropertyForPlayer(state, playerId, index, ownerships), 0)
-      + (assets.cardIds?.length ?? 0) * AI_DUNGEON_CARD_TRADE_VALUE
-      + (assets.relicIds ?? []).reduce((value, id) => value + AI_RELIC_TRADE_VALUES[id], 0);
+      + (assets.cardIds?.length ?? 0) * AI_DUNGEON_CARD_TRADE_VALUE;
   }
 
   evaluateTrade(state: GameState, playerId: string, trade: TradeOffer): TradeEvaluation {
@@ -75,22 +81,24 @@ export class EconomicAi {
   }
 
   decideTradeResponse(state: GameState, playerId: string, trade: TradeOffer): TradeDecision {
+    const profile = getAiEconomyProfile(state);
     const player = state.players.find(entry => entry.id === playerId);
     if (player?.type !== "computer" || trade.recipientId !== playerId || !this.tradeValidator.isValid(state, trade)) return { type: "reject" };
     const value = this.evaluateTrade(state, playerId, trade);
-    if (value.breaksCompleteGroup || value.goldAfterTrade < AI_ECONOMY_CONFIG.tradeGoldReserve) return { type: "reject" };
-    if (value.receivedValue >= value.givenValue * .95) return { type: "accept" };
-    if (value.receivedValue < value.givenValue * .70 || trade.counterToTradeId) return { type: "reject" };
+    if (value.breaksCompleteGroup || value.goldAfterTrade < profile.tradeGoldReserve) return { type: "reject" };
+    if (value.receivedValue >= value.givenValue * profile.tradeAcceptRatio) return { type: "accept" };
+    if (value.receivedValue < value.givenValue * profile.tradeCounterFloor || trade.counterToTradeId) return { type: "reject" };
     const request = this.createCounterOffer(state, playerId, trade);
     return request ? { type: "counter", request } : { type: "reject" };
   }
 
   createCounterOffer(state: GameState, playerId: string, trade: TradeOffer): CreateTradeOfferRequest | undefined {
+    const profile = getAiEconomyProfile(state);
     if (trade.counterToTradeId || trade.recipientId !== playerId || !this.tradeValidator.isValid(state, trade)
       || state.trades.some(entry => entry.proposerId === playerId && entry.status === "pending")) return undefined;
     const value = this.evaluateTrade(state, playerId, trade);
-    if (value.breaksCompleteGroup || value.goldAfterTrade < AI_ECONOMY_CONFIG.tradeGoldReserve || value.receivedValue < value.givenValue * .70) return undefined;
-    const copy = (assets: TradeAssets): TradeAssets => ({ ...assets, propertyTileIndices: [...assets.propertyTileIndices], cardIds: [...(assets.cardIds ?? [])], relicIds: [...(assets.relicIds ?? [])] });
+    if (value.breaksCompleteGroup || value.goldAfterTrade < profile.tradeGoldReserve || value.receivedValue < value.givenValue * profile.tradeCounterFloor) return undefined;
+    const copy = (assets: TradeAssets): TradeAssets => ({ ...assets, propertyTileIndices: [...assets.propertyTileIndices], cardIds: [...(assets.cardIds ?? [])], relicIds: [] });
     const request: CreateTradeOfferRequest = { recipientId: trade.proposerId, counterToTradeId: trade.id, offer: copy(trade.request), request: copy(trade.offer) };
     const gap = Math.max(0, Math.ceil(value.givenValue - value.receivedValue));
     const reduction = Math.min(gap, request.offer.gold);
@@ -98,13 +106,14 @@ export class EconomicAi {
     const candidate: TradeOffer = { ...request, id: "ai-counter-preview", proposerId: playerId, status: "pending", createdAt: 0 };
     if (!this.tradeValidator.isValid(state, candidate)) return undefined;
     const counterValue = this.evaluateTrade(state, playerId, candidate);
-    return counterValue.goldAfterTrade >= AI_ECONOMY_CONFIG.tradeGoldReserve && counterValue.receivedValue >= counterValue.givenValue * .95 ? request : undefined;
+    return counterValue.goldAfterTrade >= profile.tradeGoldReserve && counterValue.receivedValue >= counterValue.givenValue * profile.tradeAcceptRatio ? request : undefined;
   }
 
   findTradeProposal(state: GameState, playerId: string, lastProposalRound?: number): CreateTradeOfferRequest | undefined {
+    const profile = getAiEconomyProfile(state);
     const player = state.players.find(entry => entry.id === playerId);
     if (player?.type !== "computer" || player.isBankrupt || state.currentPlayerId !== playerId || state.turnPhase !== "waitingForEndTurn"
-      || (lastProposalRound !== undefined && state.currentRound - lastProposalRound < AI_ECONOMY_CONFIG.tradeProposalCooldownRounds)
+      || (lastProposalRound !== undefined && state.currentRound - lastProposalRound < profile.tradeProposalCooldownRounds)
       || state.trades.some(trade => trade.proposerId === playerId && trade.status === "pending")) return undefined;
     const candidates = PROPERTY_GROUPS.flatMap(group => {
       const tiles = getPropertyGroupTiles(group.id);
@@ -116,7 +125,7 @@ export class EconomicAi {
       if (human?.type !== "human" || human.isBankrupt || human.connectionState !== "connected") return [];
       const normalValue = Math.max(0, tile.economy!.purchasePrice - (ownership?.mortgaged ? getEffectiveMortgageRedemptionCost(state, tile) : 0));
       const gold = Math.round(normalValue * 1.1 / 10) * 10;
-      if (gold <= 0 || player.gold - gold < AI_ECONOMY_CONFIG.tradeGoldReserve) return [];
+      if (gold <= 0 || player.gold - gold < profile.tradeGoldReserve) return [];
       const request: CreateTradeOfferRequest = { recipientId: human.id, offer: { gold, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [tile.index] } };
       const candidate: TradeOffer = { ...request, id: "ai-proposal-preview", proposerId: playerId, status: "pending", createdAt: 0 };
       return this.tradeValidator.isValid(state, candidate) ? [{ request, potential: tiles.reduce((sum, field) => sum + field.economy!.purchasePrice, 0) }] : [];
@@ -125,35 +134,38 @@ export class EconomicAi {
   }
 
   shouldBuy(state: GameState, playerId: string): boolean {
+    const profile = getAiEconomyProfile(state);
     const player = state.players.find((candidate) => candidate.id === playerId);
     const tile = state.lastMovement ? BOARD_TILES[state.lastMovement.to] : undefined;
     if (!player || !tile?.economy) return false;
     const groupCount = tile.propertyGroup
       ? state.propertyOwnerships.filter((ownership) => ownership.ownerId === playerId && BOARD_TILES[ownership.tileIndex]?.propertyGroup === tile.propertyGroup).length
       : 0;
-    const reserve = groupCount > 0 ? Math.floor(AI_ECONOMY_CONFIG.purchaseGoldReserve / 2) : AI_ECONOMY_CONFIG.purchaseGoldReserve;
+    const reserve = groupCount > 0 ? Math.floor(profile.purchaseGoldReserve / 2) : profile.purchaseGoldReserve;
     return player.gold - getEffectivePurchasePrice(state, tile, playerId) >= reserve;
   }
 
   decideAuction(state: GameState, playerId: string): AuctionDecision {
+    const profile = getAiEconomyProfile(state);
     const player = state.players.find((candidate) => candidate.id === playerId);
     const auction = state.auction;
     const tile = auction ? BOARD_TILES[auction.tileIndex] : undefined;
     if (!player || !auction || !tile?.economy) return { type: "withdraw" };
-    const limit = Math.min(player.gold - AI_ECONOMY_CONFIG.purchaseGoldReserve, Math.round(tile.economy.purchasePrice * 1.25));
+    const limit = Math.min(player.gold - profile.purchaseGoldReserve, Math.round(tile.economy.purchasePrice * profile.auctionPriceMultiplier));
     const remaining = limit - auction.currentBid;
     if (remaining < 10) return { type: "withdraw" };
     return { type: "bid", increment: remaining >= 100 ? 100 : remaining >= 50 ? 50 : 10 };
   }
 
   decideBuildingAction(state: GameState, playerId: string): number | undefined {
+    const profile = getAiEconomyProfile(state);
     const player = state.players.find((candidate) => candidate.id === playerId);
     if (!player) return undefined;
     const candidates = state.propertyOwnerships
       .filter((ownership) => ownership.ownerId === playerId)
       .map((ownership) => ({ ownership, tile: BOARD_TILES[ownership.tileIndex]! }))
       .filter(({ tile }) => tile.type === "property" && canBuildOnProperty(state, playerId, tile.index).allowed)
-      .filter(({ tile }) => player.gold - getEffectiveBuildCost(state, tile) >= AI_ECONOMY_CONFIG.buildingGoldReserve)
+      .filter(({ tile }) => player.gold - getEffectiveBuildCost(state, tile) >= profile.buildingGoldReserve)
       .sort((left, right) => {
         const leftStarted = state.propertyOwnerships.some((entry) => entry.ownerId === playerId && entry.buildingLevel > 0 && BOARD_TILES[entry.tileIndex]?.propertyGroup === left.tile.propertyGroup);
         const rightStarted = state.propertyOwnerships.some((entry) => entry.ownerId === playerId && entry.buildingLevel > 0 && BOARD_TILES[entry.tileIndex]?.propertyGroup === right.tile.propertyGroup);
@@ -172,5 +184,41 @@ export class EconomicAi {
         const rightCost = getEffectiveBuildingSaleValue(state, BOARD_TILES[right.tileIndex]!);
         return rightCost - leftCost || right.buildingLevel - left.buildingLevel;
       })[0]?.tileIndex;
+  }
+
+  decideMortgageRedemption(state: GameState, playerId: string): number | undefined {
+    const profile = getAiEconomyProfile(state);
+    const player = state.players.find((entry) => entry.id === playerId);
+    if (!player) return undefined;
+    return state.propertyOwnerships
+      .filter((entry) => entry.ownerId === playerId && entry.mortgaged && canRedeemMortgage(state, playerId, entry.tileIndex).allowed)
+      .map((entry) => ({ entry, tile: BOARD_TILES[entry.tileIndex]! }))
+      .filter(({ tile }) => player.gold - getEffectiveMortgageRedemptionCost(state, tile) >= profile.mortgageRedemptionReserve)
+      .sort((left, right) => {
+        const synergy = (tileIndex: number) => {
+          const tile = BOARD_TILES[tileIndex]!;
+          if (tile.type === "property" && tile.propertyGroup) return getPropertyGroupTiles(tile.propertyGroup).filter((member) => state.propertyOwnerships.some((entry) => entry.ownerId === playerId && entry.tileIndex === member.index)).length;
+          return state.propertyOwnerships.filter((entry) => entry.ownerId === playerId && BOARD_TILES[entry.tileIndex]?.type === tile.type).length;
+        };
+        return synergy(right.tile.index) - synergy(left.tile.index)
+          || getEffectiveMortgageRedemptionCost(state, left.tile) - getEffectiveMortgageRedemptionCost(state, right.tile)
+          || left.tile.index - right.tile.index;
+      })[0]?.tile.index;
+  }
+
+  decideEmergencyMortgage(state: GameState, playerId: string): number | undefined {
+    const difficulty = state.config.aiDifficulty ?? "normal";
+    const candidates = state.propertyOwnerships
+      .filter((entry) => entry.ownerId === playerId && canMortgageProperty(state, playerId, entry.tileIndex).allowed)
+      .map((entry) => BOARD_TILES[entry.tileIndex]!)
+      .sort((left, right) => {
+        const complete = (tile: typeof left) => tile.propertyGroup ? getPropertyGroupTiles(tile.propertyGroup).every((member) => state.propertyOwnerships.some((entry) => entry.ownerId === playerId && entry.tileIndex === member.index)) : false;
+        const groupPenalty = Number(complete(left)) - Number(complete(right));
+        const valueOrder = left.economy!.purchasePrice - right.economy!.purchasePrice;
+        return difficulty === "hard"
+          ? -valueOrder || groupPenalty || left.index - right.index
+          : groupPenalty || (difficulty === "easy" ? valueOrder : -valueOrder) || left.index - right.index;
+      });
+    return candidates[0]?.index;
   }
 }

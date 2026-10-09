@@ -95,7 +95,7 @@ export class MobileFeedbackQueue {
     this.publish({ current, exiting: false });
     if (!current) return;
     this.effect(current);
-    this.timer = this.clock.setTimeout(this.dismiss, current.duration ?? (current.action ? 6000 : 3500));
+    this.timer = this.clock.setTimeout(this.dismiss, Math.min(current.duration ?? (current.action ? 4000 : 2800), 4000));
   }
 
   private stopTimer(): void {

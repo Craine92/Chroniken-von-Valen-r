@@ -68,6 +68,19 @@ export class PropertyDevelopmentLayer {
     container.add([shadow, ground, glow]);
     const artAsset = getBuildingAsset(region, level);
     if (artAsset && hasLoadedAsset(this.scene, artAsset)) {
+      const outlineExpansion = level === 5 ? 1.08 : 1.06;
+      const goldOutline = fitImage(
+        this.scene.add.image(0, -10, artAsset.key),
+        (level === 5 ? 46 : 38 + level) * artScale * outlineExpansion,
+        (level === 5 ? 62 : 50 + level) * artScale * outlineExpansion,
+        "contain"
+      ).setName("building-gold-outline").setOrigin(.5, .78).setRotation(-place.rotation).setTintFill(level === 5 ? 0xffdc72 : 0xd8b968);
+      const separator = fitImage(
+        this.scene.add.image(0, -10, artAsset.key),
+        (level === 5 ? 46 : 38 + level) * artScale * 1.025,
+        (level === 5 ? 62 : 50 + level) * artScale * 1.025,
+        "contain"
+      ).setName("building-dark-separator").setOrigin(.5, .78).setRotation(-place.rotation).setTintFill(0x08080b);
       const building = fitImage(
         this.scene.add.image(0, -10, artAsset.key),
         (level === 5 ? 46 : 38 + level) * artScale,
@@ -80,7 +93,7 @@ export class PropertyDevelopmentLayer {
         const x = (index - (pipCount - 1) / 2) * 7;
         rank.fillStyle(level === 5 ? 0xf3d681 : REALM_LIGHT[region], .95).fillCircle(x, 0, level === 5 ? 3.5 : 2.2);
       }
-      container.add([building, rank]);
+      container.add([goldOutline, separator, building, rank]);
       this.addLevelBadge(container, place.rotation, level);
       return container;
     }

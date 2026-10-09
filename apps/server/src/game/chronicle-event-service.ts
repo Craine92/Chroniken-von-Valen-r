@@ -40,12 +40,12 @@ export function isChronicleEventApplicable(state: GameState, definition: Chronic
 }
 
 /** Called once the server advances to the round following a completed round. */
-export function advanceChronicleEvents(state: GameState, chooseIndex: (count: number) => number = randomInt): void {
-  if (state.status !== "playing") return;
+export function advanceChronicleEvents(state: GameState, chooseIndex: (count: number) => number = randomInt): boolean {
+  if (state.status !== "playing") return false;
   if (state.activeChronicleEvent && state.currentRound >= state.activeChronicleEvent.expiresAtRound) delete state.activeChronicleEvent;
   const completedRound = state.currentRound - 1;
   const previous = state.chronicleEventHistory?.at(-1);
-  if (completedRound <= 0 || completedRound % 3 !== 0 || state.activeChronicleEvent || (previous && previous.startedAfterRound >= completedRound)) return;
+  if (completedRound <= 0 || completedRound % 3 !== 0 || state.activeChronicleEvent || (previous && previous.startedAfterRound >= completedRound)) return false;
   const candidates = CHRONICLE_EVENTS.filter((event) => event.id !== previous?.id && isChronicleEventApplicable(state, event));
   let definition = candidates[chooseIndex(candidates.length)]!;
   if (definition.effectType !== "startPassBonus") {
@@ -58,6 +58,7 @@ export function advanceChronicleEvents(state: GameState, chooseIndex: (count: nu
     expiresAtRound: state.currentRound + definition.durationRounds, startedAt: Date.now() };
   state.activeChronicleEvent = event;
   (state.chronicleEventHistory ??= []).push(event);
+  return true;
 }
 
 function chooseDragonTile(previous: number | undefined, chooseIndex: (count: number) => number): number {
@@ -75,6 +76,12 @@ export function advanceWanderingDragon(state: GameState, chooseIndex: (count: nu
   if (state.status !== "playing" || !dragon || state.currentRound < dragon.nextMoveRound) return;
   dragon.tileIndex = chooseDragonTile(dragon.tileIndex, chooseIndex);
   dragon.nextMoveRound = state.currentRound + 2;
+}
+
+/** An extra impulse move. It intentionally does not alter the regular two-round schedule. */
+export function moveWanderingDragonNow(state: GameState, chooseIndex: (count: number) => number = randomInt): void {
+  if (state.status !== "playing" || !state.wanderingDragon) return;
+  state.wanderingDragon.tileIndex = chooseDragonTile(state.wanderingDragon.tileIndex, chooseIndex);
 }
 
 export function resolveDragonEncounter(state: GameState, chooseIndex: (count: number) => number = randomInt): void {
@@ -107,14 +114,6 @@ export function preventDungeonWithAmulet(state: GameState, player: GamePlayerSta
 export function isDragonEncounterTile(tileIndex: number, dragonTileIndex: number): boolean {
   const distance = Math.abs(tileIndex - dragonTileIndex);
   return Math.min(distance, BOARD_TILES.length - distance) <= 1;
-}
-
-export function activateRelic(state: GameState, playerId: string, id: RelicId): void {
-  const player = state.players.find(player => player.id === playerId);
-  if (state.status !== "playing" || !player || player.isBankrupt || player.connectionState !== "connected") throw new Error("Dieses Relikt kann gerade nicht aktiviert werden.");
-  if (id === "runestone" || !Object.hasOwn(RELIC_DEFINITIONS, id) || !player.relics?.includes(id)) throw new Error("Du besitzt kein aktivierbares Relikt dieser Art.");
-  if (isRelicArmed(player, id)) throw new Error("Dieses Relikt ist bereits aktiv.");
-  (player.armedRelics ??= []).push(id);
 }
 
 export function recordRelicUse(state: GameState, player: GamePlayerState, id: RelicId): void {

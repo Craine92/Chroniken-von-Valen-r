@@ -1,4 +1,4 @@
-import type { GameConfig, GameMode, QuickGameDuration } from "@valenor/shared";
+import type { AiDifficulty, GameConfig, GameMode, QuickGameDuration } from "@valenor/shared";
 
 const DURATIONS: QuickGameDuration[] = [60, 75, 90];
 
@@ -10,7 +10,7 @@ interface GameModeSelectorProps {
 
 export function GameModeSelector({ config, onChange, disabled }: GameModeSelectorProps) {
   const selectMode = (mode: GameMode) => {
-    onChange(mode === "quick" ? { mode: "quick", quickGameDurationMinutes: 75 } : { mode: "chronicles" });
+    onChange(mode === "quick" ? { mode: "quick", quickGameDurationMinutes: 75, aiDifficulty: config.aiDifficulty ?? "normal" } : { mode: "chronicles", aiDifficulty: config.aiDifficulty ?? "normal" });
   };
 
   return (
@@ -52,12 +52,17 @@ export function GameModeSelector({ config, onChange, disabled }: GameModeSelecto
             key={duration}
             type="button"
             className={config.quickGameDurationMinutes === duration ? "is-selected" : ""}
-            onClick={() => onChange({ mode: "quick", quickGameDurationMinutes: duration })}
+            onClick={() => onChange({ mode: "quick", quickGameDurationMinutes: duration, aiDifficulty: config.aiDifficulty ?? "normal" })}
             disabled={disabled || config.mode !== "quick"}
           >
             {duration} MIN
           </button>
         ))}
+      </div>
+      <div className="difficulty-picker" aria-label="KI-Schwierigkeit">
+        <span>KI-Schwierigkeit</span>
+        {(["easy", "normal", "hard"] as AiDifficulty[]).map((difficulty) => <button key={difficulty} type="button" className={(config.aiDifficulty ?? "normal") === difficulty ? "is-selected" : ""} disabled={disabled} onClick={() => onChange({ ...config, aiDifficulty: difficulty })}>{difficulty === "easy" ? "LEICHT" : difficulty === "normal" ? "NORMAL" : "SCHWER"}</button>)}
+        <small>{(config.aiDifficulty ?? "normal") === "easy" ? "Große Reserven, vorsichtige Käufe und seltene Aktionen." : (config.aiDifficulty ?? "normal") === "hard" ? "Die bisherige, offensive KI mit engen Reserven." : "Ausgewogene Entscheidungen und Reserven."}</small>
       </div>
     </section>
   );

@@ -17,6 +17,8 @@ import {
 import { startNextBankruptcyAuction } from "./bankruptcy-service";
 import { consumeArmedRelic } from "./chronicle-event-service";
 import { completeQuests, ownershipQuestTypes } from "./quest-service";
+import { recordNewCompleteGroups, recordPotThreshold } from "./momentum-celebration-service";
+import { resolveWorldImpulse, updateWorldImpulse } from "./world-impulse-service";
 
 const MAX_LOG_ENTRIES = 12;
 
@@ -132,9 +134,15 @@ export class EconomyService {
     state.lastRewardedStartMovementSequence = sequence;
     const player = this.requirePlayer(state, movement.playerId);
     const reward = getStartPassReward(state, player.id);
-    player.gold += reward;
+    const runeSpark = state.worldImpulseEffects?.runeSpark ? 75 : 0;
+    player.gold += reward + runeSpark;
     consumeArmedRelic(state, player, "golden-feather");
-    this.log(state, "start", `${player.name} passiert das Runentor und erhält ${reward} Gold.`, [player.id], reward);
+    if (runeSpark) {
+      delete state.worldImpulseEffects!.runeSpark;
+      updateWorldImpulse(state, "runeSpark", { targetPlayerId: player.id, resultGold: 75 });
+      resolveWorldImpulse(state, `${player.name} erhält zusätzlich 75 Gold am Runentor.`, "runeSpark");
+    }
+    this.log(state, "start", `${player.name} passiert das Runentor und erhält ${reward + runeSpark} Gold${runeSpark ? " inklusive Runenfunke" : ""}.`, [player.id], reward + runeSpark);
     completeQuests(state, player.id, `start:${sequence}`, ["startPass"]);
   }
 
@@ -146,6 +154,7 @@ export class EconomyService {
     const price = getEffectivePurchasePrice(state, tile, playerId);
     if (player.gold < price) throw new Error("Dafür reicht dein Gold nicht aus.");
     player.gold -= price;
+    const usedMerchantLuck = Boolean(state.worldImpulseEffects?.merchantLuck);
     consumeArmedRelic(state, player, "merchant-seal");
     state.propertyOwnerships.push({ tileIndex: tile.index, ownerId: player.id, mortgaged: false, buildingLevel: 0 });
     const entry = this.log(state, "purchase", `${player.name} kauft ${tile.name} für ${price} Gold.`, [player.id], -price);
@@ -153,6 +162,11 @@ export class EconomyService {
       ...(tile.type === "property" ? ["propertyPurchase" as const] : tile.type === "harbor" ? ["harborAcquisition" as const] : []),
       ...ownershipQuestTypes(state, player.id, [tile.index])
     ]);
+    if (usedMerchantLuck) {
+      delete state.worldImpulseEffects!.merchantLuck;
+      resolveWorldImpulse(state, `${player.name} kauft ${tile.name} 15 % günstiger.`, "merchantLuck");
+    }
+    recordNewCompleteGroups(state, player.id);
     state.turnPhase = "waitingForEndTurn";
   }
 
@@ -248,10 +262,12 @@ export class EconomyService {
       const tile = BOARD_TILES[auction.tileIndex]!;
       this.log(state, "auction", `Für ${tile.name} wurde kein Gebot abgegeben.`, []);
       const wasBankruptcyAuction = auction.source === "bankruptcy";
+      const wasWorldImpulseAuction = auction.source === "worldImpulse";
       delete state.auction;
       if (!wasBankruptcyAuction || !startNextBankruptcyAuction(state)) {
-        if (!wasBankruptcyAuction) state.turnPhase = "waitingForEndTurn";
+        if (!wasBankruptcyAuction) state.turnPhase = wasWorldImpulseAuction ? "turnTransition" : "waitingForEndTurn";
       }
+      if (wasWorldImpulseAuction) resolveWorldImpulse(state, `${tile.name}: kein Gebot.`, "marketCry");
       return;
     }
     if (remaining.length !== 1 || auction.currentBid <= 0 || auction.highestBidderId !== remaining[0]) return;
@@ -263,10 +279,13 @@ export class EconomyService {
     const entry = this.log(state, "auction", `${winner.name} ersteigert ${tile.name} für ${auction.currentBid} Gold.`, [winner.id], -auction.currentBid);
     completeQuests(state, winner.id, entry.id, [...(tile.type === "harbor" ? ["harborAcquisition" as const] : []), ...ownershipQuestTypes(state, winner.id, [tile.index])]);
     const wasBankruptcyAuction = auction.source === "bankruptcy";
+    const wasWorldImpulseAuction = auction.source === "worldImpulse";
     delete state.auction;
     if (!wasBankruptcyAuction || !startNextBankruptcyAuction(state)) {
-      if (!wasBankruptcyAuction) state.turnPhase = "waitingForEndTurn";
+      if (!wasBankruptcyAuction) state.turnPhase = wasWorldImpulseAuction ? "turnTransition" : "waitingForEndTurn";
     }
+    recordNewCompleteGroups(state, winner.id);
+    if (wasWorldImpulseAuction) resolveWorldImpulse(state, `${winner.name} ersteigert ${tile.name}.`, "marketCry");
   }
 
   private transferMandatory(state: GameState, payer: GamePlayerState, payee: GamePlayerState, amount: number, reason: string): boolean {
@@ -283,7 +302,9 @@ export class EconomyService {
   }
 
   private depositWeltenwegTax(state: GameState, player: GamePlayerState, amount: number, reason: string): void {
-    state.weltenwegPot = (state.weltenwegPot ?? 0) + amount;
+    const previousPot = state.weltenwegPot ?? 0;
+    state.weltenwegPot = previousPot + amount;
+    recordPotThreshold(state, previousPot, state.weltenwegPot);
     const entry = this.log(state, "tax", `${player.name} zahlt ${amount} Gold ${reason}. Der Weltenweg-Pott steigt auf ${state.weltenwegPot} Gold.`, [player.id], -amount);
     completeQuests(state, player.id, entry.id, ["taxPaid"]);
   }

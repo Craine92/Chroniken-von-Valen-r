@@ -54,10 +54,38 @@ function resultCue(state: GameState, viewerId?: string): AudioEvent {
   return winners.includes(viewerId) ? "VICTORY" : "DEFEAT";
 }
 
+function impulseCues(state: GameState): ScheduledAudioEvent[] {
+  switch (state.activeWorldImpulse?.id) {
+    case "worldwayDonation": return [{ event: "GOLD_GAIN" }];
+    case "crownFavor": return [{ event: "EVENT_POSITIVE" }, { event: "GOLD_GAIN", delayMs: 260 }];
+    case "harborWind": return [{ event: "REALM_TRANSITION" }];
+    case "dragonCall":
+    case "marketCry":
+    case "twistOfFate":
+    case "goldenMoment": return [{ event: "EVENT_EPIC" }];
+    default: return [{ event: "EVENT_POSITIVE" }];
+  }
+}
+
 export function deriveGameAudioEvents(previous: GameState, next: GameState, viewerId?: string): ScheduledAudioEvent[] {
   const events: ScheduledAudioEvent[] = [];
   // Dice audio is coupled directly to the visible board animation in ValenorBoardScene.
   // Keeping it out of state-diff audio avoids lifecycle/HMR races and duplicate roll cues.
+
+  if (next.activeWorldImpulse?.startedAt && next.activeWorldImpulse.startedAt !== previous.activeWorldImpulse?.startedAt) {
+    events.push(...impulseCues(next));
+  }
+  if (next.activeWorldImpulse?.id === "goldenMoment" && next.activeWorldImpulse.resultDie !== undefined
+    && next.activeWorldImpulse.resultDie !== previous.activeWorldImpulse?.resultDie) {
+    events.push({ event: "DICE_ROLL" }, { event: (next.activeWorldImpulse.resultGold ?? 0) > 0 ? "EVENT_POSITIVE" : "EVENT_NEGATIVE", delayMs: 480 });
+  }
+  if (next.lastWorldImpulseResolution?.resolvedAt && next.lastWorldImpulseResolution.resolvedAt !== previous.lastWorldImpulseResolution?.resolvedAt) {
+    if (next.lastWorldImpulseResolution.impulseId === "runeSpark") events.push({ event: "GOLD_GAIN" });
+    if (next.lastWorldImpulseResolution.impulseId === "buildingFervor") events.push({ event: "EVENT_POSITIVE", delayMs: 180 });
+  }
+  if (next.lastMomentumCelebration?.id && next.lastMomentumCelebration.id !== previous.lastMomentumCelebration?.id) {
+    events.push({ event: next.lastMomentumCelebration.type === "maxBuilding" ? "PROPERTY_UPGRADE" : "EVENT_EPIC" });
+  }
 
   if (next.lastBuildingAction?.id && next.lastBuildingAction.id !== previous.lastBuildingAction?.id) {
     events.push({ event: next.lastBuildingAction.type === "build" ? "PROPERTY_UPGRADE" : "GOLD_GAIN" });

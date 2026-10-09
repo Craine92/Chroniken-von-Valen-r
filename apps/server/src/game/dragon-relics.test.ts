@@ -2,8 +2,8 @@ import { startReadyGame } from "../test-fixtures";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, GO_TO_DUNGEON_TILE_INDEX, RELIC_DEFINITIONS,
-  getBloodMoonDefinition, getEffectiveRent, isBuyableTile, type GameState, type RegionType, type RelicId } from "@valenor/shared";
-import { activateRelic, advanceChronicleEvents, advanceWanderingDragon, initializeWanderingDragon, isDragonEncounterTile, resolveDragonEncounter } from "./chronicle-event-service";
+  getBloodMoonDefinition, getEffectiveRent, isBuyableTile, isRelicArmed, type GameState, type RegionType } from "@valenor/shared";
+import { advanceChronicleEvents, advanceWanderingDragon, initializeWanderingDragon, isDragonEncounterTile, resolveDragonEncounter } from "./chronicle-event-service";
 import { EconomyService } from "./economy-service";
 import { TurnEngine } from "./turn-engine";
 import { DiceService } from "./dice-service";
@@ -25,35 +25,23 @@ function game(index = 1): GameState {
 }
 const dice = (...values: number[]) => new DiceService({ rollDie: () => { const value = values.shift(); assert.notEqual(value, undefined); return value!; } });
 
-test("activation is separate from ownership, retains the relic and rejects invalid requests", () => {
-  for (const id of ["merchant-seal", "dungeon-amulet", "golden-feather"] as const) {
+test("relic ownership makes every relic immediately ready", () => {
+  for (const id of Object.keys(RELIC_DEFINITIONS) as (keyof typeof RELIC_DEFINITIONS)[]) {
     const state = game(); state.players[0]!.relics = [id];
-    activateRelic(state, "p1", id);
-    assert.deepEqual(state.players[0]!.relics, [id]); assert.deepEqual(state.players[0]!.armedRelics, [id]);
+    assert.equal(isRelicArmed(state.players[0], id), true);
     assert.equal(state.economyLog.length, 0);
-    assert.throws(() => activateRelic(state, "p1", id), /bereits/);
-    assert.throws(() => activateRelic(state, "p2", id), /besitzt/);
   }
-  const invalid = game(); invalid.players[0]!.relics = ["runestone"];
-  assert.throws(() => activateRelic(invalid, "p1", "runestone"));
-  assert.throws(() => activateRelic(invalid, "p1", "missing" as RelicId));
-  invalid.players[0]!.relics = ["golden-feather"]; invalid.players[0]!.connectionState = "disconnected";
-  assert.throws(() => activateRelic(invalid, "p1", "golden-feather"));
-  invalid.players[0]!.connectionState = "connected"; invalid.players[0]!.isBankrupt = true;
-  assert.throws(() => activateRelic(invalid, "p1", "golden-feather"));
-  invalid.players[0]!.isBankrupt = false; invalid.status = "finished";
-  assert.throws(() => activateRelic(invalid, "p1", "golden-feather"));
 });
 
-test("unarmed relics do not discount purchases, reward passage or prevent detention", () => {
+test("owned relics automatically discount purchases, reward passage and prevent detention", () => {
   const purchase = game(); purchase.players[0]!.relics = ["merchant-seal"];
   const economy = new EconomyService(); economy.resolveLanding(purchase); economy.buyCurrentTile(purchase, "p1");
-  assert.equal(purchase.players[0]!.gold, 1440); assert.deepEqual(purchase.players[0]!.relics, ["merchant-seal"]);
+  assert.equal(purchase.players[0]!.gold, 1455); assert.deepEqual(purchase.players[0]!.relics, []);
   const passage = game(); passage.players[0]!.relics = ["golden-feather"]; passage.lastMovement!.passedStart = true;
-  economy.awardStartPass(passage); assert.equal(passage.players[0]!.gold, 1700); assert.deepEqual(passage.players[0]!.relics, ["golden-feather"]);
+  economy.awardStartPass(passage); assert.equal(passage.players[0]!.gold, 1800); assert.deepEqual(passage.players[0]!.relics, []);
   const detention = game(GO_TO_DUNGEON_TILE_INDEX); detention.players[0]!.relics = ["dungeon-amulet"];
   new TurnEngine().sendCurrentPlayerToDungeon(detention);
-  assert.equal(detention.players[0]!.dungeon.inDungeon, true); assert.deepEqual(detention.players[0]!.relics, ["dungeon-amulet"]);
+  assert.equal(detention.players[0]!.dungeon.inDungeon, false); assert.deepEqual(detention.players[0]!.relics, []);
 });
 
 test("blood moon can select every realm and applies rent only using its stored target", () => {
@@ -150,37 +138,31 @@ test("dragon awards distinct relics up to two slots, then records a full invento
 
 test("merchant seal discounts and consumes only a successful direct purchase, stacking with the festival", () => {
   const state = game(), economy = new EconomyService(); state.players[0]!.relics = ["merchant-seal"];
-  activateRelic(state, "p1", "merchant-seal");
   economy.resolveLanding(state); state.players[0]!.gold = 44;
   assert.throws(() => economy.buyCurrentTile(state, "p1"), /reicht/);
   assert.deepEqual(state.players[0]!.relics, ["merchant-seal"]);
   state.players[0]!.gold = 45; economy.buyCurrentTile(state, "p1");
   assert.equal(state.players[0]!.gold, 0); assert.deepEqual(state.players[0]!.relics, []);
-  assert.deepEqual(state.players[0]!.armedRelics, []);
   assert.equal(state.economyLog.filter(entry => entry.kind === "relic" && entry.relicId === "merchant-seal").length, 1);
   const festival = game(); festival.currentRound = 4; festival.players[0]!.relics = ["merchant-seal"];
-  activateRelic(festival, "p1", "merchant-seal");
   festival.activeChronicleEvent = { ...CHRONICLE_EVENTS[0]!, targetRegions: ["elves"], startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 1 };
   economy.resolveLanding(festival); economy.buyCurrentTile(festival, "p1");
   assert.equal(festival.players[0]!.gold, 1464);
   const auction = game(); auction.players[1]!.relics = ["merchant-seal"];
-  activateRelic(auction, "p2", "merchant-seal");
   economy.resolveLanding(auction); economy.declineCurrentTile(auction, "p1");
   economy.bid(auction, "p2", 50); economy.withdraw(auction, "p1");
   assert.equal(auction.players[1]!.gold, 1450); assert.deepEqual(auction.players[1]!.relics, ["merchant-seal"]);
-  assert.deepEqual(auction.players[1]!.armedRelics, ["merchant-seal"]);
+  assert.deepEqual(auction.players[1]!.relics, ["merchant-seal"]);
 });
 
 test("golden feather adds 100 to normal or blessed passage exactly once and is then consumed", () => {
   for (const blessed of [false, true]) {
     const state = game(); state.players[0]!.relics = ["golden-feather"];
-    activateRelic(state, "p1", "golden-feather");
     if (blessed) { state.currentRound = 4; state.activeChronicleEvent = { ...CHRONICLE_EVENTS[2]!, startedAfterRound: 3, startedAtRound: 4, expiresAtRound: 6, startedAt: 1 }; }
     state.lastMovement!.passedStart = true; state.lastMovement!.from = 39;
     const economy = new EconomyService(); economy.resolveLanding(state);
     assert.equal(state.players[0]!.gold, blessed ? 1900 : 1800);
     assert.deepEqual(state.players[0]!.relics, []);
-    assert.deepEqual(state.players[0]!.armedRelics, []);
     assert.equal(state.economyLog.filter(entry => entry.kind === "relic" && entry.relicId === "golden-feather").length, 1);
     state.turnPhase = "landed"; economy.resolveLanding(state);
     assert.equal(state.players[0]!.gold, blessed ? 1900 : 1800);
@@ -189,32 +171,27 @@ test("golden feather adds 100 to normal or blessed passage exactly once and is t
 
 test("dungeon amulet blocks the dungeon field, third double and card detention, but not visits", () => {
   const field = game(GO_TO_DUNGEON_TILE_INDEX); field.players[0]!.relics = ["dungeon-amulet"];
-  activateRelic(field, "p1", "dungeon-amulet");
   new TurnEngine().sendCurrentPlayerToDungeon(field);
   assert.equal(field.players[0]!.position, GO_TO_DUNGEON_TILE_INDEX);
   assert.equal(field.players[0]!.dungeon.inDungeon, false); assert.deepEqual(field.players[0]!.relics, []);
   assert.equal(field.turnPhase, "waitingForEndTurn");
   const bonus = game(GO_TO_DUNGEON_TILE_INDEX); bonus.players[0]!.relics = ["dungeon-amulet"];
-  activateRelic(bonus, "p1", "dungeon-amulet");
   bonus.turnContext.consecutiveDoubles = 1; bonus.turnContext.pendingExtraRoll = true;
   const bonusEngine = new TurnEngine(); bonusEngine.sendCurrentPlayerToDungeon(bonus);
   assert.equal(bonus.turnContext.pendingExtraRoll, true);
   bonusEngine.endTurn(bonus, "p1", "human");
   assert.equal(bonus.currentPlayerId, "p1"); assert.equal(bonus.turnPhase, "waitingForRoll");
   const third = game(5); third.turnPhase = "waitingForRoll"; third.players[0]!.relics = ["dungeon-amulet"];
-  activateRelic(third, "p1", "dungeon-amulet");
   third.turnContext.consecutiveDoubles = 2; new TurnEngine(dice(6,6)).rollTurn(third, "p1", "human");
   assert.equal(third.players[0]!.position, 5); assert.equal(third.players[0]!.dungeon.inDungeon, false);
   assert.equal(third.turnPhase, "waitingForEndTurn"); assert.deepEqual(third.players[0]!.relics, []);
   const card = game(2); card.turnPhase = "awaitingCardDraw"; card.players[0]!.relics = ["dungeon-amulet"];
-  activateRelic(card, "p1", "dungeon-amulet");
   const service = new CardService(), runtime = service.createRuntime();
   runtime.decks.fate.drawPile = ["fate_023", ...runtime.decks.fate.drawPile.filter(id => id !== "fate_023")];
   service.draw(card, runtime, "p1", "human");
   assert.equal(card.players[0]!.position, 2); assert.equal(card.players[0]!.dungeon.inDungeon, false);
   assert.deepEqual(card.players[0]!.relics, []); assert.equal(card.turnPhase, "cardAcknowledgement");
   const back = game(36); back.turnPhase = "awaitingCardDraw"; back.players[0]!.relics = ["dungeon-amulet"];
-  activateRelic(back, "p1", "dungeon-amulet");
   const backRuntime = service.createRuntime();
   backRuntime.decks.adventure.drawPile = ["adv_014", ...backRuntime.decks.adventure.drawPile.filter(id => id !== "adv_014")];
   service.draw(back, backRuntime, "p1", "human"); service.completeMovement(back, backRuntime);
@@ -223,14 +200,12 @@ test("dungeon amulet blocks the dungeon field, third double and card detention, 
   assert.equal(back.turnPhase, "cardAcknowledgement");
   assert.equal(back.players[0]!.dungeon.inDungeon, false); assert.deepEqual(back.players[0]!.relics, []);
   const visit = game(DUNGEON_TILE_INDEX); visit.players[0]!.relics = ["dungeon-amulet"];
-  activateRelic(visit, "p1", "dungeon-amulet");
   new EconomyService().resolveLanding(visit); assert.deepEqual(visit.players[0]!.relics, ["dungeon-amulet"]);
-  assert.deepEqual(visit.players[0]!.armedRelics, ["dungeon-amulet"]);
+  assert.deepEqual(visit.players[0]!.relics, ["dungeon-amulet"]);
 });
 
 test("runestone replaces a pending normal roll without old movement, doubles or amulet side effects", () => {
   const state = game(37); state.turnPhase = "waitingForRoll"; state.players[0]!.relics = ["runestone","dungeon-amulet"];
-  activateRelic(state, "p1", "dungeon-amulet");
   state.turnContext.consecutiveDoubles = 2; const engine = new TurnEngine(dice(6,6,2,3));
   engine.rollTurn(state, "p1", "human");
   assert.equal(state.turnContext.awaitingRuneStoneDecision, true); assert.equal(Boolean(state.lastMovement), false);
@@ -281,7 +256,5 @@ test("a feather received from the dragon after passing start applies to the next
   snapshot.players[0]!.relics!.length = 0; snapshot.wanderingDragon!.tileIndex = 0;
   assert.equal(manager.getGameState(room.code)!.players[0]!.relics!.length, 2);
   assert.notEqual(manager.getGameState(room.code)!.wanderingDragon!.tileIndex, 0);
-  const activated = manager.activateRelic(room.code, human.player.id, "golden-feather");
-  activated.players[0]!.armedRelics!.length = 0;
-  assert.deepEqual(manager.getGameState(room.code)!.players[0]!.armedRelics, ["golden-feather"]);
+  assert.ok(manager.getGameState(room.code)!.players[0]!.relics!.includes("golden-feather"));
 });

@@ -4,7 +4,6 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { GameState } from "@valenor/shared";
 import { TradePanel, getCounterOfferTemplate } from "./TradePanel";
-import { RELIC_ASSETS } from "../game/assets/asset-manifest";
 
 function state(): GameState {
   return {
@@ -26,31 +25,44 @@ function state(): GameState {
   };
 }
 
-test("relic trades display central assets and descriptions while armed relic selection is disabled", () => {
+test("relics never appear in the trade composer or legacy offer rendering", () => {
   const game = state(); game.players[0]!.relics = ["runestone","merchant-seal"]; game.players[0]!.armedRelics = ["merchant-seal"];
   game.players[1]!.relics = ["golden-feather"]; game.trades[0]!.offer.relicIds = ["golden-feather"]; game.trades[0]!.request.relicIds = ["runestone"];
   const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
-  assert.match(markup,/RELIKTE/); assert.match(markup,/AKTIV · nicht handelbar/);
-  assert.match(markup,/aria-label="Siegel des Händlers" disabled=""/); assert.match(markup,/Wurf einmal wiederholen/);
-  for (const id of ["runestone","merchant-seal","golden-feather"] as const) assert.ok(markup.includes(RELIC_ASSETS[id].path));
+  assert.doesNotMatch(markup, />Relikte<\/button>|Runenstein|Goldene Feder|trade-relic/);
 });
 
 test("trade panel renders received assets and touch actions", () => {
   const markup = renderToStaticMarkup(<TradePanel state={state()} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
-  assert.match(markup, /Erhaltene Angebote/);
+  assert.match(markup, /ANGEBOT VON JUSTINE/);
   assert.match(markup, /HANDELSANGEBOT VON JUSTINE/);
   assert.match(markup, /Mühlenweg/);
   assert.match(markup, /Annehmen/);
   assert.match(markup, /Ablehnen/);
 });
 
-test("trade creation lists both players' properties and mortgage state", () => {
-  const markup = renderToStaticMarkup(<TradePanel state={state()} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
-  assert.match(markup, /Mondpfad/);
-  assert.match(markup, /verpfändet/);
-  assert.match(markup, /Angebot senden/);
-  assert.equal((markup.match(/placeholder="0"/g) ?? []).length, 2);
-  assert.doesNotMatch(markup, /value="0"/);
+test("trade creation uses three steps and keeps both sides in one composer", () => {
+  const game = state(); game.trades = [];
+  const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
+  assert.match(markup, /SCHRITT 1 \/ 3/);
+  assert.doesNotMatch(markup, /trade-sticky-summary/);
+  assert.doesNotMatch(markup, /Du gibst auswählen|Du erhältst auswählen/);
+  assert.match(markup, />Weiter<\/button>/);
+});
+
+test("quick trade intent preselects partner and desired property in the simultaneous composer", () => {
+  const game = state(); game.trades = [];
+  const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined}
+    draftIntent={{ id: 1, recipientId: "p2", requestedPropertyTileIndices: [10] }} />);
+  assert.match(markup, /SCHRITT 2 \/ 3/);
+  assert.match(markup, /<option value="p2" selected="">Justine<\/option>/);
+  assert.match(markup, /DU GIBST/); assert.match(markup, /DU ERHÄLTST/);
+  assert.match(markup, /Mühlenweg/); assert.match(markup, /trade-selected-remove/);
+  assert.equal((markup.match(/\+ HINZUFÜGEN/g) ?? []).length, 2);
+  assert.equal((markup.match(/aria-label="Du (?:gibst|erhältst) Gold direkt"/g) ?? []).length, 2);
+  assert.match(markup, /ANGEBOT PRÜFEN/);
+  assert.match(markup, /trade-sticky-summary/);
+  assert.doesNotMatch(markup, /trade-side-trigger/);
 });
 
 test("dungeon decisions disable every trade action", () => {
@@ -60,7 +72,7 @@ test("dungeon decisions disable every trade action", () => {
   assert.match(markup, /Handel ist in dieser Spielphase nicht möglich/);
   assert.match(markup, /disabled=""[^>]*>Annehmen/);
   assert.match(markup, /disabled=""[^>]*>Ablehnen/);
-  assert.match(markup, /disabled=""[^>]*>Angebot senden/);
+  assert.match(markup, /disabled=""[^>]*>Gegenangebot/);
 });
 
 test("held dungeon cards are visible as selectable and received trade assets", () => {
@@ -69,16 +81,16 @@ test("held dungeon cards are visible as selectable and received trade assets", (
   game.players[1]!.heldCards = [{ cardId: "fate_024", deck: "fate" }];
   game.trades[0]!.offer.cardIds = ["fate_024"];
   const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
-  assert.match(markup, /Siegel der freien Pfade/);
   assert.match(markup, /Gunst der Mondseherin/);
-  assert.match(markup, /type="checkbox"/);
+  assert.match(markup, />Karten<\/button>/);
 });
 
 test("every traded property names its group, owner and status on both offer sides", () => {
   const game = state();
   game.trades.push({ ...game.trades[0]!, id: "sent", proposerId: "p1", recipientId: "p2" });
   const original = JSON.stringify(game);
-  const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
+  const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined}
+    draftIntent={{ id: 2, recipientId: "p2", requestedPropertyTileIndices: [10] }} />);
   assert.match(markup, /Mondhain · 2er-Gruppe/);
   assert.match(markup, /Silberbach · 3er-Gruppe/);
   assert.match(markup, /Besitz: Philipp/);
@@ -86,18 +98,20 @@ test("every traded property names its group, owner and status on both offer side
   assert.match(markup, /Belehnt/);
   assert.match(markup, /Du gibst/);
   assert.match(markup, /Du erhältst/);
-  assert.match(markup, /Dein Angebot im Überblick/);
+  assert.match(markup, /trade-sticky-summary/);
   assert.match(markup, /--property-group-accent:#24c4b7/);
   assert.equal(JSON.stringify(game), original);
 });
 
-test("rejected offers retain grouped property identities in collapsed history", () => {
+test("rejected offers use a compact row in closed history", () => {
   const game = state();
   game.trades[0]!.status = "rejected";
   const markup = renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} />);
   assert.match(markup, /Abgelehnt/);
   assert.match(markup, /<details class="trade-section trade-history">/);
-  assert.match(markup, /Silberbach · 3er-Gruppe/);
+  assert.match(markup, /Justine → Philipp/);
+  assert.doesNotMatch(markup, /trade-history" open/);
+  assert.doesNotMatch(markup, /Silberbach · 3er-Gruppe/);
 });
 
 test("incoming offers expose a counter action and replaced offers have clear history", () => {
@@ -108,13 +122,13 @@ test("incoming offers expose a counter action and replaced offers have clear his
   game.trades[0]!.status='countered'; assert.match(render(),/Durch Gegenangebot ersetzt/);
 });
 
-test("counter template mirrors every asset and remains editable without changing the original", () => {
+test("counter template mirrors tradeable assets, clears relics and remains isolated", () => {
   const original=state().trades[0]!;
   original.offer.cardIds=['adv_024']; original.offer.relicIds=['runestone'];
   original.request.cardIds=['fate_024']; original.request.relicIds=['golden-feather'];
   const before=JSON.stringify(original), template=getCounterOfferTemplate(original);
   assert.equal(template.recipientId,original.proposerId); assert.equal(template.counterToTradeId,original.id);
-  assert.deepEqual(template.offer,original.request); assert.deepEqual(template.request,original.offer);
+  assert.deepEqual(template.offer,{...original.request,relicIds:[]}); assert.deepEqual(template.request,{...original.offer,relicIds:[]});
   template.offer.gold=250; template.offer.propertyTileIndices.splice(0); template.offer.cardIds!.splice(0); template.offer.relicIds!.splice(0);
   template.request.propertyTileIndices.push(3); template.request.cardIds!.splice(0); template.request.relicIds!.splice(0);
   assert.equal(JSON.stringify(original),before); assert.equal(original.status,'pending');
@@ -123,10 +137,11 @@ test("counter template mirrors every asset and remains editable without changing
 test("computer partners and their inventories use the existing offer and counter editor with NPC labels", () => {
   const game=state();game.players[1]!.type='computer';game.players[1]!.connectionState='disconnected';
   game.players[1]!.heldCards=[{cardId:'fate_024',deck:'fate'}];game.players[1]!.relics=['golden-feather'];
+  game.trades[0]!.offer.cardIds=['fate_024'];game.trades[0]!.offer.relicIds=['golden-feather'];
   const render=()=>renderToStaticMarkup(<TradePanel state={game} playerId="p1" connected onCreate={()=>undefined} onDecision={()=>undefined} />);
   const markup=render();
   assert.match(markup,/<option value="p2"[^>]*>Justine · NPC<\/option>/);
-  assert.match(markup,/HANDELSANGEBOT VON JUSTINE · NPC/);assert.match(markup,/Goldene Feder/);assert.match(markup,/Gunst der Mondseherin/);
+  assert.match(markup,/HANDELSANGEBOT VON JUSTINE · NPC/);assert.doesNotMatch(markup,/Goldene Feder/);assert.match(markup,/Gunst der Mondseherin/);
   assert.match(markup,/>Annehmen<\/button>/);assert.match(markup,/>Gegenangebot<\/button>/);assert.match(markup,/>Ablehnen<\/button>/);
   game.trades[0]!.counterToTradeId='previous';assert.match(render(),/Gegenangebot zu vorherigem Handel/);
   game.players[1]!.isBankrupt=true;assert.doesNotMatch(render(),/<option value="p2"/);

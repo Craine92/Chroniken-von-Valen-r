@@ -12,6 +12,7 @@ import {
 } from "@valenor/shared";
 import { DiceService } from "./dice-service";
 import { advanceChronicleEvents, advanceWanderingDragon, preventDungeonWithAmulet, recordRelicUse } from "./chronicle-event-service";
+import { activateDeferredWorldImpulse, advanceWorldImpulses, resolveWorldImpulse } from "./world-impulse-service";
 
 export class TurnEngine {
   constructor(private readonly dice = new DiceService(), private readonly chooseWorldIndex: (count: number) => number = randomInt) {}
@@ -48,11 +49,36 @@ export class TurnEngine {
     delete state.lastTurnAction;
     state.turnContext.pendingExtraRoll = false;
 
+    if (state.worldImpulseEffects?.twistOfFate) {
+      delete state.worldImpulseEffects.twistOfFate;
+      state.pendingWorldImpulseDecision = { impulseId: "twistOfFate", playerId, status: "decision" };
+      state.turnPhase = "worldImpulseDecision";
+      return;
+    }
+
     if (player.relics?.includes("runestone")) {
       state.turnContext.awaitingRuneStoneDecision = true;
       state.turnPhase = "rolling";
       return;
     }
+    this.resolveNormalRoll(state, player);
+  }
+
+  decideTwistOfFate(state: GameState, playerId: string, actorType: PlayerType, reroll: boolean): void {
+    const pending = state.pendingWorldImpulseDecision;
+    if (state.turnPhase !== "worldImpulseDecision" || pending?.impulseId !== "twistOfFate" || pending.playerId !== playerId) {
+      throw new Error("Es gibt keinen Wurf für die Schicksalswende.");
+    }
+    const player = this.requireActor(state, playerId, actorType);
+    if (!state.lastDiceRoll || state.turnContext.rollKind !== "normal") throw new Error("Der normale Wurf fehlt.");
+    if (reroll) {
+      state.lastDiceRoll = this.dice.roll();
+      state.turnContext.rollSequence += 1;
+    }
+    delete state.pendingWorldImpulseDecision;
+    resolveWorldImpulse(state, reroll ? `${player.name} fordert das Schicksal heraus.` : `${player.name} behält den Wurf.`, "twistOfFate");
+    // Schicksalswende has priority and excludes a Runenstein reroll for this roll.
+    delete state.turnContext.awaitingRuneStoneDecision;
     this.resolveNormalRoll(state, player);
   }
 
@@ -143,16 +169,6 @@ export class TurnEngine {
     if (attempt < 3) {
       this.log(state, `${player.name} scheitert beim ${attempt === 1 ? "ersten" : "zweiten"} Fluchtversuch.`, [player.id]);
       this.advanceTurn(state);
-      return;
-    }
-
-    if (player.gold >= DUNGEON_RELEASE_COST) {
-      player.gold -= DUNGEON_RELEASE_COST;
-      player.dungeon = { inDungeon: false, failedAttempts: 0 };
-      this.setTurnAction(state, "dungeonPaid", player.id, 3);
-      this.log(state, `${player.name} zahlt ${DUNGEON_RELEASE_COST} Gold und verlässt den Dunklen Kerker.`, [player.id], -DUNGEON_RELEASE_COST);
-      state.lastMovement = this.createNormalMovement(state, player, roll);
-      state.turnPhase = "moving";
       return;
     }
 
@@ -265,6 +281,7 @@ export class TurnEngine {
     delete state.lastDiceRoll;
     delete state.lastMovement;
     delete state.lastTurnAction;
+    if (activateDeferredWorldImpulse(state)) return;
     const current = this.requireCurrentPlayer(state);
     state.turnPhase = current.dungeon.inDungeon ? "dungeonDecision" : "waitingForRoll";
   }
@@ -276,8 +293,9 @@ export class TurnEngine {
     while (state.players.find((candidate) => candidate.id === state.turnOrder[state.currentTurnIndex])?.isBankrupt);
     if (state.currentTurnIndex <= previousIndex) {
       state.currentRound += 1;
-      advanceChronicleEvents(state, this.chooseWorldIndex);
+      const chronicleStarted = advanceChronicleEvents(state, this.chooseWorldIndex);
       advanceWanderingDragon(state, this.chooseWorldIndex);
+      advanceWorldImpulses(state, chronicleStarted, this.chooseWorldIndex);
     }
     state.turnNumber += 1;
     state.currentPlayerId = state.turnOrder[state.currentTurnIndex]!;

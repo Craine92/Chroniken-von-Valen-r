@@ -36,7 +36,8 @@ export function getBuildingName(region: RegionType, level: BuildingLevel): strin
 export function getEffectiveBuildCost(state: GameState, tile: BoardTile): number {
   const base = tile.economy?.buildCost ?? 0, event = getActiveChronicleEvent(state);
   const factor = isChronicleTileAffected(event, tile) ? event?.effectType === "buildDiscount" ? .75 : event?.effectType === "buildSurcharge" ? 1.25 : 1 : 1;
-  return Math.round(base * factor);
+  const chroniclePrice = Math.round(base * factor);
+  return state.worldImpulseEffects?.buildingFervor ? Math.round(chroniclePrice * .8) : chroniclePrice;
 }
 
 export function getEffectiveBuildingSaleValue(state: GameState, tile: BoardTile): number {

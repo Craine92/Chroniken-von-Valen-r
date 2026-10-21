@@ -23,6 +23,15 @@ jobs:
         run: npm run build
       - name: Package Windows installers
         run: npm run dist:win
+      - name: Verify packaged server dependencies
+        shell: pwsh
+        run: |
+          $root = "release/win-unpacked/resources/app/node_modules"
+          foreach ($module in @("cors", "express", "socket.io")) {
+            if (-not (Test-Path (Join-Path $root $module))) {
+              throw "Missing server module in Windows package: $module"
+            }
+          }
       - name: Upload Windows builds
         uses: actions/upload-artifact@v4
         with:

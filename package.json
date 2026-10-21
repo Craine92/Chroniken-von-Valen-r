@@ -11,12 +11,37 @@
     "build": "npm run build --workspace @valenor/client && npm run build --workspace @valenor/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "start": "npm run start --workspace @valenor/server"
+    "start": "npm run start --workspace @valenor/server",
+    "dist:win": "electron-builder --win nsis portable --x64"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.12"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "main": "desktop/main.cjs",
+  "build": {
+    "appId": "de.valenor.chroniken",
+    "productName": "Chroniken von Valenør",
+    "asar": false,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**/*",
+      "apps/client/dist/**/*",
+      "apps/server/dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
   }
 }

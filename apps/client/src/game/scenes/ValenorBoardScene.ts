@@ -568,7 +568,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const { seat } = this.getTokenSeatFor(player.id, player.position);
       const target = this.getTokenWorldPosition(player.position, seat);
       const color = PLAYER_COLORS[player.color];
-      const token = this.add.container(target.x, target.y + 5).setAlpha(0).setDepth(BOARD_DEPTHS.players);
+      const token = this.add.container(target.x, target.y).setAlpha(0).setDepth(BOARD_DEPTHS.players);
       // Kräftiger Schatten, damit die Figur sich vom detailreichen Feldbild abhebt.
       const shadowSoft = this.add.ellipse(3, 12, TOKEN_VISUAL_CONFIG.shadow.softWidth * 1.25, TOKEN_VISUAL_CONFIG.shadow.softHeight * 1.5, 0x000000, .5);
       const shadowCore = this.add.ellipse(3, 14, TOKEN_VISUAL_CONFIG.shadow.coreWidth, TOKEN_VISUAL_CONFIG.shadow.coreHeight, 0x000000, .65);
@@ -641,7 +641,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.activeRings.set(player.id, activeRing);
       this.dungeonMarkers.set(player.id, dungeonMarker);
       this.applyTokenSeat(player.id, player.position, false);
-      this.tweens.add({ targets: token, alpha: 1, y: token.y - 5, duration: this.reducedMotion ? 80 : 700, delay: this.reducedMotion ? 0 : 2500 + index * 180, ease: "Back.Out" });
+      // Nur einblenden, nicht verschieben: Bewegt sich die Figur schon vorher, bliebe sie sonst an ihrer alten Höhe hängen.
+      this.tweens.add({ targets: token, alpha: 1, duration: this.reducedMotion ? 80 : 700, delay: this.reducedMotion ? 0 : 2500 + index * 180, ease: "Sine.Out" });
       if (!this.reducedMotion) {
         this.tweens.add({ targets: glow, alpha: 0.24, scale: 1.14, duration: 1300, yoyo: true, repeat: -1, delay: 3200 + index * 120 });
         this.tweens.add({ targets: miniatureVisual, y: -4, duration: 1500 + index * 170, yoyo: true, repeat: -1, ease: "Sine.InOut" });

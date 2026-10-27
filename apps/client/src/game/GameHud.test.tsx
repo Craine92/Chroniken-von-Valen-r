@@ -15,3 +15,13 @@ test("the TV shows an emote bubble at the sender's portrait only", () => {
   assert.match(cards[1]!, /Ha-ha-ha!/);
   assert.equal((html.match(/hud-emote /g) ?? []).length, 1, "only the sender gets a bubble");
 });
+
+test("the TV marks players facing bankruptcy with a pulse and a label", () => {
+  const state = livingTestState();
+  state.players[2]!.gold = 80;
+  state.pendingPayment = { payerId: "p3", payeeId: "p1", amount: 300, reason: "Miete", reasonType: "rent" };
+  const cards = renderToStaticMarkup(<GameHud gameState={state} />).split("<article").slice(1);
+  assert.match(cards[2]!, /is-in-danger/);
+  assert.match(cards[2]!, /Bankrott droht/);
+  assert.doesNotMatch(cards[0]!, /is-in-danger/);
+});

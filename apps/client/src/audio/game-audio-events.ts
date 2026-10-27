@@ -1,5 +1,7 @@
 import { getCardDefinition, type GameState } from "@valenor/shared";
 import type { AudioEvent } from "./audio-config";
+import { getPlayersInDanger, selectDramaticMoments } from "../game/living/drama";
+import { deriveGameMoments } from "../game/living/moments";
 
 export interface ScheduledAudioEvent {
   event: AudioEvent;
@@ -33,7 +35,7 @@ function economyCue(previous: GameState, next: GameState): AudioEvent | undefine
     case "rent": return "PROPERTY_RENT";
     case "tax": return "GOLD_PAY";
     case "tavern": return "GOLD_GAIN";
-    case "dragon": return entry.relicId ? "EVENT_POSITIVE" : undefined;
+    case "dragon": return entry.relicId ? "EVENT_POSITIVE" : "REALM_TRANSITION";
     case "auction": return "PROPERTY_BUY";
     // Passage audio comes from the visible field arrival, not the gold/state update.
     case "start": return undefined;
@@ -108,6 +110,14 @@ export function deriveGameAudioEvents(previous: GameState, next: GameState, view
   if (next.lastTurnAction?.id && next.lastTurnAction.id !== previous.lastTurnAction?.id) {
     if (["dungeonEscaped", "dungeonPaid"].includes(next.lastTurnAction.kind)) events.push({ event: "PRISON_EXIT" });
   }
+
+  // Spannungsmomente: ein zweiter, schwerer Ton nach der Miete, ein Siegel beim Handel, eine Warnung bei drohendem Bankrott.
+  for (const moment of selectDramaticMoments(deriveGameMoments(previous, next))) {
+    if (moment.kind === "highRent") events.push({ event: "EVENT_NEGATIVE", delayMs: 140 });
+    if (moment.kind === "tradeSealed") events.push({ event: "TRADE_SEAL" });
+  }
+  const dangerBefore = getPlayersInDanger(previous);
+  if ([...getPlayersInDanger(next)].some(playerId => !dangerBefore.has(playerId))) events.push({ event: "EVENT_NEGATIVE", delayMs: 260 });
 
   if (next.quickGameClock?.expired && !previous.quickGameClock?.expired) events.push({ event: "EVENT_EPIC" });
   if (next.status === "finished" && previous.status !== "finished") events.push({ event: resultCue(next, viewerId), delayMs: 180 });

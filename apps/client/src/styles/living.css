@@ -179,3 +179,20 @@
   .controller-page .emote-button { transition: none; }
 }
 .board-page[data-quality="low"] .hud-emote { animation: none; }
+
+/* --- Spannung: Bankrott droht (TV) -------------------------------------- */
+.game-sidebar .hud-player.is-in-danger {
+  border-color: var(--danger);
+  border-left-color: var(--danger);
+  background: linear-gradient(125deg, rgb(var(--c-oxblood-800-rgb) / .95), var(--c-ink-850));
+  animation: danger-pulse 1.4s var(--ease-in-out) infinite alternate;
+  box-shadow: 0 0 0 1px var(--danger), 0 0 20px rgb(var(--c-oxblood-400-rgb) / .4);
+}
+.game-sidebar .hud-player.is-in-danger > div > span { color: var(--danger-text); font-weight: 800; white-space: normal; }
+@keyframes danger-pulse {
+  from { box-shadow: 0 0 0 1px var(--danger), 0 0 6px rgb(var(--c-oxblood-400-rgb) / .2); }
+  to { box-shadow: 0 0 0 1px var(--danger), 0 0 26px rgb(var(--c-oxblood-400-rgb) / .6); }
+}
+
+@media (prefers-reduced-motion: reduce) { .game-sidebar .hud-player.is-in-danger { animation: none; } }
+.board-page[data-quality="low"] .hud-player.is-in-danger { animation: none; }

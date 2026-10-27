@@ -26,6 +26,7 @@ export type AudioEvent =
   | "PRISON_EXIT"
   | "REALM_TRANSITION"
   | "START_PASS"
+  | "TRADE_SEAL"
   | "UI_CLICK"
   | "UI_CONFIRM"
   | "UI_CANCEL"
@@ -68,6 +69,7 @@ export const AUDIO_CUES: Readonly<Record<AudioEvent, AudioCueConfig>> = {
   PRISON_EXIT: { paths: [sfx("prison", "prison-exit.ogg")], group: "SFX", audience: "board", volume: 0.78, cooldownMs: 800 },
   REALM_TRANSITION: { paths: [sfx("world", "realm-transition-01.ogg"), sfx("world", "realm-transition-02.ogg")], group: "SFX", audience: "board", volume: 0.52, cooldownMs: 1_200 },
   START_PASS: { paths: [sfx("world", "start-pass.ogg")], group: "SFX", audience: "board", volume: 0.82, cooldownMs: 650 },
+  TRADE_SEAL: { paths: [sfx("ui", "confirm.ogg"), sfx("property", "property-buy.ogg")], group: "SFX", audience: "board", volume: 0.8, cooldownMs: 800 },
   UI_CLICK: { paths: [sfx("ui", "click-01.ogg"), sfx("ui", "click-02.ogg")], group: "UI", audience: "board", volume: 0.46, cooldownMs: 80, pitchVariation: 0.015 },
   UI_CONFIRM: { paths: [sfx("ui", "confirm.ogg")], group: "UI", audience: "board", volume: 0.58, cooldownMs: 180 },
   UI_CANCEL: { paths: [sfx("ui", "click-02.ogg")], group: "UI", audience: "board", volume: 0.52, cooldownMs: 180 },

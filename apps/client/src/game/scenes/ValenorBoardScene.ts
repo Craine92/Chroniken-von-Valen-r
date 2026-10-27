@@ -8,7 +8,10 @@ import { BoardArtLayer } from "../layers/BoardArtLayer";
 import { getCharacterAsset, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
 import { fitImage } from "../assets/asset-runtime";
 import { BOARD_DEPTHS } from "../layers/board-depths";
-import { VISUAL_QUALITY, getGraphicsQuality, prefersReducedMotion } from "../visual-config";
+import { VISUAL_QUALITY, getGraphicsQuality, getLivingBoardSettings, prefersReducedMotion } from "../visual-config";
+import { DramaEffectsLayer } from "../layers/DramaEffectsLayer";
+import { deriveGameMoments } from "../living/moments";
+import { selectDramaticMoments } from "../living/drama";
 import { BoardTileRenderer } from "../tiles/BoardTileRenderer";
 import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
 import { CARD_DRAW_DURATION_MS, DEFAULT_BOARD_PRESENTATION_MODE, LANDING_CONNECTION_DURATION_MS, getBoardVisualScale, getCardPresentationKey, getBoardScreenLayout, type BoardPresentationMode } from "../board-presentation";
@@ -84,6 +87,8 @@ export class ValenorBoardScene extends Phaser.Scene {
   private readonly reducedMotion = prefersReducedMotion();
   private readonly graphicsQuality = getGraphicsQuality();
   private readonly visualQuality = VISUAL_QUALITY[this.graphicsQuality];
+  private readonly living = getLivingBoardSettings(this.graphicsQuality, this.reducedMotion);
+  private dramaLayer: DramaEffectsLayer | undefined;
   private lastDiagnosticAt = 0;
   private readonly handleResize = () => { this.fitCamera(); this.syncRealmNames(); };
 
@@ -114,6 +119,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.propertyGroupLayer.setExternalFocus(this.externalPropertyGroupFocus);
     this.artLayer.renderRealmDecorations();
     this.artLayer.renderRealmAtmosphere(this.reducedMotion, this.visualQuality.animateAmbient);
+    this.dramaLayer = new DramaEffectsLayer(this, this.living.drama);
     this.game.canvas.dataset.graphicsQuality = this.graphicsQuality;
     this.drawRealmMiniatures(renderedRealmBackgrounds);
     this.artLayer.renderBoardEffects();
@@ -159,6 +165,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.boardReady = false;
       this.game.canvas.dataset.boardReady = "false";
       this.developmentLayer?.destroy();
+      this.dramaLayer?.destroy();
+      this.dramaLayer = undefined;
       this.mortgageOverlayLayer?.destroy();
       this.propertyGroupLayer?.destroy();
       this.artLayer?.destroy();
@@ -208,6 +216,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       else this.animateMovement(next);
     }
     const playerChanged = this.currentPlayerId !== next.currentPlayerId;
+    const moments = deriveGameMoments(this.state, next);
+    if (moments.length) this.game.canvas.dataset.lastMoments = moments.map(moment => moment.kind).join(",");
     this.state = next;
     this.syncCardDecks(next);
     this.propertyGroupLayer?.sync(next);
@@ -221,6 +231,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.syncWorldImpulse(next);
     this.syncMomentumCelebration(next);
     this.developmentLayer?.sync(next, true);
+    selectDramaticMoments(moments).forEach(moment => this.dramaLayer?.play(moment));
     this.mortgageOverlayLayer?.sync(next);
     const ownershipSignature = next.propertyOwnerships.map((entry) => `${entry.tileIndex}:${entry.ownerId}:${entry.mortgaged}`).join("|");
     if (ownershipSignature !== this.ownershipSignature) this.drawOwnershipMarkers();

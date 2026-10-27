@@ -65,3 +65,11 @@ export const CODEX_FONTS = {
 
 /** Schriften, die vor dem ersten Phaser-Text geladen sein müssen. */
 export const CODEX_FONT_FACES = ["600 32px Cinzel", "700 32px Cinzel", "400 16px \"Alegreya Sans\"", "700 16px \"Alegreya Sans\"", "800 16px \"Alegreya Sans\""] as const;
+
+/** Bewegungsdauern aus tokens.css (--dur-*), in Millisekunden für Phaser-Tweens. */
+export const CODEX_DURATIONS = {
+  instant: 80,
+  fast: 140,
+  base: 220,
+  slow: 420
+} as const;

@@ -1,0 +1,218 @@
+/*
+ * Valenør Design-System „Codex“.
+ * Primitive Farben (--c-*) beschreiben die Palette; semantische Tokens (--surface-*, --text-*, --accent-*)
+ * benennen ihre Rolle. Komponenten verwenden bevorzugt die semantischen Tokens.
+ * Farben mit Transparenz: rgb(var(--c-gold-500-rgb) / .35).
+ * Phaser liest dieselben Werte aus src/game/design-tokens.ts; beide Dateien gemeinsam ändern.
+ */
+
+:root {
+  /* Tinte – Flächen */
+  --c-ink-950: #080609;
+  --c-ink-950-rgb: 8 6 9;
+  --c-ink-900: #100c10;
+  --c-ink-900-rgb: 16 12 16;
+  --c-ink-850: #161115;
+  --c-ink-850-rgb: 22 17 21;
+  --c-ink-800: #1d171b;
+  --c-ink-800-rgb: 29 23 27;
+  --c-ink-750: #251d22;
+  --c-ink-750-rgb: 37 29 34;
+  --c-ink-700: #2e252a;
+  --c-ink-700-rgb: 46 37 42;
+  --c-ink-600: #3d3237;
+  --c-ink-600-rgb: 61 50 55;
+  --c-ink-500: #54474c;
+  --c-ink-500-rgb: 84 71 76;
+
+  /* Leder – warme Flächen und Linien */
+  --c-leather-900: #1c140d;
+  --c-leather-900-rgb: 28 20 13;
+  --c-leather-800: #2a1d13;
+  --c-leather-800-rgb: 42 29 19;
+  --c-leather-700: #3b2a1b;
+  --c-leather-700-rgb: 59 42 27;
+  --c-leather-600: #4f3a26;
+  --c-leather-600-rgb: 79 58 38;
+  --c-leather-500: #6b5236;
+  --c-leather-500-rgb: 107 82 54;
+
+  /* Pergament – Text und helle Flächen */
+  --c-parchment-50: #fbf4e2;
+  --c-parchment-50-rgb: 251 244 226;
+  --c-parchment-100: #f1e5c8;
+  --c-parchment-100-rgb: 241 229 200;
+  --c-parchment-200: #e3d3ae;
+  --c-parchment-200-rgb: 227 211 174;
+  --c-parchment-300: #cdbb94;
+  --c-parchment-300-rgb: 205 187 148;
+  --c-parchment-400: #ad9c7d;
+  --c-parchment-400-rgb: 173 156 125;
+  --c-parchment-500: #8d806a;
+  --c-parchment-500-rgb: 141 128 106;
+  --c-parchment-600: #6b6152;
+  --c-parchment-600-rgb: 107 97 82;
+
+  /* Blattgold – der einzige Akzent */
+  --c-gold-200: #fbe6b0;
+  --c-gold-200-rgb: 251 230 176;
+  --c-gold-300: #f2d796;
+  --c-gold-300-rgb: 242 215 150;
+  --c-gold-400: #e3c27a;
+  --c-gold-400-rgb: 227 194 122;
+  --c-gold-500: #c9a14f;
+  --c-gold-500-rgb: 201 161 79;
+  --c-gold-600: #a8823c;
+  --c-gold-600-rgb: 168 130 60;
+  --c-gold-700: #7d5f2b;
+  --c-gold-700-rgb: 125 95 43;
+  --c-gold-800: #4f3c1c;
+  --c-gold-800-rgb: 79 60 28;
+
+  /* Bedeutung – Erfolg, Gefahr, Magie, Wasser */
+  --c-verdigris-300: #9fd8bd;
+  --c-verdigris-300-rgb: 159 216 189;
+  --c-verdigris-500: #5e9b84;
+  --c-verdigris-500-rgb: 94 155 132;
+  --c-verdigris-800: #1e3a30;
+  --c-verdigris-800-rgb: 30 58 48;
+  --c-oxblood-300: #f0a59a;
+  --c-oxblood-300-rgb: 240 165 154;
+  --c-oxblood-400: #d9675c;
+  --c-oxblood-400-rgb: 217 103 92;
+  --c-oxblood-500: #9c3d35;
+  --c-oxblood-500-rgb: 156 61 53;
+  --c-oxblood-800: #3f1a18;
+  --c-oxblood-800-rgb: 63 26 24;
+  --c-arcane-300: #c8b2f0;
+  --c-arcane-300-rgb: 200 178 240;
+  --c-arcane-500: #8a63c9;
+  --c-arcane-500-rgb: 138 99 201;
+  --c-arcane-800: #2e2142;
+  --c-arcane-800-rgb: 46 33 66;
+  --c-tide-300: #9fc7ef;
+  --c-tide-300-rgb: 159 199 239;
+  --c-tide-500: #4f86c2;
+  --c-tide-500-rgb: 79 134 194;
+  --c-tide-800: #1a2c40;
+  --c-tide-800-rgb: 26 44 64;
+
+  /* Spielerfarben (identisch mit PLAYER_COLOR_VALUES) */
+  --c-player-violet: #a16deb;
+  --c-player-violet-rgb: 161 109 235;
+  --c-player-green: #5ec58a;
+  --c-player-green-rgb: 94 197 138;
+  --c-player-red: #dc5f67;
+  --c-player-red-rgb: 220 95 103;
+  --c-player-blue: #5f9ddd;
+  --c-player-blue-rgb: 95 157 221;
+  --c-player-orange: #ed8a3c;
+  --c-player-orange-rgb: 237 138 60;
+  --c-player-cyan: #41d9d2;
+  --c-player-cyan-rgb: 65 217 210;
+
+  /* Rein */
+  --c-white: #ffffff;
+  --c-white-rgb: 255 255 255;
+  --c-black: #000000;
+  --c-black-rgb: 0 0 0;
+
+  /* Semantik: Flächen */
+  --surface-page: var(--c-ink-950);
+  --surface-sunken: var(--c-ink-900);
+  --surface-1: var(--c-ink-850);
+  --surface-2: var(--c-ink-800);
+  --surface-3: var(--c-ink-750);
+  --surface-overlay: rgb(var(--c-ink-900-rgb) / .94);
+  --surface-scrim: rgb(var(--c-black-rgb) / .62);
+
+  /* Semantik: Text */
+  --text-strong: var(--c-parchment-50);
+  --text: var(--c-parchment-100);
+  --text-muted: var(--c-parchment-400);
+  --text-faint: var(--c-parchment-500);
+  --text-on-accent: var(--c-leather-900);
+
+  /* Semantik: Akzent, Linien, Zustände */
+  --accent: var(--c-gold-500);
+  --accent-strong: var(--c-gold-400);
+  --accent-soft: var(--c-gold-300);
+  --accent-deep: var(--c-gold-700);
+  --line: rgb(var(--c-gold-500-rgb) / .22);
+  --line-strong: rgb(var(--c-gold-500-rgb) / .5);
+  --line-quiet: rgb(var(--c-parchment-100-rgb) / .1);
+  --success: var(--c-verdigris-500);
+  --success-text: var(--c-verdigris-300);
+  --danger: var(--c-oxblood-500);
+  --danger-text: var(--c-oxblood-300);
+  --danger-surface: var(--c-oxblood-800);
+  --arcane: var(--c-arcane-500);
+  --focus-ring: var(--c-gold-300);
+
+  /* Typografie */
+  --font-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --font-text: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --fs-2xs: .6875rem;  /* 11 px – nur Mikro-Etiketten auf dem Handy */
+  --fs-xs: .75rem;     /* 12 px */
+  --fs-sm: .875rem;    /* 14 px */
+  --fs-md: 1rem;       /* 16 px – Fließtext Handy */
+  --fs-lg: 1.125rem;   /* 18 px */
+  --fs-xl: 1.375rem;   /* 22 px – Mindestgröße für TV-Text */
+  --fs-2xl: 1.75rem;   /* 28 px */
+  --fs-3xl: 2.25rem;   /* 36 px */
+  --fs-4xl: 3rem;      /* 48 px */
+  --fs-5xl: 4rem;      /* 64 px */
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
+  --lh-body: 1.5;
+  --tracking-caps: .12em;
+  --tracking-display: .04em;
+
+  /* Abstände: 4-px-Raster */
+  --space-0-5: .125rem;
+  --space-1: .25rem;
+  --space-1-5: .375rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --touch-target: 2.75rem; /* 44 px */
+
+  /* Radien: Codex bleibt kantig */
+  --radius-xs: .125rem;
+  --radius-sm: .25rem;
+  --radius-md: .375rem;
+  --radius-lg: .625rem;
+  --radius-pill: 999px;
+
+  /* Schatten */
+  --shadow-sm: 0 2px 6px rgb(var(--c-black-rgb) / .35);
+  --shadow-md: 0 10px 28px rgb(var(--c-black-rgb) / .45);
+  --shadow-lg: 0 24px 70px rgb(var(--c-black-rgb) / .58);
+  --shadow-inset-gold: inset 0 0 0 1px rgb(var(--c-gold-300-rgb) / .09);
+  --shadow-glow-gold: 0 0 24px rgb(var(--c-gold-500-rgb) / .28);
+  --shadow-button: inset 0 -2px 0 rgb(var(--c-black-rgb) / .25), 0 6px 18px rgb(var(--c-gold-500-rgb) / .22);
+
+  /* Icon-Masken für per CSS gesetzte Symbole (Pfade aus components/icons/icon-data.ts, CC BY 3.0 game-icons.net) */
+  --icon-crown: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20512%20512'%3E%3Cpath%20d%3D'm408.256%20119.46l-37.7%2052.165l19.57%2044.426l34.8-37.214l-16.67-59.375zm86.074%2012.513L384.44%20249.498L334.01%20135.02l-75.162%20132.947l-86.948-131.78l-33.334%20114.122L17.922%20132.83l39.3%20127.6c1.945-.348%203.94-.54%205.98-.54c18.812%200%2034.26%2015.452%2034.26%2034.262c0%2013.823-8.346%2025.822-20.235%2031.22l5.337%2017.33c12.425%2025.466%2071.863%2045.152%20176.582%2047.206c110.805%202.174%20178.12-17.54%20189.854-47.207h-.002l4.357-20.26c-16.836-2.114-30.02-16.612-30.02-33.986c0-18.81%2015.45-34.262%2034.263-34.262c3.513%200%206.91.54%2010.11%201.54l26.622-123.762zm-391.77%202.04l1.22%2056.337l25.56%2024.89l9.592-32.842l-36.37-48.386zm150.585%202.91l-24.483%2051.36l28.955%2043.885l24.922-44.08l-29.395-51.166zm204.453%20135.962c-8.712%200-15.575%206.862-15.575%2015.572s6.863%2015.574%2015.575%2015.574s15.572-6.863%2015.572-15.573s-6.86-15.572-15.572-15.572zM63.2%20278.58c-8.71%200-15.573%206.864-15.573%2015.574s6.862%2015.573%2015.574%2015.573s15.573-6.862%2015.573-15.573s-6.86-15.574-15.572-15.574zm130.33%2017.842c18.812%200%2034.26%2015.45%2034.26%2034.262c0%2018.81-15.448%2034.26-34.26%2034.26c-18.813%200-34.262-15.45-34.262-34.26s15.45-34.262%2034.26-34.262zm131.234%200c18.812%200%2034.26%2015.45%2034.26%2034.262c0%2018.81-15.448%2034.26-34.26%2034.26c-18.813%200-34.262-15.45-34.262-34.26s15.45-34.262%2034.262-34.262m-131.235%2018.69c-8.713%200-15.573%206.86-15.573%2015.572c0%208.71%206.86%2015.574%2015.572%2015.574c8.71%200%2015.572-6.864%2015.572-15.574s-6.86-15.573-15.573-15.573zm131.234%200c-8.712%200-15.573%206.86-15.573%2015.572c0%208.71%206.862%2015.574%2015.574%2015.574s15.574-6.864%2015.574-15.574s-6.862-15.573-15.574-15.573z'%2F%3E%3C%2Fsvg%3E");
+  --icon-gold: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20512%20512'%3E%3Cpath%20d%3D'M264.4%2095.01c-35.6-.06-80.2%2011.19-124.2%2034.09C96.27%20152%2061.45%20182%2041.01%20211.3c-20.45%2029.2-25.98%2056.4-15.92%2075.8c10.07%2019.3%2035.53%2030.4%2071.22%2030.4c35.69.1%2080.29-11.2%20124.19-34c44-22.9%2078.8-53%2099.2-82.2c20.5-29.2%2025.9-56.4%2015.9-75.8c-10.1-19.3-35.5-30.49-71.2-30.49m91.9%2070.29c-3.5%2015.3-11.1%2031-21.8%2046.3c-22.6%2032.3-59.5%2063.8-105.7%2087.8c-46.2%2024.1-93.1%2036.2-132.5%2036.2c-18.6%200-35.84-2.8-50.37-8.7l10.59%2020.4c10.08%2019.4%2035.47%2030.5%2071.18%2030.5c35.7%200%2080.3-11.2%20124.2-34.1c44-22.8%2078.8-52.9%2099.2-82.2c20.4-29.2%2026-56.4%2015.9-75.7zm28.8%2016.8c11.2%2026.7%202.2%2059.2-19.2%2089.7c-18.9%2027.1-47.8%2053.4-83.6%2075.4c11.1%201.2%2022.7%201.8%2034.5%201.8c49.5%200%2094.3-10.6%20125.9-27.1c31.7-16.5%2049.1-38.1%2049.1-59.9s-17.4-43.4-49.1-59.9c-16.1-8.4-35.7-15.3-57.6-20m106.7%20124.8c-10.2%2011.9-24.2%2022.4-40.7%2031c-35%2018.2-82.2%2029.1-134.3%2029.1c-21.2%200-41.6-1.8-60.7-5.2c-23.2%2011.7-46.5%2020.4-68.9%2026.1c1.2.7%202.4%201.3%203.7%202c31.6%2016.5%2076.4%2027.1%20125.9%2027.1s94.3-10.6%20125.9-27.1c31.7-16.5%2049.1-38.1%2049.1-59.9z'%2F%3E%3C%2Fsvg%3E");
+  --icon-magic: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20512%20512'%3E%3Cpath%20d%3D'M237.4%2020.73c-6.1%2042.1-26.8%2064.2-63.9%2064c31.6%204.5%2063.8%208%2063.9%2064.07c-.6-46.1%2024.5-63.07%2064.1-64.07c-38-1.5-64.9-16.3-64.1-64m127.8%2011.58c-9.1%2014.25-20.8%2021.29-38.9%2010.28c14.9%2011.79%2018.6%2024.76%2010.2%2038.97c8.9-11.18%2017.5-22.73%2039-10.27c-17.8-10.06-18.8-23.57-10.3-38.98M59.68%2041.69c-2.7%2018.8-12%2028.6-28.5%2028.5c14.1%202%2028.4%203.6%2028.5%2028.52c-.3-20.5%2010.9-28.12%2028.5-28.52c-16.9-.7-28.9-7.3-28.5-28.5M431%2066.28c-2.7%2018.8-12%2028.6-28.5%2028.5c14.1%202%2028.4%203.6%2028.5%2028.52c-.3-20.5%2010.9-28.12%2028.5-28.52c-16.9-.7-28.9-7.3-28.5-28.5M120.3%20116.4c-15.8%2053.7-47.76%2048-79.35%2043.4C76.6%20170%2090.3%20197.1%2084.28%20239.2c12.66-46%2042.62-52.6%2079.42-43.4c-37.6-12.1-56.9-35.4-43.4-79.4m187%205c-8.8%2061.6-39.3%2094-93.6%2093.7c46.2%206.5%2093.6%2011.7%2093.6%2093.7c-.8-67.3%2035.9-92.2%2093.8-93.7c-55.5-2.2-94.9-23.9-93.8-93.7m136.8%2038.3c-13.1%2021.6-29.5%2028.8-49.7%2020.1c16.3%209.7%2033%2019.1%2020.1%2049.6c10.3-25.2%2027.9-28.7%2049.7-20c-20.3-9.7-31.6-23.9-20.1-49.7M50.7%20243.2c9.16%2016.7%207.63%2030.1-5.61%2040c12.46-6.9%2024.85-14.3%2039.91%205.6c-12.57-16.2-8.2-29%205.61-40c-13.92%209.7-27.47%2011.6-39.91-5.6m137.2.3c11.4%2026.8-.5%2041.3-21.7%2050.9c22.7-8.5%2040.8-4.5%2050.9%2021.7c-12.7-31.8%204.8-41.2%2021.7-50.9c-21%208.5-37.8.9-50.9-21.7m228%2012.6c-26.6%2064.7-68.7%2091.7-127.8%2076.4c48.6%2019.8%2098.8%2038.5%2076.4%20127.9c17.5-73.7%2064.4-90.7%20127.9-76.5c-59.9-17.5-96.9-52-76.5-127.8M99.94%20295.5c15.66%2057.8.86%2098.1-47.32%20118.5c43.46-11.8%2087.38-25.2%20118.68%2047.4c-26.4-59.3-3.4-95.4%2047.3-118.8c-50%2019.2-93.1%2015-118.66-47.1m169.36%2061c-21.8%2020.6-43%2023.6-63.2%207.3c15.5%2016.3%2031.6%2032.4%207.2%2063.3c19.8-25.6%2041.2-24.1%2063.3-7.3c-20.2-17.4-28.6-37.5-7.3-63.3M443.2%20404c-2.7%2018.8-12%2028.6-28.5%2028.5c14.1%202%2028.4%203.6%2028.5%2028.5c-.3-20.5%2010.9-28.1%2028.5-28.5c-16.9-.7-28.9-7.3-28.5-28.5m-169.7%2036c-2.7%2018.8-12%2028.6-28.5%2028.5c14.1%202%2028.4%203.6%2028.5%2028.5c-.3-20.5%2010.9-28.1%2028.5-28.5c-16.9-.7-28.9-7.3-28.5-28.5'%2F%3E%3C%2Fsvg%3E");
+
+  /* Bewegung: gemessen und schwer */
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 420ms;
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --ease-seal: cubic-bezier(.3, 1.4, .5, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-instant: 1ms; --dur-fast: 1ms; --dur-base: 1ms; --dur-slow: 1ms; }
+}

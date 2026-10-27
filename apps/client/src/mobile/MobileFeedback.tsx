@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import type { GameState } from "@valenor/shared";
 import { MobileFeedbackEventTracker } from "./mobile-feedback-events";
 import { MobileFeedbackQueue, type FeedbackSnapshot } from "./mobile-feedback";
+import { Icon } from "../components/icons/Icon";
 
 export function useMobileFeedback(state: GameState | undefined, playerId: string | undefined) {
   const [queue] = useState(() => new MobileFeedbackQueue());
@@ -50,14 +51,14 @@ export function MobileFeedbackToast({ snapshot, onDismiss, onHeightChange }: {
   if (!feedback) return null;
   return (
     <aside ref={ref} className={`mobile-feedback-toast ${snapshot.exiting ? "is-exiting" : ""}`}
-      style={{ "--feedback-accent": feedback.accent ?? "#d8b968" } as CSSProperties}
+      style={{ "--feedback-accent": feedback.accent ?? "var(--accent)" } as CSSProperties}
       role="status" aria-live={feedback.type === "tradeOffer" ? "assertive" : "polite"} aria-atomic="true">
-      <span className="mobile-feedback-toast__icon" aria-hidden="true">{feedback.icon ?? "✦"}</span>
+      <span className="mobile-feedback-toast__icon" aria-hidden="true"><Icon name={feedback.icon ?? "magic"} /></span>
       <div className="mobile-feedback-toast__content">
         <strong>{feedback.title}</strong><p>{feedback.message}</p>
         {feedback.action && <button type="button" onClick={() => { feedback.action?.(); onDismiss(); }}>{feedback.actionLabel}</button>}
       </div>
-      <button className="mobile-feedback-toast__close" type="button" aria-label="Meldung schließen" onClick={onDismiss}>×</button>
+      <button className="mobile-feedback-toast__close" type="button" aria-label="Meldung schließen" onClick={onDismiss}><Icon name="close" /></button>
     </aside>
   );
 }

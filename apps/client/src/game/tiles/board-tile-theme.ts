@@ -1,4 +1,5 @@
 import { getPropertyGroup, type BoardTile, type BoardTileType, type RegionType } from "@valenor/shared";
+import { GROUP_ICONS, type IconName } from "../../components/icons/Icon";
 
 export type TileVisualVariant = BoardTileType;
 
@@ -18,14 +19,14 @@ export interface TilePalette {
 export interface PropertyGroupVisual {
   accent: number;
   cssAccent: string;
-  sigil: string;
+  icon: IconName;
   size: 2 | 3;
 }
 
 const FALLBACK_GROUP_VISUAL: PropertyGroupVisual = {
   accent: 0xd6bd78,
   cssAccent: "#d6bd78",
-  sigil: "◇",
+  icon: "property",
   size: 3
 };
 
@@ -125,7 +126,8 @@ function breakCompoundTitle(word: string): string {
     .filter(({ index }) => index >= 4 && word.length - index >= 3)
     .sort((a, b) => Math.abs(word.length / 2 - a.index) - Math.abs(word.length / 2 - b.index));
   const split = candidates[0]?.index;
-  if (split !== undefined) return `${word.slice(0, split)}\n${word.slice(split)}`;
+  // Getrennte Komposita bekommen einen Trennstrich, damit sie nicht wie zwei Wörter wirken.
+  if (split !== undefined) return `${word.slice(0, split)}-\n${word.slice(split)}`;
   if (word.length <= TITLE_UNBROKEN_FALLBACK_LIMIT) return word;
 
   const center = Math.round(word.length / 2);
@@ -134,7 +136,7 @@ function breakCompoundTitle(word: string): string {
     const boundaryPenalty = (position: number) => /[AEIOUÄÖÜ]/.test(word[position - 1] ?? "") === /[AEIOUÄÖÜ]/.test(word[position] ?? "") ? 1 : 0;
     return Math.abs(center - a) * 2 + boundaryPenalty(a) - Math.abs(center - b) * 2 - boundaryPenalty(b);
   })[0] ?? center;
-  return `${word.slice(0, boundary)}\n${word.slice(boundary)}`;
+  return `${word.slice(0, boundary)}-\n${word.slice(boundary)}`;
 }
 
 export function getTilePalette(tile: BoardTile): TilePalette {
@@ -185,7 +187,7 @@ export function getPropertyGroupVisual(propertyGroup: string | undefined): Prope
   return {
     accent: Number.parseInt(definition.accent.slice(1), 16),
     cssAccent: definition.accent,
-    sigil: definition.sigil,
+    icon: GROUP_ICONS[definition.id],
     size: definition.size
   };
 }

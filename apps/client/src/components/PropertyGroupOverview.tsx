@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { getPropertyGroup, getBuildingName, canBuildOnProperty, canSellBuilding, getEffectiveBuildingSaleValue, getEffectiveBuildCost, getEffectiveRent, type BoardTile, type GamePlayerState, type GameState, type PropertyGroupId, type PropertyOwnership } from "@valenor/shared";
 import { getPropertyGroupVisual } from "../game/tiles/board-tile-theme";
+import { Icon } from "./icons/Icon";
 
 interface PropertyGroupOverviewProps {
   propertyGroup: string;
@@ -73,7 +74,7 @@ export function PropertyGroupOverview({
       }}
     >
       {showHeader && <header className="property-group__header">
-        <span className="property-group__sigil" aria-hidden="true">{visual.sigil}</span>
+        <span className="property-group__sigil" aria-hidden="true"><Icon name={visual.icon} /></span>
         <div className="property-group__identity">
           <strong>{propertyGroup}</strong>
           <small>{tiles.length}ER-SET · BAUGRUPPE</small>
@@ -109,12 +110,12 @@ export function PropertyGroupOverview({
           return (
             <div className="property-group__entry" key={tile.index}>
             <Member className={`property-group__member${ownedByViewer ? " is-owned" : ""}${owner && !ownedByViewer ? " is-rival" : ""}`} type={onSelectTile ? "button" : undefined} onClick={onSelectTile ? () => onSelectTile(tile.index) : undefined}>
-              <span className={`property-group__owner${owner ? ` property-group__owner--${owner.color}` : ""}`} aria-hidden="true">{ownedByViewer ? "◆" : owner ? "◇" : "·"}</span>
+              <span className={`property-group__owner${owner ? ` property-group__owner--${owner.color}` : ""}`} aria-hidden="true">{ownedByViewer ? <Icon name="property" /> : owner ? <Icon name="companion" /> : null}</span>
               <div><strong>{tile.name}</strong>{onSelectTile ? <span className="controller-status-chips"><small>{ownedByViewer ? "Dein Besitz" : owner ? `Besitz: ${owner.name}` : "Frei"}</small>{ownership?.mortgaged && <small>Belehnt</small>}</span> : <small>{status}</small>}
                 {tile.region && <span className="controller-property-level"><span className="controller-level-dots" aria-hidden="true">{[1,2,3,4,5].map(dot => <i className={dot <= level ? "is-active" : undefined} key={dot} />)}</span><small>{level === 0 ? "UNBEBAUT" : `STUFE ${level} · ${getBuildingName(tile.region, level)}`}</small></span>}
                 {ownedByViewer && gameState && <span className="controller-property-rent">Aktuelle Miete: <b>{getEffectiveRent(gameState, tile, viewerId)} Gold</b></span>}
               </div>
-              {onSelectTile && <span className="controller-member-sigil" aria-hidden="true">{visual.sigil}</span>}
+              {onSelectTile && <span className="controller-member-sigil" aria-hidden="true"><Icon name={visual.icon} /></span>}
             </Member>
             {ownedByViewer && canDevelop && gameState && onBuild && <div className="controller-inline-property-actions">
               <button type="button" className="controller-inline-build" disabled={!connected || !build?.allowed} title={build?.reason} onClick={event => { event.stopPropagation(); onBuild(tile.index); }}>+ BAUEN · {getEffectiveBuildCost(gameState, tile)} GOLD</button>
@@ -128,7 +129,7 @@ export function PropertyGroupOverview({
         })}
       </div>
       <p className={`property-group__build-status${buildAvailable ? " can-build" : ""}`}>
-        {buildAvailable ? "✦ " : ""}{onSelectTile && missingCount > 0 ? `Fehlt: ${missingTiles.map((tile) => tile.name).join(" · ")}` : buildStatus}
+        {buildAvailable ? <><Icon name="building" /> </> : ""}{onSelectTile && missingCount > 0 ? `Fehlt: ${missingTiles.map((tile) => tile.name).join(" · ")}` : buildStatus}
         {onSelectTile && buildAvailable && <span className="property-group__build-hint">{onBuild ? "Direkt bei der Straße bauen" : "Grundstück auswählen"}</span>}
       </p>
       {onSelectTile && onSelect && groupDefinition && <button type="button" className="controller-board-focus" aria-pressed={selected} onClick={() => onSelect(groupDefinition.id)}>{selected ? "Markierung aufheben" : "Gruppe auf dem Board markieren"}</button>}

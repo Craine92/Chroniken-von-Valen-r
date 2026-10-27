@@ -11,6 +11,7 @@ import {
 import { PropertyGroupOverview } from "./PropertyGroupOverview";
 import { RelicIcon } from "./RelicIcon";
 import { ControllerActionBar } from "./ControllerActionBar";
+import { Icon, tileIcon } from "./icons/Icon";
 
 interface PossessionsProps {
   state: GameState;
@@ -63,9 +64,9 @@ export function ControllerPropertyDetails({ state, playerId, connected, tile, on
   const canDevelop = tile.type === "property" && tile.region && schedule;
   const buildAction = own && canDevelop && build.allowed ? { label: `Bauen · ${getEffectiveBuildCost(state, tile)} Gold`, onClick: () => onBuild(SOCKET_EVENTS.propertyBuild, tile.index), disabled: !connected } : undefined;
   const sellAction = own && canDevelop && sell.allowed ? { label: `Verkaufen · +${getEffectiveBuildingSaleValue(state, tile)} Gold`, onClick: () => onBuild(SOCKET_EVENTS.propertySellBuilding, tile.index), disabled: !connected, tone: "secondary" as const } : undefined;
-  return <div className="controller-property-detail has-context-action-bar" style={{ "--property-group-accent": group?.accent ?? "#d6bd78" } as CSSProperties}>
+  return <div className="controller-property-detail has-context-action-bar" style={{ "--property-group-accent": group?.accent ?? "var(--accent-strong)" } as CSSProperties}>
     <article className="property-card controller-detail-card">
-      <header><span className="controller-detail-sigil" aria-hidden="true">{group?.sigil ?? (tile.type === "harbor" ? "⚓" : "⚙")}</span><div><h3>{tile.name}</h3><p>{group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung")} · Feld {tile.index}</p></div></header>
+      <header><span className="controller-detail-sigil" aria-hidden="true"><Icon name={tileIcon(tile)} /></span><div><h3>{tile.name}</h3><p>{group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung")} · Feld {tile.index}</p></div></header>
       <div className="controller-status-chips"><span>{own ? "Dein Besitz" : owner ? `Besitz: ${owner.name}` : "Frei"}</span>{ownership?.mortgaged && <span className="mortgage-status" title="Belehnt"><b aria-hidden="true">×</b> BELEHNT</span>}{complete && <span>{active ? "SETBONUS AKTIV" : "SETBONUS RUHT"}</span>}</div>
       {canDevelop && <div className="controller-rent-highlights">
         <div><small>Aktuelle Miete</small><strong>{currentRent} Gold</strong></div>
@@ -128,12 +129,12 @@ export function ControllerPossessions(props: PossessionsProps) {
     </details>;
   };
   return <section className="ownership-list" id="controller-property">
-    {tile ? <><button type="button" className="controller-back" onClick={() => setSelectedTileIndex(undefined)}>← Zur Gruppenübersicht</button><h2 ref={detailHeading} tabIndex={-1} className="controller-detail-heading">Grundstück</h2><ControllerPropertyDetails {...props} tile={tile} /></> : <>
+    {tile ? <><button type="button" className="controller-back" onClick={() => setSelectedTileIndex(undefined)}><Icon name="chevron-left" /> Zur Gruppenübersicht</button><h2 ref={detailHeading} tabIndex={-1} className="controller-detail-heading">Grundstück</h2><ControllerPropertyDetails {...props} tile={tile} /></> : <>
       <div className="ownership-list__heading"><h2>Mein Besitz</h2><p>Tippe ein Feld an, um Werte und Aktionen zu sehen.</p></div>
       {owned.length === 0 && <p>Noch keine Ländereien, Häfen oder Versorgungswerke.</p>}
       {orderedOwnedGroups.map(renderGroup)}
-      {owned.some(entry => BOARD_TILES[entry.tileIndex]?.type !== "property") && <section className="controller-special-properties"><h3>Häfen &amp; Versorgung</h3>{owned.filter(entry => BOARD_TILES[entry.tileIndex]?.type !== "property").map(entry => <button type="button" key={entry.tileIndex} onClick={() => setSelectedTileIndex(entry.tileIndex)}><span aria-hidden="true">{BOARD_TILES[entry.tileIndex]?.type === "harbor" ? "⚓" : "⚙"}</span><strong>{BOARD_TILES[entry.tileIndex]?.name}</strong><small>{entry.mortgaged ? "Belehnt" : "Dein Besitz"}</small></button>)}</section>}
-      {redemptionPlan.tileIndices.length > 0 && <section className="controller-finance-section"><h3>Hypotheken</h3><p>{redemptionPlan.tileIndices.length} aktiv · alle auslösen: {redemptionPlan.totalCost} Gold</p><button type="button" disabled={!props.connected || !redemptionPlan.allowed || !props.onRedeemAllMortgages} onClick={props.onRedeemAllMortgages}>ALLE HYPOTHEKEN AUSLÖSEN</button>{!redemptionPlan.affordable && <small>Nicht genügend Gold für die atomare Gesamtauslösung.</small>}</section>}
+      {owned.some(entry => BOARD_TILES[entry.tileIndex]?.type !== "property") && <section className="controller-special-properties"><h3>Häfen &amp; Versorgung</h3>{owned.filter(entry => BOARD_TILES[entry.tileIndex]?.type !== "property").map(entry => <button type="button" key={entry.tileIndex} onClick={() => setSelectedTileIndex(entry.tileIndex)}><span aria-hidden="true"><Icon name={tileIcon(BOARD_TILES[entry.tileIndex]!)} /></span><strong>{BOARD_TILES[entry.tileIndex]?.name}</strong><small>{entry.mortgaged ? "Belehnt" : "Dein Besitz"}</small></button>)}</section>}
+      {redemptionPlan.tileIndices.length > 0 && <section className="controller-finance-section"><h3>Hypotheken</h3><p>{redemptionPlan.tileIndices.length} aktiv · alle auslösen: {redemptionPlan.totalCost} Gold</p><button type="button" disabled={!props.connected || !redemptionPlan.allowed || !props.onRedeemAllMortgages} onClick={props.onRedeemAllMortgages}>ALLE HYPOTHEKEN AUSLÖSEN</button>{!redemptionPlan.affordable && <small>Dein Gold reicht nicht, um alle Hypotheken auf einmal auszulösen.</small>}</section>}
       {otherGroups.length > 0 && <details className="controller-other-groups"><summary>Weitere Baugruppen ({otherGroups.length})</summary>{otherGroups.map(renderGroup)}</details>}
       <ControllerRelics {...props} />
       <details className="controller-possession-extras"><summary>Karten &amp; Bank · {player.heldCards?.length ?? 0} besondere Karten</summary><section className="held-cards"><h3>Besondere Karten</h3>{player.heldCards?.length ? player.heldCards.map(held => <article key={held.cardId}><strong>{getCardDefinition(held.cardId).title}</strong><span>{describeCardEffects(getCardDefinition(held.cardId))}</span></article>) : <p>Keine besonderen Karten.</p>}</section><div className="building-bank"><span>BAUWERKE</span><b>Unbegrenzt</b></div></details>

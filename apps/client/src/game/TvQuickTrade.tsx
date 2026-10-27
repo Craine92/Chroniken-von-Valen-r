@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { BOARD_TILES, formatQuickTradeHeadline, getQuickTradeTerms, type GameState, type TradeAction } from "@valenor/shared";
 import { propertyIdentity } from "../components/TradePanel";
+import { Icon } from "../components/icons/Icon";
 
 /** Wie lange der TV den Ausgang eines Schnellhandels zeigt. Ein offenes Angebot bleibt sichtbar, solange es gilt. */
 export const QUICK_TRADE_TV_RESULT_MS: Record<Exclude<TradeAction["type"], "created">, number> = { accepted: 4_500, rejected: 3_000, cancelled: 3_000, expired: 3_500 };
@@ -49,7 +50,7 @@ export function getTvQuickTradeView(state: GameState, shownResultActionId?: stri
 export function TvQuickTradeCard({ view }: { view: TvQuickTradeView }) {
   const identity = propertyIdentity(view.tileIndex);
   return <aside className={`tv-quick-trade tv-quick-trade--${view.kind}`} role="status" style={{ "--property-group-accent": identity.accent } as CSSProperties}>
-    <i className="tv-quick-trade__seal" aria-hidden="true">{view.kind === "accepted" ? "✦" : identity.sigil}</i>
+    <i className="tv-quick-trade__seal" aria-hidden="true"><Icon name={view.kind === "accepted" ? "seal" : identity.icon} /></i>
     <small>{view.eyebrow}</small>
     <strong>{view.title}</strong>
     <span>{view.detail}</span>

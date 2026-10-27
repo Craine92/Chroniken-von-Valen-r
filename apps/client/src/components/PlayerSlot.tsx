@@ -1,6 +1,7 @@
 import { PLAYER_CHARACTERS, type Player } from "@valenor/shared";
 import { PLAYER_COLOR_LABELS } from "../lib/player-colors";
 import { PlayerPortrait } from "./PlayerPortrait";
+import { Icon } from "./icons/Icon";
 
 interface PlayerSlotProps {
   player: Player | undefined;
@@ -15,7 +16,7 @@ export function PlayerSlot({ player, index, onAddComputer, onRemovePlayer, disab
     return (
       <article className="player-slot player-slot--empty">
         <span className="player-slot__number">0{index + 1}</span>
-        <div className="player-slot__sigil" aria-hidden="true">◇</div>
+        <div className="player-slot__sigil" aria-hidden="true"><Icon name="companion" /></div>
         <div className="player-slot__identity">
           <h3>Spielerplatz frei</h3>
           <button className="slot-action" type="button" onClick={onAddComputer} disabled={disabled}>
@@ -34,7 +35,7 @@ export function PlayerSlot({ player, index, onAddComputer, onRemovePlayer, disab
       <div className="player-slot__identity">
         <h3>{player.name}</h3>
         <p>{PLAYER_CHARACTERS.find(character => character.id === player.characterId)?.name} · {player.type === "computer" ? "Computer" : "Mensch"} · {PLAYER_COLOR_LABELS[player.color]}</p>
-        <span className="player-slot__state">{disconnected ? "Getrennt" : player.ready ? "✓ Bereit" : "Noch nicht bereit"}</span>
+        <span className="player-slot__state">{disconnected ? "Getrennt" : player.ready ? <><Icon name="check" /> Bereit</> : "Noch nicht bereit"}</span>
       </div>
       {(
         <button

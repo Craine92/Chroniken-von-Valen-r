@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ActiveWorldImpulse, GameState, MomentumCelebration, WorldImpulseChoice } from "@valenor/shared";
+import { Icon, dieIcon } from "./icons/Icon";
 
 const IMPULSE_NOTICE_MS = 3_200;
 const CELEBRATION_NOTICE_MS = 2_400;
@@ -24,12 +25,12 @@ export function WorldImpulseBanner({ impulse }: { impulse: ActiveWorldImpulse | 
     <div className="world-impulse-flash" aria-hidden="true" />
     <aside className="world-impulse-banner" role="status" data-impulse={visible.id}>
       <div className="world-impulse-particles" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} />)}</div>
-      <i className="world-impulse-sigil" aria-hidden="true">✦</i>
+      <i className="world-impulse-sigil" aria-hidden="true"><Icon name="magic" /></i>
       <small>WELTIMPULS</small>
       <strong>{visible.title}</strong>
       <span>{visible.effectSummary}</span>
-      {visible.id === "worldwayDonation" && <div className="world-impulse-coins" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <i key={index}>●</i>)}</div>}
-      {visible.resultDie !== undefined && <b className={`world-impulse-result ${visible.resultGold ? "is-win" : "is-empty"}`}><i aria-hidden="true">{["","⚀","⚁","⚂","⚃","⚄","⚅"][visible.resultDie]}</i>{visible.resultGold ? `+${visible.resultGold} GOLD` : "0 GOLD"}</b>}
+      {visible.id === "worldwayDonation" && <div className="world-impulse-coins" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <i key={index}><Icon name="gold" /></i>)}</div>}
+      {visible.resultDie !== undefined && <b className={`world-impulse-result ${visible.resultGold ? "is-win" : "is-empty"}`}><i aria-hidden="true"><Icon name={dieIcon(visible.resultDie)} /></i>{visible.resultGold ? `+${visible.resultGold} GOLD` : "0 GOLD"}</b>}
     </aside>
   </>;
 }
@@ -39,7 +40,7 @@ export function MomentumCelebrationBanner({ celebration, state }: { celebration:
   if (!visible) return null;
   const player = "playerId" in visible ? state.players.find(entry => entry.id === visible.playerId) : undefined;
   return <aside className={`momentum-celebration momentum-celebration--${visible.type}`} role="status">
-    <i aria-hidden="true">✦</i><small>{visible.type === "completeGroup" ? player?.name : undefined}</small>
+    <i aria-hidden="true"><Icon name="magic" /></i><small>{visible.type === "completeGroup" ? player?.name : undefined}</small>
     <strong>{visible.title}</strong><span>{visible.subtitle}</span>
   </aside>;
 }
@@ -70,7 +71,7 @@ export function WorldImpulseDecisionPanel({ state, playerId, connected, onChoose
   </section>;
   return <section className="controller-world-impulse-decision controller-world-impulse-decision--golden" aria-live="polite">
     <small>WELTIMPULS</small><h2>Goldener Augenblick</h2>
-    {pending.status === "rolling" ? <><div className="golden-ritual" aria-hidden="true">✦</div><p>Das Schicksal entscheidet …</p></> : <>
+    {pending.status === "rolling" ? <><div className="golden-ritual" aria-hidden="true"><Icon name="magic" /></div><p>Das Schicksal entscheidet …</p></> : <>
       <p>50 Gold sicher nehmen oder das Schicksal herausfordern?</p>
       {showActions && <><button className="controller-primary-action" type="button" disabled={!connected} onClick={() => onChoose("safe")}>50 Gold sicher</button>
       <button type="button" disabled={!connected} onClick={() => onChoose("risk")}>Risiko: 0 / 75 / 150 Gold</button></>}

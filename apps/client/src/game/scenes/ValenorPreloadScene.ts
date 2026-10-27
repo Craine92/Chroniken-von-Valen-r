@@ -1,5 +1,16 @@
 import Phaser from "phaser";
 import { getPreloadAssets } from "../assets/asset-manifest";
+import { CODEX_FONT_FACES } from "../design-tokens";
+import { preloadIconTextures } from "../icon-textures";
+
+/** Lädt die Schriften des Design-Systems, bevor Phaser Text rastert; ohne Schrift-API (Tests) sofort fertig. */
+export function loadCodexFonts(timeoutMs = 2_500): Promise<void> {
+  const fonts = typeof document === "undefined" ? undefined : document.fonts;
+  if (!fonts?.load) return Promise.resolve();
+  const loaded = Promise.all(CODEX_FONT_FACES.map(face => fonts.load(face))).then(() => undefined, () => undefined);
+  // Fehlt eine Schrift, zeichnet Phaser nach kurzer Wartezeit mit dem Fallback weiter.
+  return Promise.race([loaded, new Promise<void>(resolve => window.setTimeout(resolve, timeoutMs))]);
+}
 
 export interface PreloadCallbacks {
   onProgress?: (progress: number) => void;
@@ -28,6 +39,7 @@ export class ValenorPreloadScene extends Phaser.Scene {
       }
       console.warn(`Valenør asset unavailable; procedural fallback remains active: ${file.key}`);
     });
+    preloadIconTextures(this.load);
     getPreloadAssets().forEach((asset) => {
       if (asset.kind === "image") this.load.image(asset.key, asset.path);
       else this.load.atlas(asset.key, asset.texturePath, asset.atlasPath);
@@ -35,8 +47,10 @@ export class ValenorPreloadScene extends Phaser.Scene {
   }
 
   create() {
-    this.callbacks.onProgress?.(1);
-    this.callbacks.onComplete?.();
-    this.scene.start("valenor-board");
+    void loadCodexFonts().then(() => {
+      this.callbacks.onProgress?.(1);
+      this.callbacks.onComplete?.();
+      this.scene.start("valenor-board");
+    });
   }
 }

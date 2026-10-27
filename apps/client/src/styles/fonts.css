@@ -1,0 +1,13 @@
+/*
+ * Lokal eingebundene Schriften des Design-Systems „Codex“ (keine Laufzeit-Hotlinks).
+ * Cinzel (Titel, Namen) und Alegreya Sans (Text), beide SIL Open Font License 1.1.
+ * Dateien und Lizenztexte: public/assets/fonts/, Herkunft: ATTRIBUTIONS.md.
+ */
+@font-face { font-family: "Cinzel"; font-style: normal; font-weight: 500; font-display: swap; src: url("/assets/fonts/cinzel/cinzel-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Cinzel"; font-style: normal; font-weight: 600; font-display: swap; src: url("/assets/fonts/cinzel/cinzel-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Cinzel"; font-style: normal; font-weight: 700 900; font-display: swap; src: url("/assets/fonts/cinzel/cinzel-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 300 400; font-display: swap; src: url("/assets/fonts/alegreya-sans/alegreya-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya Sans"; font-style: italic; font-weight: 300 900; font-display: swap; src: url("/assets/fonts/alegreya-sans/alegreya-sans-latin-400-italic.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 500 600; font-display: swap; src: url("/assets/fonts/alegreya-sans/alegreya-sans-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url("/assets/fonts/alegreya-sans/alegreya-sans-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya Sans"; font-style: normal; font-weight: 800 900; font-display: swap; src: url("/assets/fonts/alegreya-sans/alegreya-sans-latin-800-normal.woff2") format("woff2"); }

@@ -1,5 +1,6 @@
 import { BOARD_TILES, RELIC_DEFINITIONS, QUEST_DEFINITIONS, formatQuickTradeHeadline, getActiveChronicleEvent, getChronicleRegionLabel, getPropertyGroup, type GameState } from "@valenor/shared";
 import { openControllerTrade, type MobileFeedback } from "./mobile-feedback";
+import { RELIC_ICONS, tileIcon } from "../components/icons/Icon";
 
 // Reads server-confirmed records only. No actions, balances or game rules are changed.
 export class MobileFeedbackEventTracker {
@@ -26,28 +27,28 @@ export class MobileFeedbackEventTracker {
 
     const chronicle = getActiveChronicleEvent(state);
     if (chronicle) add({ id: `chronicle:${chronicle.id}:${chronicle.startedAtRound}`, type: "chronicle",
-      title: chronicle.title.toUpperCase(), message: [getChronicleRegionLabel(chronicle), chronicle.effectSummary].filter(Boolean).join(" · "), icon: "✦" });
+      title: chronicle.title.toUpperCase(), message: [getChronicleRegionLabel(chronicle), chronicle.effectSummary].filter(Boolean).join(" · "), icon: "chronicle" });
 
     if (state.currentPlayerId === playerId && state.turnPhase !== "determiningOrder" && state.turnPhase !== "turnTransition") {
       add({ id: `turn:${state.turnNumber}:${playerId}`, type: "turn", title: "DU BIST AM ZUG",
-        message: "Dein Abenteuer geht weiter.", hapticPattern: 80, icon: "✦" }, true);
+        message: "Dein Abenteuer geht weiter.", hapticPattern: 80, icon: "crown" }, true);
     }
     for (const trade of state.trades) {
       if (trade.recipientId !== playerId && trade.proposerId !== playerId) continue;
       if (trade.status === "pending" && trade.recipientId === playerId) {
         add({ id: `trade:${trade.id}:pending`, type: "tradeOffer", title: "HANDELSANGEBOT",
           message: (trade.mode === "quick" ? formatQuickTradeHeadline(state, trade) : undefined) ?? `${name(trade.proposerId) ?? "Ein Gefährte"} möchte mit dir handeln.`,
-          hapticPattern: [80, 60, 80], icon: "◇",
+          hapticPattern: [80, 60, 80], icon: "trade",
           actionLabel: "HANDEL ANSEHEN", action: openControllerTrade }, true);
       } else if (trade.status === "accepted" || trade.status === "rejected") {
         const accepted = trade.status === "accepted";
         add({ id: `trade:${trade.id}:${trade.status}`, type: accepted ? "tradeAccepted" : "tradeRejected",
           title: accepted ? "HANDEL ANGENOMMEN" : "HANDEL ABGELEHNT",
           message: accepted ? "Der Handel wurde abgeschlossen." : "Das Angebot wurde abgelehnt.",
-          hapticPattern: accepted ? 60 : undefined, icon: "◇" });
+          hapticPattern: accepted ? 60 : undefined, icon: "trade" });
       } else if (trade.status === "expired") {
         add({ id: `trade:${trade.id}:expired`, type: "tradeRejected", title: "ANGEBOT VERFALLEN",
-          message: trade.closedReason ?? "Das Angebot gilt nicht mehr.", icon: "◇" });
+          message: trade.closedReason ?? "Das Angebot gilt nicht mehr.", icon: "trade" });
       }
     }
     const turn = state.lastTurnAction;
@@ -57,19 +58,19 @@ export class MobileFeedbackEventTracker {
         (state.turnContext.pendingExtraRoll || state.turnPhase === "waitingForRoll") &&
         !viewer.dungeon.inDungeon && !["rolling", "moving", "landed", "awaitingCardDraw", "cardResolving", "cardMoving", "dungeonTransfer"].includes(state.turnPhase)) {
       add({ id: `double:${turn.id}`, type: "double", title: "PASCH!",
-        message: "Du darfst erneut würfeln.", hapticPattern: [50, 40, 50], icon: "⚄" });
+        message: "Du darfst erneut würfeln.", hapticPattern: [50, 40, 50], icon: "dice" });
     } else if (initial && turn) this.seen.add(`double:${turn.id}`);
     const building = state.lastBuildingAction;
     if (building?.playerId === playerId && building.type === "build") {
       add({ id: `build:${building.id}`, type: "build", title: "BAU ABGESCHLOSSEN",
         message: `${BOARD_TILES[building.tileIndex]?.name ?? "Dein Grundstück"}: ${building.buildingName} · Stufe ${building.toLevel}`,
-        accent: region(building.tileIndex)?.accent, icon: region(building.tileIndex)?.sigil ?? "♜" });
+        accent: region(building.tileIndex)?.accent, icon: "building" });
     }
     for (const entry of state.economyLog) {
       if (!entry.playerIds.includes(playerId)) continue;
       if (entry.kind === "quest" && entry.questId && entry.amount !== undefined) {
         const quest = QUEST_DEFINITIONS[entry.questId];
-        add({ id: `economy:${entry.id}`, type: "coin", title: "AUFTRAG ERFÜLLT", message: `${quest.title} · +${entry.amount} Gold`, icon: quest.symbol, hapticPattern: 60 });
+        add({ id: `economy:${entry.id}`, type: "coin", title: "AUFTRAG ERFÜLLT", message: `${quest.title} · +${entry.amount} Gold`, icon: "check", hapticPattern: 60 });
       } else if (entry.kind === "purchase") {
         const acquired = state.propertyOwnerships.filter((ownership) => ownership.ownerId === playerId &&
           !this.previous?.propertyOwnerships.some((old) => old.tileIndex === ownership.tileIndex && old.ownerId === playerId));
@@ -77,16 +78,16 @@ export class MobileFeedbackEventTracker {
         add({ id: `economy:${entry.id}`, type: "purchase", title: "GRUNDSTÜCK ERWORBEN",
           message: tile ? `${tile.name} gehört jetzt dir.` : entry.message,
           accent: tile ? region(tile.index)?.accent : undefined,
-          icon: tile ? region(tile.index)?.sigil ?? "♜" : "♜" });
+          icon: tile ? tileIcon(tile) : "property" });
       } else if (entry.kind === "dragon" || entry.kind === "relic") {
         const relic = entry.relicId ? RELIC_DEFINITIONS[entry.relicId] : undefined;
         add({ id: `economy:${entry.id}`, type: "coin", title: entry.kind === "dragon" ? "DER WANDERNDE DRACHE" : relic?.name.toUpperCase() ?? "RELIKT VERWENDET",
-          message: entry.kind === "dragon" && relic ? `${relic.name}: ${relic.shortDescription}` : entry.message, icon: relic?.symbol ?? "✦" });
+          message: entry.kind === "dragon" && relic ? `${relic.name}: ${relic.shortDescription}` : entry.message, icon: relic ? RELIC_ICONS[relic.id] : "magic" });
       } else if (entry.kind === "tavern" && entry.amount !== undefined) {
         const result = state.tavern?.playerId === playerId && state.tavern.status === "resolved" ? state.tavern : undefined;
         add({ id: `economy:${entry.id}`, type: "coin", title: "TAVERNE AM WELTENWEG",
           message: entry.amount > 0 ? `${result?.choice === "gamble" ? "DOPPELT!" : "Pott gesichert!"} +${entry.amount} Gold` : `VERZOCKT! Der Pott bleibt bei ${result?.pot ?? state.weltenwegPot ?? 0} Gold.`,
-          hapticPattern: entry.amount > 0 ? [40,60,80] : 40, icon: entry.amount > 0 ? "V" : "⚂" });
+          hapticPattern: entry.amount > 0 ? [40,60,80] : 40, icon: "gold" });
       } else if (entry.kind === "rent" && entry.playerIds.length === 2 && entry.amount !== undefined) {
         // EconomyService records payer first, recipient second, after settlement.
         const [payer, recipient] = entry.playerIds;
@@ -95,7 +96,7 @@ export class MobileFeedbackEventTracker {
         if (!other) continue;
         add({ id: `economy:${entry.id}`, type: "coin", title: received ? "MIETE ERHALTEN" : "MIETE GEZAHLT",
           message: `${received ? "+" : "−"}${Math.abs(entry.amount)} Gold ${received ? "von" : "an"} ${other}`,
-          icon: "V" });
+          icon: "gold" });
       } else if (entry.kind === "system") {
         // CardService's draw log has a unique ID, including repeated draws of the same card.
         // Effect/payment logs deliberately do not match this authoritative draw record.
@@ -104,7 +105,7 @@ export class MobileFeedbackEventTracker {
         if (adventure || fate) add({ id: `card:${entry.id}`, type: adventure ? "adventure" : "fate",
           title: adventure ? "ABENTEUER" : "SCHICKSAL",
           message: entry.message.slice(`${viewer.name} zieht ${adventure ? "Abenteuer" : "Schicksal"}:`.length).trim(),
-          icon: adventure ? "✦" : "✧" });
+          icon: adventure ? "adventure" : "fate" });
       }
     }
     this.previous = state;

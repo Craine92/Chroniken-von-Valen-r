@@ -6,6 +6,8 @@ import type { BoardArtLayer } from "../layers/BoardArtLayer";
 import { BOARD_DEPTHS } from "../layers/board-depths";
 import { getBoardTileVisualLayout, type BoardTileVisualLayout } from "./board-tile-layout";
 import { getPropertyGroupVisual, getRegionAccent, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, type TilePalette } from "./board-tile-theme";
+import { CODEX_FONTS } from "../design-tokens";
+import { addIconImage } from "../icon-textures";
 
 export interface BoardTileRendererOptions {
   artLayer?: BoardArtLayer;
@@ -91,7 +93,7 @@ export class BoardTileRenderer {
     const tileTitle = getTileTitle(tile.name, tile.type === "property" ? 7 : undefined);
     const title = this.scene.add.text(layout.title.x, layout.title.y, tileTitle, {
       color: palette.text,
-      fontFamily: tile.type === "adventure" || tile.type === "fate" ? "Arial, sans-serif" : "Georgia, serif",
+      fontFamily: CODEX_FONTS.display,
       fontSize: `${layout.title.fontSize}px`,
       fontStyle: "bold",
       align: "center",
@@ -104,7 +106,7 @@ export class BoardTileRenderer {
     while(title.width>layout.title.width && titleSize>16)title.setFontSize(--titleSize);
     const footer = this.scene.add.text(layout.footer.x, layout.footer.y, getTileFooter(tile), {
       color: palette.mutedText,
-      fontFamily: "Arial, sans-serif",
+      fontFamily: CODEX_FONTS.text,
       fontSize: `${layout.footer.fontSize}px`,
       fontStyle: "bold",
       align: "center",
@@ -114,10 +116,11 @@ export class BoardTileRenderer {
       strokeThickness: 2,
       lineSpacing: 1
     }).setOrigin(.5).setMaxLines(1).setResolution(2).setVisible(layout.kind === "corner");
-    const primary = tile.economy ? `✦ ${tile.economy.purchasePrice}` : tile.type === "tax" ? `✦ ${tile.index === 38 ? DRAGON_TITHE : CROWN_TAX}` : tile.type === "adventure" || tile.type === "fate" ? "ZIEHEN" : getTilePrimaryAction(tile);
+    const showsGold = Boolean(tile.economy) || tile.type === "tax";
+    const primary = tile.economy ? `${tile.economy.purchasePrice}` : tile.type === "tax" ? `${tile.index === 38 ? DRAGON_TITHE : CROWN_TAX}` : tile.type === "adventure" || tile.type === "fate" ? "ZIEHEN" : getTilePrimaryAction(tile);
     const price = this.scene.add.text(layout.price.x, layout.price.y, primary, {
       color: "#ffebad",
-      fontFamily: "Arial, sans-serif",
+      fontFamily: CODEX_FONTS.text,
       fontSize: `${layout.price.fontSize}px`,
       fontStyle: "bold",
       align: "center",
@@ -127,14 +130,22 @@ export class BoardTileRenderer {
       strokeThickness: 3,
       shadow: { color: "#000000", blur: 2, fill: true, offsetY: 1 }
     }).setOrigin(.5).setMaxLines(2).setResolution(2);
+    // Münz-Icon und Betrag werden gemeinsam zentriert.
+    const coinSize = layout.price.fontSize * 1.1;
+    const coin = showsGold ? addIconImage(this.scene, 0, layout.price.y, "gold", coinSize, 0xffebad) : undefined;
+    if (coin) {
+      const gap = coinSize * .2, start = layout.price.x - (coinSize + gap + price.width) / 2;
+      coin.setX(start + coinSize / 2);
+      price.setX(start + coinSize + gap + price.width / 2);
+    }
     this.typography.set(tile.index,{title:tileTitle,fontSize:titleSize,titleWidth:title.width,titleHeight:title.height,price:primary,iconSize:layout.emblem.size});
     const objects: Phaser.GameObjects.GameObject[] = [plate];
     if (assetAccent) objects.push(assetAccent);
-    objects.push(...emblemObjects, title, footer, price);
+    objects.push(...emblemObjects, title, footer, price, ...(coin ? [coin] : []));
     if (layout.kind === "corner") {
       objects.push(this.scene.add.text(-layout.width / 2 + 8, -layout.height / 2 + 6, String(tile.index).padStart(2, "0"), {
         color: "#b9aa83",
-        fontFamily: "Arial, sans-serif",
+        fontFamily: CODEX_FONTS.text,
         fontSize: "6.5px",
         fontStyle: "bold",
         stroke: "#090807",

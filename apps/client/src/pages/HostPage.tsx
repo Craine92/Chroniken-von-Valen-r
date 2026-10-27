@@ -17,8 +17,12 @@ import { ConnectionBadge } from "../components/ConnectionBadge";
 import { GameModeSelector } from "../components/GameModeSelector";
 import { PlayerSlot } from "../components/PlayerSlot";
 import { createValenorSocket } from "../lib/socket";
+import { CODEX_COLORS } from "../game/design-tokens";
 import { shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { audioManager } from "../audio/AudioManager";
+import { Icon } from "../components/icons/Icon";
+
+const CreditsOverlay = lazy(() => import("../components/credits/CreditsOverlay"));
 
 const GameExperience = lazy(() =>
   import("../game/GameExperience").then((module) => ({ default: module.GameExperience }))
@@ -37,6 +41,8 @@ export function HostPage() {
   const [error, setError] = useState("");
   const [signal, setSignal] = useState<MagicSignal>();
   const [propertyGroupFocus, setPropertyGroupFocus] = useState<PropertyGroupFocusSignal>();
+  const [creditsOpen, setCreditsOpen] = useState(false);
+  const closeCredits = useCallback(() => setCreditsOpen(false), []);
   const signalTimer = useRef<number | undefined>(undefined);
   const propertyGroupFocusTimer = useRef<number | undefined>(undefined);
   const lastRoomPhase = useRef<GameRoom["phase"] | undefined>(undefined);
@@ -215,7 +221,7 @@ export function HostPage() {
       <section className="setup-layout">
         <aside className="join-panel join-panel--compact">
           <div className="join-panel__heading">
-            <span className="ornament" aria-hidden="true">◆</span>
+            <span className="ornament" aria-hidden="true"><Icon name="seal" /></span>
             <div><p className="eyebrow">Smartphone</p><h2>Beitreten</h2></div>
           </div>
           <div className="qr-frame qr-frame--compact">
@@ -224,8 +230,8 @@ export function HostPage() {
                 value={controllerUrl}
                 size={166}
                 level="M"
-                bgColor="#f4eddc"
-                fgColor="#11121b"
+                bgColor={CODEX_COLORS.parchment50}
+                fgColor={CODEX_COLORS.ink900}
                 marginSize={2}
                 title={`Beitritt zum Spielraum ${room?.code ?? "Valenør"}`}
               />
@@ -277,9 +283,9 @@ export function HostPage() {
               disabled={!canStart || !connected || busy}
               onClick={startAdventure}
             >
-              <span aria-hidden="true">✦</span>
+              <span aria-hidden="true"><Icon name="magic" /></span>
               Abenteuer beginnen
-              <span aria-hidden="true">✦</span>
+              <span aria-hidden="true"><Icon name="magic" /></span>
             </button>
           </section>
         </div>
@@ -287,12 +293,13 @@ export function HostPage() {
 
       {signal && (
         <div className={`magic-toast magic-toast--${signal.color}`} role="status">
-          <span className="magic-toast__glyph" aria-hidden="true">✦</span>
+          <span className="magic-toast__glyph" aria-hidden="true"><Icon name="magic" /></span>
           <div><strong>{signal.playerName}</strong> sendet ein magisches Signal</div>
         </div>
       )}
       {error && <div className="error-toast" role="alert">{error}</div>}
-      <footer className="host-footer">CHRONIKEN VON VALENØR · SPIELVORBEREITUNG</footer>
+      <footer className="host-footer"><span>CHRONIKEN VON VALENØR · SPIELVORBEREITUNG</span><button type="button" className="host-footer__credits" onClick={() => setCreditsOpen(true)}>Mitwirkende</button></footer>
+      {creditsOpen && <Suspense fallback={null}><CreditsOverlay onClose={closeCredits} /></Suspense>}
     </main>
   );
 }

@@ -11,6 +11,7 @@ import { audioManager } from "../audio/AudioManager";
 import { GameAudioEventTracker } from "../audio/game-audio-events";
 import { MomentumCelebrationBanner, WorldImpulseBanner } from "../components/WorldImpulseUi";
 import { TvQuickTradeBanner, isQuickTradeAction } from "./TvQuickTrade";
+import { Icon, dieIcon, GROUP_ICONS } from "../components/icons/Icon";
 
 const GameCanvas = lazy(() =>
   import("./GameCanvas").then((module) => ({ default: module.GameCanvas }))
@@ -153,10 +154,10 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
         <div className="board-notification-lane" aria-live="polite" aria-atomic="true">
           {doubleAction && (
             <aside key={doubleAction.id} className="double-banner" role="status" data-notification-id={doubleAction.id}>
-              <i aria-hidden="true">✦</i>
+              <i aria-hidden="true"><Icon name="magic" /></i>
               <strong>PASCH!</strong>
               <span>{doublePlayer?.name} darf erneut würfeln.</span>
-              <i aria-hidden="true">✦</i>
+              <i aria-hidden="true"><Icon name="magic" /></i>
             </aside>
           )}
         </div>
@@ -173,7 +174,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
             <small>TAVERNE AM WELTENWEG</small>
             <strong>{tavernNotice.status === "decision" ? "DER WELTENWEG-POTT" : tavernNotice.status === "rolling" ? "DOPPELT ODER NIX!" : tavernNotice.choice === "take" ? "POTT GESICHERT!" : tavernNotice.payout ? "DAS GLÜCK IST MIT DIR!" : "VERZOCKT!"}</strong>
             <span>{tavernWinner?.name ?? "Ein Gefährte"}{tavernNotice.status === "decision" ? " entscheidet: sicher nehmen oder riskieren?" : tavernNotice.status === "rolling" ? ` setzt ${tavernNotice.pot} Gold aufs Spiel.` : tavernNotice.payout ? " gewinnt den Pott." : ": Das Gold bleibt im Pott."}</span>
-            {tavernNotice.choice === "gamble" && <i className={`tavern-die${tavernNotice.status === "rolling" ? " tavern-die--rolling" : ""}`} aria-label={tavernNotice.die ? `Tavernenwürfel ${tavernNotice.die}` : "Tavernenwürfel rollt"}>{["⚄","⚀","⚁","⚂","⚃","⚄","⚅"][tavernNotice.die ?? 0]}</i>}
+            {tavernNotice.choice === "gamble" && <i className={`tavern-die${tavernNotice.status === "rolling" ? " tavern-die--rolling" : ""}`} aria-label={tavernNotice.die ? `Tavernenwürfel ${tavernNotice.die}` : "Tavernenwürfel rollt"}><Icon name={tavernNotice.die ? dieIcon(tavernNotice.die) : "dice"} /></i>}
             <b>{tavernNotice.status === "resolved" && tavernNotice.payout ? `+${tavernNotice.payout}` : tavernNotice.pot} GOLD</b>
             {tavernNotice.status === "resolved" && !tavernNotice.payout && <small>BLEIBEN IM POTT</small>}
           </aside>}
@@ -209,7 +210,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
         )}
         {focusedPropertyGroup && (
           <aside className="board-group-focus-card" aria-live="polite">
-            <i aria-hidden="true">{focusedPropertyGroup.sigil}</i>
+            <i aria-hidden="true"><Icon name={GROUP_ICONS[focusedPropertyGroup.id]} /></i>
             <div>
               <strong>{focusedPropertyGroup.displayName} · {focusedOwnedTiles.length}/{focusedPropertyGroup.size}</strong>
               <span>{focusedBuildAvailable ? "Vollständig · Bauen jetzt möglich" : focusedMissingTiles.length ? `Fehlt: ${focusedMissingTiles.map((tile) => tile.name).join(", ")}` : "Gruppe vollständig"}</span>
@@ -217,7 +218,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
           </aside>
         )}
       </section>
-      {onReturnToLobby && <button type="button" className="return-to-lobby" title="Zur Lobby" aria-label="Zur Lobby" onClick={onReturnToLobby}>↻</button>}
+      {onReturnToLobby && <button type="button" className="return-to-lobby" title="Zur Lobby" aria-label="Zur Lobby" onClick={onReturnToLobby}><Icon name="lobby" /></button>}
       {gameState.status === "finished" && (
         <section className="victory-overlay">
           <GameResultPanel gameState={gameState} onNewChronicle={onNewChronicle} />
@@ -225,7 +226,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
       )}
       {introVisible && gameState.status !== "finished" && (
         <div className="game-intro" aria-live="polite">
-          <div className="game-intro__rune" aria-hidden="true">✦</div>
+          <div className="game-intro__rune" aria-hidden="true"><Icon name="seal" /></div>
           <p>DIE SIEGEL SIND GEBROCHEN</p>
           <h1>Die Chroniken von Valenør beginnen …</h1>
         </div>

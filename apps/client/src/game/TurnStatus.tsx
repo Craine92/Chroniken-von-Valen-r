@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BOARD_TILES, getEffectiveRent, getEffectivePurchasePrice, getBuildingName, type BoardTileType, type GameState } from "@valenor/shared";
 import { PropertyCard } from "../components/PropertyCard";
 import { DICE_SETTLE_DURATION_MS } from "./board-presentation";
+import { Icon, dieIcon } from "../components/icons/Icon";
 
 export function BoardTopHud({ state }: { state: GameState }) {
   const current = state.players.find(player => player.id === state.currentPlayerId);
@@ -20,12 +21,12 @@ export function BoardTopHud({ state }: { state: GameState }) {
   return <aside className={`board-top-hud${roll ? " has-result" : ""}${roll && !settled ? " is-rolling" : ""}`} aria-label="Zug und Würfelergebnis">
     {roll ? <>
       <div className="board-top-hud__dice" aria-label={`Würfel ${roll.die1} und ${roll.die2}`}>
-        {[roll.die1, roll.die2].map((die, index) => <span key={index} className="dice-face" aria-hidden="true">{["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][die]}</span>)}
+        {[roll.die1, roll.die2].map((die, index) => <span key={index} className="dice-face" aria-hidden="true"><Icon name={dieIcon(die)} /></span>)}
       </div>
       <div className="board-top-hud__caption"><small>{settled ? "WÜRFELERGEBNIS" : "DIE WÜRFEL ROLLEN"}</small><strong>{current?.name}</strong></div>
       <b className="board-top-hud__total">{settled ? roll.total : "…"}</b>
       {roll.isDouble && settled && <em>PASCH!</em>}
-    </> : <><i aria-hidden="true">♛</i><div className="board-top-hud__caption"><small>AM ZUG</small><strong>{current?.name ?? "Das Schicksal entscheidet"}</strong></div><b className="board-top-hud__prompt">{state.turnPhase === "waitingForRoll" ? "WÜRFLE" : "VALENØR"}</b></>}
+    </> : <><i aria-hidden="true"><Icon name="crown" /></i><div className="board-top-hud__caption"><small>AM ZUG</small><strong>{current?.name ?? "Das Schicksal entscheidet"}</strong></div><b className="board-top-hud__prompt">{state.turnPhase === "waitingForRoll" ? "WÜRFLE" : "VALENØR"}</b></>}
   </aside>;
 }
 
@@ -68,7 +69,7 @@ export function TurnStatus({ state }: { state: GameState }) {
             return (
               <article key={player.id} className={`order-player order-player--${player.color}`}>
                 <strong>{player.name}</strong>
-                {latest ? <span>⚄ {latest.die1} + {latest.die2} <b>{latest.total}</b></span> : <span>{waiting ? "wartet …" : "–"}</span>}
+                {latest ? <span><Icon name="dice" /> {latest.die1} + {latest.die2} <b>{latest.total}</b></span> : <span>{waiting ? "wartet …" : "–"}</span>}
               </article>
             );
           })}
@@ -88,6 +89,7 @@ export function TurnStatus({ state }: { state: GameState }) {
   const landedRent = landed?.type === "property" && ownership && owner
     ? getEffectiveRent(state, landed, owner.id)
     : undefined;
+  const landedSubtitle = landed ? (landed.type === "property" && landed.propertyGroup ? `${landed.propertyGroup} · ${TYPE_LABELS[landed.type]}` : TYPE_LABELS[landed.type] ?? "") : "";
   return (
     <section className="turn-overlay">
       {state.turnPhase === "dungeonDecision" && (
@@ -106,7 +108,8 @@ export function TurnStatus({ state }: { state: GameState }) {
         <div className="landed-card">
           <small>GELANDET AUF FELD {landed.index}</small>
           <strong>{landed.name}</strong>
-          <span>{landed.type === "property" && landed.propertyGroup ? `${landed.propertyGroup} · ${TYPE_LABELS[landed.type]}` : TYPE_LABELS[landed.type]}</span>
+          {/* Keine Unterzeile, die nur den Titel wiederholt (z. B. „Abenteuer“ auf dem Feld „Abenteuer“). */}
+          {landedSubtitle.toLocaleLowerCase("de") !== landed.name.toLocaleLowerCase("de") && <span>{landedSubtitle}</span>}
           {landed.economy && <b>{getEffectivePurchasePrice(state, landed)} GOLD</b>}
           {landed.type === "property" && landed.region && ownership && ownership.buildingLevel > 0 && (
             <><b>{getBuildingName(landed.region, ownership.buildingLevel)}</b><em>Miete: {landedRent} Gold</em></>

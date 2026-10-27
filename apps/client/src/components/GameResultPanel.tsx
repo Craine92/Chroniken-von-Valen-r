@@ -1,5 +1,6 @@
 import type { GameState } from "@valenor/shared";
 import { Icon } from "./icons/Icon";
+import { PlayerPortrait } from "./PlayerPortrait";
 
 export function GameResultPanel({ gameState, viewerId, onNewChronicle }: {
   gameState: GameState;
@@ -8,7 +9,7 @@ export function GameResultPanel({ gameState, viewerId, onNewChronicle }: {
 }) {
   const result = gameState.gameResult;
   const winnerIds = result?.winnerIds ?? gameState.winnerIds ?? (gameState.winnerId ? [gameState.winnerId] : []);
-  const winners = winnerIds.map((id) => gameState.players.find((player) => player.id === id)).filter(Boolean);
+  const winners = winnerIds.map((id) => gameState.players.find((player) => player.id === id)).filter((player) => player !== undefined);
   const shared = winners.length > 1;
   const scores = gameState.finalScores ?? result?.scores ?? [];
   const ownScore = scores.find((score) => score.playerId === viewerId);
@@ -18,9 +19,16 @@ export function GameResultPanel({ gameState, viewerId, onNewChronicle }: {
   return (
     <div className="game-result-panel">
       <p className="eyebrow">{result?.finishReason === "quickGameTimeExpired" ? "Das schnelle Abenteuer endet" : "Die Chronik ist entschieden"}</p>
-      <div className="result-miniature" aria-hidden="true"><i><Icon name="figure" /></i><span><Icon name="magic" /></span></div>
+      {/* Siegerpose: die Gewinner erheben sich im Lichtkranz. Ohne Bewegung bei reduzierter Bewegung. */}
+      <div className={`result-miniature result-pose${shared ? " result-pose--shared" : ""}`} aria-hidden="true">
+        <span className="result-pose__halo" />
+        {winners.length
+          ? winners.map((winner, index) => <span key={winner.id} className={`result-pose__hero player-theme--${winner.color}`} style={{ animationDelay: `${index * 120}ms` }}><PlayerPortrait characterId={winner.characterId} /></span>)
+          : <i><Icon name="figure" /></i>}
+        <span className="result-pose__crown"><Icon name="crown" /></span>
+      </div>
       <h1>{shared ? "Geteilter Sieg" : winners[0]?.name ?? "Valenør"}</h1>
-      <strong>{shared ? winners.map((winner) => winner!.name).join(" · ") : "Herrscher von Valenør"}</strong>
+      <strong>{shared ? winners.map((winner) => winner.name).join(" · ") : "Herrscher von Valenør"}</strong>
       {scores.length > 0 && (
         <>
           <h2>Vermögensabrechnung</h2>

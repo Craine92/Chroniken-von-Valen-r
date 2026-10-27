@@ -196,3 +196,82 @@
 
 @media (prefers-reduced-motion: reduce) { .game-sidebar .hud-player.is-in-danger { animation: none; } }
 .board-page[data-quality="low"] .hud-player.is-in-danger { animation: none; }
+
+/* --- Siegerpose (Siegerbildschirm auf TV und Handy) --------------------- */
+.result-miniature.result-pose {
+  width: auto;
+  min-width: 7rem;
+  height: 7.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin: var(--space-2) auto var(--space-3);
+  padding: 0 var(--space-4);
+  overflow: visible;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.result-pose .result-pose__halo {
+  position: absolute;
+  bottom: auto;
+  z-index: 0;
+  left: 50%;
+  top: 46%;
+  width: 11rem;
+  height: 11rem;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgb(var(--c-gold-300-rgb) / .55), rgb(var(--c-gold-500-rgb) / .16) 45%, transparent 68%),
+    repeating-conic-gradient(rgb(var(--c-gold-300-rgb) / .22) 0deg 7deg, transparent 7deg 20deg);
+  -webkit-mask-image: radial-gradient(circle, #000 35%, transparent 70%);
+  mask-image: radial-gradient(circle, #000 35%, transparent 70%);
+  animation: halo-turn 28s linear infinite;
+}
+.result-pose--shared .result-pose__halo { width: 15rem; }
+.result-pose .result-pose__hero {
+  position: relative;
+  bottom: auto;
+  text-shadow: none;
+  z-index: 1;
+  display: grid;
+  place-items: end center;
+  color: var(--player-accent, var(--c-gold-400));
+  animation: hero-rise 900ms var(--ease-seal) both;
+}
+.result-pose__hero .hud-player__portrait {
+  position: relative;
+  width: 5.2rem;
+  height: 6.2rem;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 30%, rgb(var(--c-gold-600-rgb) / .55), var(--c-ink-950));
+  border: 3px solid currentColor;
+  border-radius: 48% 48% 14% 14%;
+  box-shadow: 0 0 0 2px var(--c-gold-500), 0 0 32px rgb(var(--c-gold-400-rgb) / .45);
+}
+.result-pose__hero .hud-player__portrait img { position: absolute; left: -22%; top: -2%; width: 144%; height: 184%; max-width: none; object-fit: contain; object-position: 50% 0; }
+.result-pose .result-pose__crown {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: -1.6rem;
+  bottom: auto;
+  translate: -50% 0;
+  color: var(--c-gold-300);
+  font-size: var(--fs-3xl);
+  text-shadow: none;
+  filter: drop-shadow(0 0 10px rgb(var(--c-gold-400-rgb) / .7));
+  animation: crown-settle 1100ms 300ms var(--ease-seal) both;
+}
+.result-miniature.result-pose > i { position: relative; z-index: 1; color: var(--c-parchment-200); font: normal var(--fs-4xl) var(--font-display); }
+@keyframes halo-turn { to { rotate: 360deg; } }
+@keyframes hero-rise { from { opacity: 0; translate: 0 1.5rem; scale: .9; } to { opacity: 1; translate: 0 0; scale: 1; } }
+@keyframes crown-settle { from { opacity: 0; translate: -50% -1.4rem; } to { opacity: 1; translate: -50% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .result-pose :is(.result-pose__halo, .result-pose__hero, .result-pose__crown) { animation: none; }
+}
+.board-page[data-quality="low"] .result-pose :is(.result-pose__halo, .result-pose__hero, .result-pose__crown) { animation: none; }

@@ -48,5 +48,6 @@ test("result panel renders shared victory, ranking and the viewer breakdown", ()
   assert.match(markup, /1 Grundst/);
   assert.match(markup, /1 Gruppe/);
   assert.match(markup, /1 Gebäude/);
-  assert.match(markup, /result-miniature/);
+  assert.match(markup, /result-miniature result-pose result-pose--shared/);
+  assert.equal((markup.match(/class="result-pose__hero /g) ?? []).length, 2, "both winners strike the victory pose");
 });

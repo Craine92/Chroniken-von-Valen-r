@@ -22,6 +22,7 @@ function getMovementSignature(state: GameState): string {
 }
 
 import { PLAYER_COLOR_VALUES as PLAYER_COLORS, PLAYER_CHARACTERS } from "@valenor/shared";
+import { CODEX_FONTS } from "../design-tokens";
 
 const REGION_TRAIL: Record<RegionType, number> = {
   elves: 0xbd8cff,
@@ -458,18 +459,18 @@ export class ValenorBoardScene extends Phaser.Scene {
     }
     logo.add(seal);
     logo.add(this.add.text(0, -43, "CHRONIKEN", {
-      color: "#fff0cc", fontFamily: "Georgia, serif", fontSize: "31px", letterSpacing: 7,
+      color: "#fff0cc", fontFamily: CODEX_FONTS.display, fontSize: "31px", letterSpacing: 7,
       stroke: "#3b2c18", strokeThickness: 3, shadow: { color: "#d5a94e", blur: 10, fill: true }
     }).setOrigin(0.5));
     logo.add(this.add.text(0, -3, "VON", {
-      color: "#a88e58", fontFamily: "Georgia, serif", fontSize: "13px", letterSpacing: 8
+      color: "#a88e58", fontFamily: CODEX_FONTS.display, fontSize: "13px", letterSpacing: 8
     }).setOrigin(0.5));
     logo.add(this.add.text(0, 36, "VALENØR", {
-      color: "#ffe7aa", fontFamily: "Georgia, serif", fontSize: "38px", letterSpacing: 8,
+      color: "#ffe7aa", fontFamily: CODEX_FONTS.display, fontSize: "38px", letterSpacing: 8,
       stroke: "#3b2c18", strokeThickness: 3, shadow: { color: "#e3b759", blur: 14, fill: true }
     }).setOrigin(0.5));
     logo.add(this.add.text(0, 78, "VIER REICHE · EINE KRONE", {
-      color: "#9b938a", fontFamily: "Arial, sans-serif", fontSize: "10px", letterSpacing: 4
+      color: "#9b938a", fontFamily: CODEX_FONTS.text, fontSize: "10px", letterSpacing: 4
     }).setOrigin(0.5));
 
     const compass = this.add.graphics();
@@ -504,8 +505,8 @@ export class ValenorBoardScene extends Phaser.Scene {
         if(!offset)card.setY(-1.5);
         deck.add(card);
       }
-      const symbol = this.add.text(0, -4, glyph, { color: "#62471f", fontFamily: "Georgia,serif", fontSize: "32px" }).setOrigin(.5);
-      const title = this.add.text(0, 27, label, { color: "#352315", fontFamily: "Georgia,serif", fontSize: "12px", fontStyle: "bold" }).setOrigin(.5).setResolution(2);
+      const symbol = this.add.text(0, -4, glyph, { color: "#62471f", fontFamily: CODEX_FONTS.display, fontSize: "32px" }).setOrigin(.5);
+      const title = this.add.text(0, 27, label, { color: "#352315", fontFamily: CODEX_FONTS.display, fontSize: "12px", fontStyle: "bold" }).setOrigin(.5).setResolution(2);
       deck.add([symbol, title]);
       this.cardDecks.set(kind,deck);
       return deck;
@@ -559,7 +560,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const baseLower = this.add.ellipse(0, 13, 44, 12, 0x050507, .92);
       const baseOuter = this.add.ellipse(0, 10, TOKEN_VISUAL_CONFIG.base.outerWidth, TOKEN_VISUAL_CONFIG.base.outerHeight, 0x15151a, 1).setStrokeStyle(4, color, 1);
       const baseInner = this.add.ellipse(0, 7, TOKEN_VISUAL_CONFIG.base.innerWidth, TOKEN_VISUAL_CONFIG.base.innerHeight, color, .94).setStrokeStyle(2, 0xffedbd, .9);
-      const baseRune = this.add.text(0, 5, "ᚱ", { color: "#fff1c7", fontSize: "9px", fontFamily: "Georgia,serif" }).setOrigin(.5);
+      const baseRune = this.add.text(0, 5, "ᚱ", { color: "#fff1c7", fontSize: "9px", fontFamily: CODEX_FONTS.display }).setOrigin(.5);
       const miniatureAsset = getCharacterAsset(player.characterId);
       const miniatureVisual = this.add.container(0, 0).setName("token-character");
       if (miniatureAsset && this.artLayer?.hasAsset(miniatureAsset)) {
@@ -593,7 +594,7 @@ export class ValenorBoardScene extends Phaser.Scene {
         this.add.circle(0, 0, TOKEN_VISUAL_CONFIG.activeRingRadius - 5, 0x000000, 0).setStrokeStyle(2, 0xffe3a0, .92)
       ]);
       const nameText = this.add.text(0, 0, player.name.toUpperCase(), {
-        color: "#fff7df", fontFamily: "Arial,sans-serif", fontSize: "12px", fontStyle: "bold",
+        color: "#fff7df", fontFamily: CODEX_FONTS.text, fontSize: "12px", fontStyle: "bold",
         stroke: "#050507", strokeThickness: 3
       }).setOrigin(.5).setResolution(2);
       const namePlate = this.add.graphics();
@@ -826,7 +827,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const banner = this.add.rectangle(badgeX, badgeY, 28, 21, 0x09090c, .96)
         .setStrokeStyle(3, PLAYER_COLORS[owner.color], 1);
       const initials = owner.name.trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "✦";
-      const rune = this.add.text(badgeX, badgeY, initials, { color: "#fff3cf", fontFamily: "Arial,sans-serif", fontSize: "10px", fontStyle: "bold", stroke: "#080709", strokeThickness: 2 }).setOrigin(.5);
+      const rune = this.add.text(badgeX, badgeY, initials, { color: "#fff3cf", fontFamily: CODEX_FONTS.text, fontSize: "10px", fontStyle: "bold", stroke: "#080709", strokeThickness: 2 }).setOrigin(.5);
       if(ownership.mortgaged)marker.add(this.add.rectangle(0,0,place.width-9,place.height-9,0x000000,.28).setName("mortgage-shade"));
       marker.add([ownershipFrame, strip, glow, banner, rune]);
       const group = BOARD_TILES[ownership.tileIndex]?.propertyGroup;
@@ -1071,7 +1072,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const token = resolution.targetPlayerId ? this.tokens.get(resolution.targetPlayerId) : undefined;
       if (token && resolution.resultGold !== undefined) {
         const popup = this.add.text(token.x, token.y - 68, `${resolution.resultGold > 0 ? "+" : ""}${resolution.resultGold} GOLD`, {
-          color: resolution.resultGold > 0 ? "#ffe18a" : "#a9a49a", fontFamily: "Arial", fontSize: "22px", fontStyle: "bold",
+          color: resolution.resultGold > 0 ? "#ffe18a" : "#a9a49a", fontFamily: CODEX_FONTS.text, fontSize: "22px", fontStyle: "bold",
           stroke: "#24160a", strokeThickness: 5
         }).setOrigin(.5).setDepth(BOARD_DEPTHS.ui);
         this.tweens.add({ targets: popup, y: popup.y - 34, alpha: 0, duration: this.reducedMotion ? 250 : 1250, ease: "Sine.Out", onComplete: () => popup.destroy() });
@@ -1194,7 +1195,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const rollVisual=this.add.container(0,0).setName("dice-roll-presentation").setDepth(BOARD_DEPTHS.ui);
     this.temporaryVisuals.add(rollVisual);
     const cup = this.add.circle(0, 10, 112, 0x120f0c, .76).setDepth(BOARD_DEPTHS.ui).setStrokeStyle(3, die1 === die2 ? 0xf1d89b : 0x8f7548, .72);
-    const rune = this.add.text(0, 10, "ᚠ  ·  ᚱ  ·  ᛟ  ·  ᚷ", { color: die1 === die2 ? "#f5d685" : "#85704b", fontFamily: "Georgia,serif", fontSize: "13px", letterSpacing: 5 }).setOrigin(.5).setDepth(BOARD_DEPTHS.ui + 1);
+    const rune = this.add.text(0, 10, "ᚠ  ·  ᚱ  ·  ᛟ  ·  ᚷ", { color: die1 === die2 ? "#f5d685" : "#85704b", fontFamily: CODEX_FONTS.display, fontSize: "13px", letterSpacing: 5 }).setOrigin(.5).setDepth(BOARD_DEPTHS.ui + 1);
     const first = this.createDie(die1, -62);
     const second = this.createDie(die2, 62);
     rollVisual.add([cup,rune,first,second]);

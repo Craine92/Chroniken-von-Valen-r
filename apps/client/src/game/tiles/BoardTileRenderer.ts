@@ -6,6 +6,7 @@ import type { BoardArtLayer } from "../layers/BoardArtLayer";
 import { BOARD_DEPTHS } from "../layers/board-depths";
 import { getBoardTileVisualLayout, type BoardTileVisualLayout } from "./board-tile-layout";
 import { getPropertyGroupVisual, getRegionAccent, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, type TilePalette } from "./board-tile-theme";
+import { CODEX_FONTS } from "../design-tokens";
 
 export interface BoardTileRendererOptions {
   artLayer?: BoardArtLayer;
@@ -91,7 +92,7 @@ export class BoardTileRenderer {
     const tileTitle = getTileTitle(tile.name, tile.type === "property" ? 7 : undefined);
     const title = this.scene.add.text(layout.title.x, layout.title.y, tileTitle, {
       color: palette.text,
-      fontFamily: tile.type === "adventure" || tile.type === "fate" ? "Arial, sans-serif" : "Georgia, serif",
+      fontFamily: CODEX_FONTS.display,
       fontSize: `${layout.title.fontSize}px`,
       fontStyle: "bold",
       align: "center",
@@ -104,7 +105,7 @@ export class BoardTileRenderer {
     while(title.width>layout.title.width && titleSize>16)title.setFontSize(--titleSize);
     const footer = this.scene.add.text(layout.footer.x, layout.footer.y, getTileFooter(tile), {
       color: palette.mutedText,
-      fontFamily: "Arial, sans-serif",
+      fontFamily: CODEX_FONTS.text,
       fontSize: `${layout.footer.fontSize}px`,
       fontStyle: "bold",
       align: "center",
@@ -117,7 +118,7 @@ export class BoardTileRenderer {
     const primary = tile.economy ? `✦ ${tile.economy.purchasePrice}` : tile.type === "tax" ? `✦ ${tile.index === 38 ? DRAGON_TITHE : CROWN_TAX}` : tile.type === "adventure" || tile.type === "fate" ? "ZIEHEN" : getTilePrimaryAction(tile);
     const price = this.scene.add.text(layout.price.x, layout.price.y, primary, {
       color: "#ffebad",
-      fontFamily: "Arial, sans-serif",
+      fontFamily: CODEX_FONTS.text,
       fontSize: `${layout.price.fontSize}px`,
       fontStyle: "bold",
       align: "center",
@@ -134,7 +135,7 @@ export class BoardTileRenderer {
     if (layout.kind === "corner") {
       objects.push(this.scene.add.text(-layout.width / 2 + 8, -layout.height / 2 + 6, String(tile.index).padStart(2, "0"), {
         color: "#b9aa83",
-        fontFamily: "Arial, sans-serif",
+        fontFamily: CODEX_FONTS.text,
         fontSize: "6.5px",
         fontStyle: "bold",
         stroke: "#090807",

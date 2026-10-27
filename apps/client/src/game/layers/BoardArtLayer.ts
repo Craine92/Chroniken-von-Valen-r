@@ -6,6 +6,7 @@ import { addFittedImage, hasLoadedAsset, type AssetFit } from "../assets/asset-r
 import { ANIMATED_REALM_DECORATIONS, REALM_DECORATIONS } from "../assets/realm-decoration-config";
 import { BOARD_EFFECT_DECORATIONS } from "../assets/board-effect-config";
 import { BOARD_DEPTHS } from "./board-depths";
+import { CODEX_FONTS } from "../design-tokens";
 
 interface RealmArtPlacement {
   realm: RegionType;
@@ -90,7 +91,7 @@ export class BoardArtLayer {
       const {xFactor,yFactor}=REALM_LABEL_POSITIONS[realm];
       const x=Math.min(...points.map(point=>point.x!))+edgeX*xFactor;
       const y=Math.min(...points.map(point=>point.y!))+edgeY*yFactor;
-      this.realmLabels.push(this.scene.add.text(x,y,names[realm],{fontFamily:"Georgia,serif",fontSize:"31px",fontStyle:"bold",color:"#eddbaf",letterSpacing:3,stroke:"#16130f",strokeThickness:4,shadow:{color:"#000000",blur:6,fill:true}}).setOrigin(.5).setAlpha(.92).setDepth(BOARD_DEPTHS.players-.5).setName(`realm-label-${realm}`));
+      this.realmLabels.push(this.scene.add.text(x,y,names[realm],{fontFamily: CODEX_FONTS.display,fontSize:"31px",fontStyle:"bold",color:"#eddbaf",letterSpacing:3,stroke:"#16130f",strokeThickness:4,shadow:{color:"#000000",blur:6,fill:true}}).setOrigin(.5).setAlpha(.92).setDepth(BOARD_DEPTHS.players-.5).setName(`realm-label-${realm}`));
       const image = this.addMaskedRealmImage(asset, points);
       if (!image) return;
       rendered.add(realm);

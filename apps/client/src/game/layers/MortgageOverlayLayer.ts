@@ -3,6 +3,7 @@ import { BOARD_TILES, type GameState } from "@valenor/shared";
 import { getTilePlacement } from "../board-layout";
 import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
 import { BOARD_DEPTHS } from "./board-depths";
+import { CODEX_FONTS } from "../design-tokens";
 
 export class MortgageOverlayLayer {
   private readonly overlays = new Map<number, Phaser.GameObjects.Container>();
@@ -30,7 +31,7 @@ export class MortgageOverlayLayer {
     const halfHeight = Math.max(28, layout.height * .35);
     graphics.lineStyle(11, 0x160506, .94).beginPath().moveTo(-halfWidth, -halfHeight).lineTo(halfWidth, halfHeight).moveTo(halfWidth, -halfHeight).lineTo(-halfWidth, halfHeight).strokePath();
     graphics.lineStyle(6, 0xd73737, 1).beginPath().moveTo(-halfWidth, -halfHeight).lineTo(halfWidth, halfHeight).moveTo(halfWidth, -halfHeight).lineTo(-halfWidth, halfHeight).strokePath();
-    const label = this.scene.add.text(0, layout.kind === "landscape" ? 0 : 21, "BELEHNT", { color: "#fff4e8", backgroundColor: "#7d1014", fontFamily: "Arial,sans-serif", fontSize: "10px", fontStyle: "bold", padding: { x: 4, y: 2 }, stroke: "#210000", strokeThickness: 2 }).setOrigin(.5).setRotation(-rotation).setResolution(2);
+    const label = this.scene.add.text(0, layout.kind === "landscape" ? 0 : 21, "BELEHNT", { color: "#fff4e8", backgroundColor: "#7d1014", fontFamily: CODEX_FONTS.text, fontSize: "10px", fontStyle: "bold", padding: { x: 4, y: 2 }, stroke: "#210000", strokeThickness: 2 }).setOrigin(.5).setRotation(-rotation).setResolution(2);
     container.setName(`mortgage-overlay-${tile?.type ?? "property"}-${tileIndex}`).add([graphics, label]);
     return container;
   }

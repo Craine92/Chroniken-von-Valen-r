@@ -4,6 +4,7 @@ import { getTileInnerAnchor, getTilePlacement } from "../board-layout";
 import { getBuildingAsset } from "../assets/asset-manifest";
 import { fitImage, hasLoadedAsset } from "../assets/asset-runtime";
 import { BOARD_DEPTHS } from "./board-depths";
+import { CODEX_FONTS } from "../design-tokens";
 
 const REALM_LIGHT: Record<RegionType, number> = {
   elves: 0xb98cff,
@@ -110,7 +111,7 @@ export class PropertyDevelopmentLayer {
     badge.fillStyle(level === 5 ? 0x261d0d : 0x08080b, .96).fillRoundedRect(-17, -12, 34, 24, 5);
     badge.lineStyle(level === 5 ? 2.5 : 2, level === 5 ? 0xf3d681 : 0xd8bd78, .98).strokeRoundedRect(-17, -12, 34, 24, 5);
     const label = this.scene.add.text(0, 8, `${level}`, {
-      color: level === 5 ? "#fff0a8" : "#fff7dc", fontFamily: "Arial,sans-serif", fontSize: "16px", fontStyle: "bold",
+      color: level === 5 ? "#fff0a8" : "#fff7dc", fontFamily: CODEX_FONTS.text, fontSize: "16px", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 2
     }).setName("building-level-label").setOrigin(.5).setRotation(-rotation).setResolution(2);
     container.add([badge, label]);

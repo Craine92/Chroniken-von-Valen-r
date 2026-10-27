@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { BOARD_TILES, getCardDefinition, getPropertyGroupTiles, type GameState, type TradeAssets, type TradeOffer } from "@valenor/shared";
+import { BOARD_TILES, QUICK_TRADE_MIN_PRICE, formatQuickTradeHeadline, getCardDefinition, getOpenQuickTrade, getPropertyGroupTiles, getQuickTradeExpiryReason, getQuickTradeTerms, type GameState, type QuickTradeRequest, type TradeAssets, type TradeMode, type TradeOffer } from "@valenor/shared";
 import { completeQuests, ownershipQuestTypes } from "./quest-service";
 import { recordLargeTrade, recordNewCompleteGroups } from "./momentum-celebration-service";
 
 export interface CreateTradeRequest {
   counterToTradeId?: string;
+  mode?: TradeMode;
   recipientId: string;
   offer: TradeAssets;
   request: TradeAssets;
@@ -36,31 +37,66 @@ export class TradeService {
     if (original && (original.recipientId !== proposerId || original.proposerId !== request.recipientId)) {
       throw new Error("Nur der Empfänger kann dem ursprünglichen Anbieter ein Gegenangebot senden.");
     }
+    const quick = request.mode === "quick" || original?.mode === "quick";
     const offer: TradeOffer = {
       id: randomUUID(), proposerId, recipientId: request.recipientId,
       offer: this.normalizeAssets(request.offer), request: this.normalizeAssets(request.request),
-      status: "pending", createdAt: Date.now(), ...(original ? { counterToTradeId: original.id } : {})
+      status: "pending", createdAt: Date.now(), ...(original ? { counterToTradeId: original.id } : {}), ...(quick ? { mode: "quick" as const } : {})
     };
     this.validate(state, offer);
     if (offer.offer.gold === 0 && offer.request.gold === 0 && offer.offer.propertyTileIndices.length === 0 && offer.request.propertyTileIndices.length === 0 && !(offer.offer.cardIds?.length) && !(offer.request.cardIds?.length) && !offer.offer.relicIds?.length && !offer.request.relicIds?.length) {
       throw new Error("Ein Handelsangebot muss mindestens einen Wert enthalten.");
     }
+    if (quick) {
+      this.validateQuickShape(offer, original);
+      if (getOpenQuickTrade(state, proposerId)) throw new Error("Du hast bereits ein offenes Schnellangebot. Zieh es zurück, bevor du ein neues sendest.");
+      const ownership = state.propertyOwnerships.find(entry => entry.tileIndex === getQuickTradeTerms(offer)!.tileIndex)!;
+      offer.quickSnapshot = { round: state.currentRound, mortgaged: ownership.mortgaged };
+    }
     if (original) original.status = "countered";
     state.trades.push(offer);
-    state.lastTradeAction = { id: randomUUID(), type: "created", proposerId, recipientId: offer.recipientId, createdAt: Date.now() };
+    state.lastTradeAction = { id: randomUUID(), tradeId: offer.id, type: "created", proposerId, recipientId: offer.recipientId, createdAt: Date.now() };
     const proposer = state.players.find((player) => player.id === proposerId)!;
     const recipient = state.players.find((player) => player.id === offer.recipientId)!;
-    const message = proposer.type === "computer" && !original && offer.offer.gold > 0 && offer.request.propertyTileIndices.length === 1
-      ? `${proposer.name} bietet ${recipient.name} ${offer.offer.gold} Gold für ${BOARD_TILES[offer.request.propertyTileIndices[0]!]!.name}.`
-      : `${proposer.name} unterbreitet ${recipient.name} ein ${original ? "Gegenangebot" : "Handelsangebot"}.`;
+    const message = quick ? formatQuickTradeHeadline(state, offer)!
+      : proposer.type === "computer" && !original && offer.offer.gold > 0 && offer.request.propertyTileIndices.length === 1
+        ? `${proposer.name} bietet ${recipient.name} ${offer.offer.gold} Gold für ${BOARD_TILES[offer.request.propertyTileIndices[0]!]!.name}.`
+        : `${proposer.name} unterbreitet ${recipient.name} ein ${original ? "Gegenangebot" : "Handelsangebot"}.`;
     this.log(state, message, [proposerId, recipient.id]);
     return offer;
+  }
+
+  /** Schnellhandel: Der Server leitet Richtung und Partner aus dem Besitz ab; der Client nennt nur Feld und Preis. */
+  createQuick(state: GameState, actorId: string, request: QuickTradeRequest): TradeOffer {
+    this.requireSafePhase(state);
+    if (!Number.isInteger(request.tileIndex)) throw new Error("Das Grundstück ist ungültig.");
+    if (!Number.isSafeInteger(request.gold) || request.gold < QUICK_TRADE_MIN_PRICE) throw new Error(`Ein Schnellhandel braucht mindestens ${QUICK_TRADE_MIN_PRICE} Gold.`);
+    const ownership = state.propertyOwnerships.find(entry => entry.tileIndex === request.tileIndex);
+    if (!BOARD_TILES[request.tileIndex]?.economy || !ownership) throw new Error("Dieses Grundstück hat keinen Besitzer, mit dem du handeln könntest.");
+    const original = request.counterToTradeId === undefined ? undefined : this.requirePending(state, request.counterToTradeId);
+    const selling = ownership.ownerId === actorId;
+    if (!selling && request.recipientId !== undefined && request.recipientId !== ownership.ownerId) throw new Error("Dieses Grundstück gehört einem anderen Gefährten.");
+    const recipientId = original ? original.proposerId : selling ? request.recipientId : ownership.ownerId;
+    if (!recipientId) throw new Error("Wähle zuerst einen Käufer für dein Grundstück.");
+    const property = { gold: 0, propertyTileIndices: [request.tileIndex] };
+    const payment = { gold: request.gold, propertyTileIndices: [] };
+    return this.create(state, actorId, {
+      recipientId, mode: "quick",
+      offer: selling ? property : payment,
+      request: selling ? payment : property,
+      ...(original ? { counterToTradeId: original.id } : {})
+    });
   }
 
   accept(state: GameState, recipientId: string, tradeId: string): void {
     this.requireSafePhase(state);
     const trade = this.requirePending(state, tradeId);
     if (trade.recipientId !== recipientId) throw new Error("Dieses Angebot ist nicht an dich gerichtet.");
+    const expiryReason = trade.mode === "quick" ? getQuickTradeExpiryReason(state, trade) : undefined;
+    if (expiryReason) {
+      this.expire(state, trade, expiryReason);
+      throw new Error(`Dieses Angebot ist verfallen. ${expiryReason}`);
+    }
     try {
       this.validate(state, trade);
       for (const player of state.players.filter(player => player.type === "computer" && (player.id === trade.proposerId || player.id === trade.recipientId))) {
@@ -83,8 +119,11 @@ export class TradeService {
     this.transferCards(proposer, recipient, trade.offer.cardIds ?? []);
     this.transferCards(recipient, proposer, trade.request.cardIds ?? []);
     trade.status = "accepted";
-    state.lastTradeAction = { id: randomUUID(), type: "accepted", proposerId: proposer.id, recipientId: recipient.id, createdAt: Date.now() };
-    this.log(state, recipient.type === "computer" ? `${recipient.name} nimmt das Handelsangebot von ${proposer.name} an.` : `${proposer.name} und ${recipient.name} schließen einen Handel.`, [proposer.id, recipient.id]);
+    state.lastTradeAction = { id: randomUUID(), tradeId: trade.id, type: "accepted", proposerId: proposer.id, recipientId: recipient.id, createdAt: Date.now() };
+    const quickTerms = trade.mode === "quick" ? getQuickTradeTerms(trade) : undefined;
+    this.log(state, quickTerms
+      ? `Handel besiegelt: ${state.players.find(player => player.id === quickTerms.buyerId)!.name} erwirbt ${BOARD_TILES[quickTerms.tileIndex]!.name} von ${state.players.find(player => player.id === quickTerms.sellerId)!.name} für ${quickTerms.gold} Gold.`
+      : recipient.type === "computer" ? `${recipient.name} nimmt das Handelsangebot von ${proposer.name} an.` : `${proposer.name} und ${recipient.name} schließen einen Handel.`, [proposer.id, recipient.id]);
     completeQuests(state, proposer.id, trade.id, ownershipQuestTypes(state, proposer.id, trade.request.propertyTileIndices));
     completeQuests(state, recipient.id, trade.id, ownershipQuestTypes(state, recipient.id, trade.offer.propertyTileIndices));
     recordNewCompleteGroups(state, proposer.id);
@@ -96,14 +135,40 @@ export class TradeService {
     const trade = this.requirePending(state, tradeId);
     if (trade.recipientId !== recipientId) throw new Error("Dieses Angebot ist nicht an dich gerichtet.");
     trade.status = "rejected";
+    state.lastTradeAction = { id: randomUUID(), tradeId: trade.id, type: "rejected", proposerId: trade.proposerId, recipientId, createdAt: Date.now() };
     const recipient = state.players.find(player => player.id === recipientId);
-    if (recipient?.type === "computer") this.log(state, `${recipient.name} lehnt das Handelsangebot von ${state.players.find(player => player.id === trade.proposerId)!.name} ab.`, [trade.proposerId, recipientId]);
+    const proposerName = state.players.find(player => player.id === trade.proposerId)!.name;
+    const quickTerms = trade.mode === "quick" ? getQuickTradeTerms(trade) : undefined;
+    if (quickTerms && recipient) this.log(state, `${recipient.name} lehnt das Angebot von ${proposerName} für ${BOARD_TILES[quickTerms.tileIndex]!.name} ab.`, [trade.proposerId, recipientId]);
+    else if (recipient?.type === "computer") this.log(state, `${recipient.name} lehnt das Handelsangebot von ${proposerName} ab.`, [trade.proposerId, recipientId]);
   }
 
   cancel(state: GameState, proposerId: string, tradeId: string): void {
     const trade = this.requirePending(state, tradeId);
     if (trade.proposerId !== proposerId) throw new Error("Nur der Anbieter kann dieses Angebot zurückziehen.");
     trade.status = "cancelled";
+    if (trade.mode !== "quick") return;
+    state.lastTradeAction = { id: randomUUID(), tradeId: trade.id, type: "cancelled", proposerId, recipientId: trade.recipientId, createdAt: Date.now() };
+    const terms = getQuickTradeTerms(trade);
+    if (terms) this.log(state, `${state.players.find(player => player.id === proposerId)!.name} zieht das Angebot für ${BOARD_TILES[terms.tileIndex]!.name} zurück.`, [proposerId, trade.recipientId]);
+  }
+
+  /** Lässt jedes offene Schnellangebot verfallen, das nicht mehr zum Spielstand passt. Läuft nach jeder Zustandsänderung. */
+  expireStaleQuickTrades(state: GameState): void {
+    for (const trade of state.trades) {
+      if (trade.status !== "pending" || trade.mode !== "quick") continue;
+      const reason = getQuickTradeExpiryReason(state, trade);
+      if (reason) this.expire(state, trade, reason);
+    }
+  }
+
+  private expire(state: GameState, trade: TradeOffer, reason: string): void {
+    trade.status = "expired";
+    trade.closedReason = reason;
+    state.lastTradeAction = { id: randomUUID(), tradeId: trade.id, type: "expired", proposerId: trade.proposerId, recipientId: trade.recipientId, createdAt: Date.now() };
+    const terms = getQuickTradeTerms(trade);
+    const proposerName = state.players.find(player => player.id === trade.proposerId)?.name ?? "Ein Gefährte";
+    this.log(state, `Das Angebot von ${proposerName}${terms ? ` für ${BOARD_TILES[terms.tileIndex]!.name}` : ""} ist verfallen: ${reason}`, [trade.proposerId, trade.recipientId]);
   }
 
   private validate(state: GameState, trade: TradeOffer): void {
@@ -119,6 +184,16 @@ export class TradeService {
     this.validateProperties(state, trade.request.propertyTileIndices, recipient.id);
     this.validateCards(proposer, trade.offer.cardIds ?? []);
     this.validateCards(recipient, trade.request.cardIds ?? []);
+  }
+
+  private validateQuickShape(trade: TradeOffer, original: TradeOffer | undefined): void {
+    const terms = getQuickTradeTerms(trade);
+    if (!terms) throw new Error("Ein Schnellhandel tauscht genau ein Grundstück gegen Gold.");
+    if (!original) return;
+    const previous = getQuickTradeTerms(original);
+    if (!previous || previous.tileIndex !== terms.tileIndex || previous.buyerId !== terms.buyerId || previous.sellerId !== terms.sellerId) {
+      throw new Error("Ein Gegenangebot im Schnellhandel darf nur den Preis ändern.");
+    }
   }
 
   private validateProperties(state: GameState, tileIndices: readonly number[], ownerId: string): void {

@@ -23,7 +23,7 @@ export function getCurrentBoardContext(state: GameState, now = Date.now(), landi
   if (trade && now - trade.createdAt < BOARD_CONTEXT_DURATION_MS) {
     const offer = state.trades.filter(entry=>entry.proposerId===trade.proposerId && entry.recipientId===trade.recipientId).at(-1);
     return {kind:"trade",eyebrow:"HANDEL",title:`${state.players.find(player=>player.id===trade.proposerId)?.name ?? ""} ↔ ${state.players.find(player=>player.id===trade.recipientId)?.name ?? ""}`,
-      lines:[trade.type === "accepted" ? "ANGENOMMEN" : offer?.counterToTradeId ? "GEGENANGEBOT" : "ANGEBOT"]};
+      lines:[trade.type === "accepted" ? "ANGENOMMEN" : trade.type === "rejected" ? "ABGELEHNT" : trade.type === "cancelled" ? "ZURÜCKGEZOGEN" : trade.type === "expired" ? "VERFALLEN" : offer?.counterToTradeId ? "GEGENANGEBOT" : "ANGEBOT"]};
   }
   const dragon=fresh("dragon");if(dragon)return {kind:"dragon",eyebrow:"DRACHENBEGEGNUNG",title:"Hüter der Relikte",lines:[dragon.message]};
   const movement=state.lastMovement?.playerId === state.currentPlayerId ? state.lastMovement : undefined;

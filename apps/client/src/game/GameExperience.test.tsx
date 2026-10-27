@@ -85,7 +85,9 @@ test("card presentation ignores resolution updates but distinguishes consecutive
   state.decks={fate:{drawCount:1,discardCount:0},adventure:{drawCount:0,discardCount:0}};
   const key=getCardPresentationKey(state);state.activeCard.status="readyToAcknowledge";assert.equal(getCardPresentationKey(state),key);
   state.decks.fate.drawCount++;assert.notEqual(getCardPresentationKey(state),key);
-  for(const [width,height] of [[1699,1080],[2280,1440],[3444,2160]])assert.ok(getBoardScreenLayout(width!,height!).topSpace>45);
+  // Über der oberen Feldreihe (Rand plus Rahmen) bleibt Platz für die Zuganzeige.
+  for(const [width,height] of [[1176,768],[1699,1080],[2280,1440],[3444,2160]]){const layout=getBoardScreenLayout(width!,height!);
+    assert.ok(layout.topSpace+20*layout.zoom>44);}
 });
 
 test("TV context prioritizes decisions and cards and expires transient events without stale turns",()=>{

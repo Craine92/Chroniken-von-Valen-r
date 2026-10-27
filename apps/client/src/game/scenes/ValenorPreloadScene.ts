@@ -40,7 +40,9 @@ export class ValenorPreloadScene extends Phaser.Scene {
       console.warn(`Valenør asset unavailable; procedural fallback remains active: ${file.key}`);
     });
     preloadIconTextures(this.load);
-    getPreloadAssets().forEach((asset) => {
+    // Nur in der Entwicklung: `?fieldArt=off` zeigt das Brett ohne Feldbilder, um den Fallback zu prüfen.
+    const skipFieldArt = import.meta.env.DEV && new URLSearchParams(window.location.search).get("fieldArt") === "off";
+    getPreloadAssets().filter(asset => !(skipFieldArt && asset.key.startsWith("field-"))).forEach((asset) => {
       if (asset.kind === "image") this.load.image(asset.key, asset.path);
       else this.load.atlas(asset.key, asset.texturePath, asset.atlasPath);
     });

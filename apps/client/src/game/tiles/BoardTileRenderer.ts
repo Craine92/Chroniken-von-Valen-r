@@ -1,13 +1,14 @@
 import Phaser from "phaser";
 import { CROWN_TAX, DRAGON_TITHE, type BoardTile, type PropertyGroupId } from "@valenor/shared";
-import { FIELD_BASE_ASSETS, SPECIAL_TILE_ASSETS } from "../assets/asset-manifest";
+import { FIELD_BASE_ASSETS, getFieldArtAsset, SPECIAL_TILE_ASSETS, type ImageAssetDefinition } from "../assets/asset-manifest";
 import { fitImage, hasLoadedAsset } from "../assets/asset-runtime";
 import type { BoardArtLayer } from "../layers/BoardArtLayer";
 import { BOARD_DEPTHS } from "../layers/board-depths";
+import { FIELD_BANDS, getFieldZones, type FieldRect } from "../board-layout";
 import { getBoardTileVisualLayout, type BoardTileVisualLayout } from "./board-tile-layout";
-import { getPropertyGroupVisual, getRegionAccent, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, type TilePalette } from "./board-tile-theme";
+import { getFieldSymbol, getPropertyGroupVisual, getRegionAccent, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, type TilePalette } from "./board-tile-theme";
 import { CODEX_FONTS } from "../design-tokens";
-import { addIconImage } from "../icon-textures";
+import { addIconImage, type BoardIconName } from "../icon-textures";
 
 export interface BoardTileRendererOptions {
   artLayer?: BoardArtLayer;
@@ -35,10 +36,16 @@ export class BoardTileRenderer {
       .setOrigin(0)
       .setVisible(false);
     const atlasSource = this.scene.add.container(0, 0);
+    const fieldArt = new Map(tiles.map(tile => [tile.index, getFieldArtAsset(tile)]));
+    const hasArt = (tile: BoardTile) => {
+      const asset = fieldArt.get(tile.index);
+      return Boolean(asset && hasLoadedAsset(this.scene, asset));
+    };
     tiles.forEach((tile, index) => {
       const column = index % columns;
       const row = Math.floor(index / columns);
-      const source = this.createTileSource(tile);
+      // Mit Feldbild liegt im Atlas nur die Schrift- und Bandebene; das Bild selbst wird scharf direkt gezeichnet.
+      const source = hasArt(tile) ? this.createArtOverlaySource(tile) : this.createTileSource(tile);
       source.setScale(atlasScale).setPosition(column * cellSize + cellSize / 2, row * cellSize + cellSize / 2);
       atlasSource.add(source);
     });
@@ -52,8 +59,9 @@ export class BoardTileRenderer {
       .setDepth(BOARD_DEPTHS.tileFields)
       .setAlpha(1)
       .setVisible(true);
-    const rendered = tiles.map((tile, index) => {
+    const rendered = tiles.flatMap((tile, index) => {
       const layout = getBoardTileVisualLayout(tile.index);
+      const art = hasArt(tile) ? this.createFieldArt(fieldArt.get(tile.index)!, layout) : undefined;
       const column = index % columns;
       const row = Math.floor(index / columns);
       const frameName = `board-tile-${tile.index}`;
@@ -72,9 +80,10 @@ export class BoardTileRenderer {
           .on(Phaser.Input.Events.GAMEOBJECT_POINTER_OUT, () => this.options.onPropertyGroupFocus?.(tile.propertyGroupId!, "leave"))
           .on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => this.options.onPropertyGroupFocus?.(tile.propertyGroupId!, "toggle"));
       }
-      return image;
+      return art ? [art, image] : [image];
     });
     tileLayer.add(rendered);
+    if (import.meta.env.DEV) this.scene.game.canvas.dataset.fieldArtCount = String(tiles.filter(hasArt).length);
     atlasSource.removeAll(true);
     atlasSource.destroy();
     return tileLayer;
@@ -152,6 +161,108 @@ export class BoardTileRenderer {
         strokeThickness: 2
       }).setOrigin(0, 0));
     }
+    source.add(objects);
+    return source;
+  }
+
+  /** Feldbild als Cover-Zuschnitt: füllt das Feld, das Motiv bleibt mittig. */
+  private createFieldArt(asset: ImageAssetDefinition, layout: BoardTileVisualLayout): Phaser.GameObjects.Image {
+    const image = this.scene.add.image(layout.x, layout.y, asset.key).setName("board-field-art");
+    const inset = 2, width = layout.width - inset * 2, height = layout.height - inset * 2;
+    const scale = Math.max(width / image.width, height / image.height);
+    const cropWidth = width / scale, cropHeight = height / scale;
+    return image.setCrop((image.width - cropWidth) / 2, (image.height - cropHeight) / 2, cropWidth, cropHeight).setScale(scale);
+  }
+
+  /** Bänder mit leichtem Verlauf, Gruppenleiste, Rahmen und Schrift über dem Feldbild. */
+  private createArtOverlaySource(tile: BoardTile): Phaser.GameObjects.Container {
+    const layout = getBoardTileVisualLayout(tile.index);
+    const zones = getFieldZones(tile.index);
+    const palette = getTilePalette(tile);
+    const { width, height } = layout;
+    const source = this.scene.add.container(0, 0);
+    const bands = this.scene.add.graphics();
+    const shade = 0x07060a, solid = .84, fade = 12;
+    const band = (rect: FieldRect, fadeDirection: -1 | 1) => {
+      bands.fillStyle(shade, solid).fillRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+      const edge = fadeDirection > 0 ? rect.bottom : rect.top - fade;
+      const [topAlpha, bottomAlpha] = fadeDirection > 0 ? [solid, 0] : [0, solid];
+      bands.fillGradientStyle(shade, shade, shade, shade, topAlpha, topAlpha, bottomAlpha, bottomAlpha).fillRect(rect.left, edge, rect.right - rect.left, fade);
+    };
+    band(zones.nameBand, zones.kind === "corner" ? -1 : 1);
+    if (zones.priceBand) band(zones.priceBand, -1);
+    if (tile.type === "property") {
+      const strip = zones.groupStrip;
+      bands.fillStyle(getPropertyGroupVisual(tile.propertyGroup).accent, .98).fillRect(strip.left, strip.top, strip.right - strip.left, strip.bottom - strip.top);
+    }
+    bands.lineStyle(3, 0x0b0907, 1).strokeRoundedRect(-width / 2 + 1.5, -height / 2 + 1.5, width - 3, height - 3, 5);
+    bands.lineStyle(1.5, palette.specialFrame ? palette.accent : palette.rim, palette.specialFrame ? .95 : .78).strokeRoundedRect(-width / 2 + 3.5, -height / 2 + 3.5, width - 7, height - 7, 4);
+    const objects: Phaser.GameObjects.GameObject[] = [bands];
+
+    const titleStyle = (fontSize: number, align: "center" | "left") => ({
+      color: palette.text, fontFamily: CODEX_FONTS.display, fontSize: `${fontSize}px`, fontStyle: "bold", align,
+      lineSpacing: -5, stroke: "#080706", strokeThickness: 3, shadow: { color: "#000000", blur: 2, fill: true, offsetY: 1 }
+    });
+    const priceText = tile.economy ? `${tile.economy.purchasePrice}` : tile.type === "tax" ? `${tile.index === 38 ? DRAGON_TITHE : CROWN_TAX}` : tile.type === "adventure" || tile.type === "fate" ? "ZIEHEN" : "";
+    const showsGold = Boolean(tile.economy) || tile.type === "tax";
+    const symbol = getFieldSymbol(tile) as BoardIconName;
+    const symbolTint = tile.type === "property" ? getPropertyGroupVisual(tile.propertyGroup).accent : palette.accent;
+    const fit = (text: Phaser.GameObjects.Text, maxWidth: number, minSize: number) => {
+      let size = Number.parseFloat(String(text.style.fontSize));
+      while (text.width > maxWidth && size > minSize) text.setFontSize(--size);
+      return size;
+    };
+    // Betrag mit Münze und Feldsymbol als eine Zeile; liefert die Breite für die Ausrichtung.
+    const priceRow = (anchorX: number, y: number, fontSize: number, align: "center" | "right") => {
+      const parts: Phaser.GameObjects.GameObject[] = [];
+      const label = priceText ? this.scene.add.text(0, y, priceText, {
+        color: "#ffebad", fontFamily: CODEX_FONTS.text, fontSize: `${fontSize}px`, fontStyle: "bold", letterSpacing: .25,
+        stroke: "#080706", strokeThickness: 3, shadow: { color: "#000000", blur: 2, fill: true, offsetY: 1 }
+      }).setOrigin(.5).setResolution(2) : undefined;
+      const coinSize = fontSize * 1.05, symbolSize = fontSize * 1.15, gap = fontSize * .28;
+      const coin = showsGold ? addIconImage(this.scene, 0, y, "gold", coinSize, 0xffebad) : undefined;
+      const mark = addIconImage(this.scene, 0, y, symbol, symbolSize, symbolTint);
+      const total = symbolSize + (coin ? gap + coinSize : 0) + (label ? gap + label.width : 0);
+      let x = align === "center" ? anchorX - total / 2 : anchorX - total;
+      mark.setX(x + symbolSize / 2); x += symbolSize;
+      if (coin) { coin.setX(x + gap + coinSize / 2); x += gap + coinSize; }
+      if (label) label.setX(x + gap + label.width / 2);
+      parts.push(mark, ...(coin ? [coin] : []), ...(label ? [label] : []));
+      return { parts, width: total };
+    };
+
+    let titleSize = 0, title: Phaser.GameObjects.Text;
+    const titleText = zones.kind === "landscape" ? tile.name.toUpperCase() : getTileTitle(tile.name, tile.type === "property" ? 7 : undefined);
+    if (zones.kind === "portrait") {
+      const centerY = (zones.nameBand.top + zones.nameBand.bottom) / 2 + (zones.inward.y < 0 ? 3 : 0);
+      title = this.scene.add.text(0, centerY, titleText, titleStyle(17, "center")).setOrigin(.5).setMaxLines(2).setResolution(2);
+      titleSize = fit(title, width - 10, 12);
+      // Rechtsbündig: Links im Preisband sitzt bei Besitz das Wappen des Besitzers.
+      const price = priceRow(width / 2 - 8, (zones.priceBand!.top + zones.priceBand!.bottom) / 2 - (zones.inward.y > 0 ? 2 : 0), 13, "right");
+      objects.push(title, ...price.parts);
+    } else if (zones.kind === "landscape") {
+      const centerY = (zones.nameBand.top + zones.nameBand.bottom) / 2;
+      const outer = zones.inward.x > 0 ? -width / 2 + 10 : -width / 2 + 10 + FIELD_BANDS.groupStrip;
+      const innerEdge = zones.inward.x > 0 ? width / 2 - 10 - FIELD_BANDS.groupStrip : width / 2 - 10;
+      const price = priceRow(innerEdge, centerY, 13, "right");
+      title = this.scene.add.text(outer, centerY, titleText, titleStyle(16, "left")).setOrigin(0, .5).setResolution(2);
+      titleSize = fit(title, innerEdge - outer - price.width - 8, 11);
+      objects.push(title, ...price.parts);
+    } else {
+      const footerText = getTileFooter(tile);
+      const centerY = (zones.nameBand.top + zones.nameBand.bottom) / 2 - (footerText ? 6 : 0);
+      title = this.scene.add.text(0, centerY, getTileTitle(tile.name, 12), titleStyle(18, "center")).setOrigin(.5).setMaxLines(2).setResolution(2);
+      titleSize = fit(title, width - 16, 13);
+      objects.push(title);
+      if (footerText) {
+        const footer = this.scene.add.text(0, zones.nameBand.bottom - 9, footerText, {
+          color: palette.mutedText, fontFamily: CODEX_FONTS.text, fontSize: "10px", fontStyle: "bold", letterSpacing: .4, stroke: "#080706", strokeThickness: 2
+        }).setOrigin(.5).setResolution(2);
+        fit(footer, width - 20, 8);
+        objects.push(footer);
+      }
+    }
+    this.typography.set(tile.index, { title: titleText, fontSize: titleSize, titleWidth: title.width, titleHeight: title.height, price: priceText, iconSize: 0 });
     source.add(objects);
     return source;
   }

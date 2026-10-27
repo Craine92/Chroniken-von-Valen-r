@@ -1,11 +1,13 @@
 export const BOARD_WIDTH = 1_700;
-export const BOARD_HEIGHT = 960;
+export const BOARD_HEIGHT = 1_000;
 export const BOARD_HALF_WIDTH = BOARD_WIDTH / 2;
 export const BOARD_HALF_HEIGHT = BOARD_HEIGHT / 2;
-export const BOARD_CORNER_WIDTH = 160;
-export const BOARD_CORNER_HEIGHT = 135;
-export const BOARD_HORIZONTAL_FIELD_DEPTH = 135;
-export const BOARD_SIDE_FIELD_DEPTH = 135;
+/** Tiefe aller Randfelder: genug Fläche, damit das Feldbild unter Namens- und Preisband zur Geltung kommt. */
+export const BOARD_FIELD_DEPTH = 190;
+export const BOARD_CORNER_WIDTH = BOARD_FIELD_DEPTH;
+export const BOARD_CORNER_HEIGHT = BOARD_FIELD_DEPTH;
+export const BOARD_HORIZONTAL_FIELD_DEPTH = BOARD_FIELD_DEPTH;
+export const BOARD_SIDE_FIELD_DEPTH = BOARD_FIELD_DEPTH;
 export const BOARD_HORIZONTAL_FIELD_COUNT = 12;
 export const BOARD_VERTICAL_FIELD_COUNT = 6;
 export const BOARD_HORIZONTAL_CELL_WIDTH = (BOARD_WIDTH - BOARD_CORNER_WIDTH * 2) / BOARD_HORIZONTAL_FIELD_COUNT;
@@ -64,73 +66,187 @@ export function getTileWorldPosition(index: number) {
   return { x, y };
 }
 
-const FORMATIONS = {
-  1: [{ x: 0, y: 0 }],
-  2: [{ x: -23, y: 0 }, { x: 23, y: 0 }],
-  3: [{ x: 0, y: -20 }, { x: -24, y: 19 }, { x: 24, y: 19 }],
-  4: [{ x: -23, y: -19 }, { x: 23, y: -19 }, { x: -23, y: 19 }, { x: 23, y: 19 }],
-  5: [{x:-46,y:-19},{x:0,y:-19},{x:46,y:-19},{x:-23,y:19},{x:23,y:19}],
-  6: [{x:-46,y:-19},{x:0,y:-19},{x:46,y:-19},{x:-46,y:19},{x:0,y:19},{x:46,y:19}]
-} as const;
+export type FieldKind = "portrait" | "landscape" | "corner";
 
-export function getTokenFormationOffset(count: number, index: number) {
-  const formation = FORMATIONS[Math.min(6, Math.max(1, count)) as keyof typeof FORMATIONS];
-  return formation[index] ?? { x: 0, y: 0 };
+export interface FieldRect { left: number; top: number; right: number; bottom: number }
+
+/**
+ * Aufteilung eines Feldes in Feldkoordinaten (Mitte = 0/0): Namens- und Preisband, die Leiste in Gruppenfarbe,
+ * der Bauplatz an der Innenkante und die Standfläche der Figuren. Die Bänder bedecken zusammen höchstens ein Drittel.
+ */
+export interface FieldZones {
+  kind: FieldKind;
+  /** Richtung zur Brettmitte. */
+  inward: { x: number; y: number };
+  nameBand: FieldRect;
+  priceBand?: FieldRect;
+  groupStrip: FieldRect;
+  building?: FieldRect;
+  tokens: FieldRect;
 }
 
-/** Upright artwork footprints, expressed in units of the current field's shorter side. */
-export function getTileInnerAnchor(tileIndex: number, purpose: "token" | "dragon" | "building", occupiedByBuilding = false) {
+export const FIELD_BANDS = {
+  portrait: { name: 40, price: 22 },
+  landscape: { name: 30 },
+  corner: { name: 56 },
+  groupStrip: 6,
+  inset: 4
+} as const;
+
+export function getFieldKind(tileIndex: number): FieldKind {
+  const side = getTilePlacement(tileIndex).side;
+  return side === "corner" ? "corner" : side === "left" || side === "right" ? "landscape" : "portrait";
+}
+
+export function getFieldZones(tileIndex: number): FieldZones {
+  const place = getTilePlacement(tileIndex);
+  const kind = getFieldKind(tileIndex);
+  const halfW = place.width / 2, halfH = place.height / 2, inset = FIELD_BANDS.inset, strip = FIELD_BANDS.groupStrip;
+  const edge = getInnerEdgeOffset(tileIndex, 0);
+  const inward = { x: Math.sign(edge.x), y: Math.sign(edge.y) };
+  if (kind === "portrait") {
+    const nameBottom = -halfH + FIELD_BANDS.portrait.name, priceTop = halfH - FIELD_BANDS.portrait.price;
+    return {
+      kind, inward,
+      nameBand: { left: -halfW, top: -halfH, right: halfW, bottom: nameBottom },
+      priceBand: { left: -halfW, top: priceTop, right: halfW, bottom: halfH },
+      groupStrip: inward.y < 0 ? { left: -halfW + inset, top: -halfH + inset, right: halfW - inset, bottom: -halfH + inset + strip }
+        : { left: -halfW + inset, top: halfH - inset - strip, right: halfW - inset, bottom: halfH - inset },
+      building: { left: -halfW + 8, top: nameBottom + 2, right: halfW - 8, bottom: nameBottom + 74 },
+      tokens: { left: -halfW + inset + 2, top: nameBottom + 2, right: halfW - inset - 2, bottom: priceTop - 6 }
+    };
+  }
+  if (kind === "landscape") {
+    const nameBottom = -halfH + FIELD_BANDS.landscape.name, buildingWidth = 64;
+    const building = inward.x > 0
+      ? { left: halfW - inset - strip - buildingWidth, top: nameBottom, right: halfW - inset - strip, bottom: halfH - inset }
+      : { left: -halfW + inset + strip, top: nameBottom, right: -halfW + inset + strip + buildingWidth, bottom: halfH - inset };
+    return {
+      kind, inward,
+      nameBand: { left: -halfW, top: -halfH, right: halfW, bottom: nameBottom },
+      groupStrip: inward.x > 0 ? { left: halfW - inset - strip, top: -halfH + inset, right: halfW - inset, bottom: halfH - inset }
+        : { left: -halfW + inset, top: -halfH + inset, right: -halfW + inset + strip, bottom: halfH - inset },
+      building,
+      tokens: { left: -halfW + inset + strip + 2, top: nameBottom + 1, right: halfW - inset - strip - 2, bottom: halfH - inset - 12 }
+    };
+  }
+  const nameTop = halfH - FIELD_BANDS.corner.name;
+  return {
+    kind, inward,
+    nameBand: { left: -halfW, top: nameTop, right: halfW, bottom: halfH },
+    groupStrip: { left: 0, top: 0, right: 0, bottom: 0 },
+    tokens: { left: -halfW + inset + 6, top: -halfH + inset + 2, right: halfW - inset - 6, bottom: nameTop - 14 }
+  };
+}
+
+/**
+ * Größe einer Figur bei Platzfaktor 1 in Weltpixeln, inklusive der TV-Vergrößerung der Figuren
+ * (TOKEN_VISUAL_CONFIG mal getBoardVisualScale): Sockelbreite sowie Höhe über und unter den Füßen.
+ */
+export const TOKEN_FOOTPRINT = { width: 59, above: 108, below: 15, nominalVisualScale: 1.23 } as const;
+/** Größter Platzfaktor je Figurenzahl; die aktive Figur steht vorne und wird etwas größer. */
+export const TOKEN_SEAT_MAX_SCALE = [1, .86, .76, .7, .62, .58] as const;
+export const ACTIVE_TOKEN_SCALE_BOOST = 1.15;
+const TOKEN_ROW_STEP = .34;
+
+export interface TokenSeat {
+  /** Position der Füße relativ zur Feldmitte. */
+  x: number;
+  y: number;
+  /** Platzfaktor; 1 entspricht der bisherigen Figurengröße auf dem TV. */
+  scale: number;
+  row: number;
+  front: boolean;
+}
+
+function splitRows(count: number, rows: number, columns: number): number[] {
+  if (rows === 1) return [count];
+  // Vorne eine ungerade Zahl, damit die aktive Figur mittig vorne steht – solange hinten genug Platz bleibt.
+  let front = Math.min(columns, count - (rows - 1));
+  if (front % 2 === 0 && count - (front - 1) <= columns * (rows - 1)) front -= 1;
+  const back: number[] = [];
+  let rest = count - front;
+  for (let row = 0; row < rows - 1; row += 1) {
+    const inRow = Math.ceil(rest / (rows - 1 - row));
+    back.push(inRow);
+    rest -= inRow;
+  }
+  return [...back, front];
+}
+
+function layoutSeats(zone: FieldRect, count: number): TokenSeat[] {
+  const width = zone.right - zone.left, height = zone.bottom - zone.top;
+  const cap = TOKEN_SEAT_MAX_SCALE[count - 1]!;
+  const tall = TOKEN_FOOTPRINT.above + TOKEN_FOOTPRINT.below;
+  let best = { rows: 1, columns: count, scale: 0 };
+  for (let rows = 1; rows <= Math.min(3, count); rows += 1) {
+    const columns = Math.ceil(count / rows);
+    // Nachbarn dürfen sich um 8 % überlappen; die äußeren Figuren bleiben ganz auf der Standfläche.
+    const byWidth = width / (TOKEN_FOOTPRINT.width * (1 + (columns - 1) * .92));
+    const byHeight = height / (tall + (rows - 1) * TOKEN_ROW_STEP * tall);
+    const scale = Math.min(cap, byWidth, byHeight);
+    if (scale > best.scale + .01) best = { rows, columns, scale };
+  }
+  const { rows, columns, scale } = best;
+  const counts = splitRows(count, rows, columns);
+  const tokenWidth = TOKEN_FOOTPRINT.width * scale;
+  const spacing = columns > 1 ? Math.min((width - tokenWidth) / (columns - 1), tokenWidth * 1.08) : 0;
+  const centerX = (zone.left + zone.right) / 2;
+  const frontFeet = zone.bottom - TOKEN_FOOTPRINT.below * scale;
+  const seats: TokenSeat[] = [];
+  // Reihenfolge: vordere Reihe von der Mitte nach außen, dann die Reihen dahinter.
+  for (let row = rows - 1; row >= 0; row -= 1) {
+    const inRow = counts[row]!;
+    const y = frontFeet - (rows - 1 - row) * TOKEN_ROW_STEP * tall * scale;
+    const order = Array.from({ length: inRow }, (_, index) => index)
+      .sort((a, b) => Math.abs(a - (inRow - 1) / 2) - Math.abs(b - (inRow - 1) / 2) || a - b);
+    order.forEach(index => seats.push({ x: centerX + (index - (inRow - 1) / 2) * spacing, y, scale, row, front: row === rows - 1 }));
+  }
+  return seats;
+}
+
+/**
+ * Platz einer Figur auf ihrem Feld. Bis zu sechs Figuren stehen in ein bis drei Reihen auf der Standfläche,
+ * die aktive Figur vorne in der Mitte und etwas größer. Steht ein Gebäude auf dem Feld, bleibt sein Bauplatz frei.
+ */
+export function getTokenSeat(tileIndex: number, count: number, index: number, options: { activeIndex?: number; occupiedByBuilding?: boolean } = {}): TokenSeat {
+  const zones = getFieldZones(tileIndex);
+  const zone = { ...zones.tokens };
+  if (options.occupiedByBuilding && zones.building) {
+    if (zones.kind === "portrait") zone.top = zones.building.bottom - 30;
+    else if (zones.inward.x > 0) zone.right = zones.building.left;
+    else zone.left = zones.building.right;
+  }
+  const total = Math.min(6, Math.max(1, count));
+  const seats = layoutSeats(zone, total);
+  const active = options.activeIndex !== undefined && options.activeIndex >= 0 && options.activeIndex < total ? options.activeIndex : undefined;
+  const seatIndex = active === undefined ? index : index === active ? 0 : index < active ? index + 1 : index;
+  const seat = seats[Math.min(seats.length - 1, Math.max(0, seatIndex))]!;
+  if (active === undefined || index !== active || total === 1) return seat;
+  // Größer als die anderen, aber nie über die Standfläche hinaus (sonst verdeckt der Kopf den Feldnamen).
+  const fits = (seat.y - zone.top) / TOKEN_FOOTPRINT.above;
+  return { ...seat, scale: Math.max(seat.scale, Math.min(seat.scale * ACTIVE_TOKEN_SCALE_BOOST, fits)) };
+}
+
+/** Bauplatz in Feldkoordinaten: Fußpunkt (Mitte unten) und das Rechteck, in das das Gebäudebild passt. */
+export function getBuildingSeat(tileIndex: number) {
+  const zones = getFieldZones(tileIndex);
+  const box = zones.building ?? zones.tokens;
+  return { x: (box.left + box.right) / 2, y: box.bottom, width: box.right - box.left, height: box.bottom - box.top };
+}
+
+/** Where the dragon stands just inside the board, expressed in units of the field's shorter side. */
+export function getTileInnerAnchor(tileIndex: number) {
   const place = getTilePlacement(tileIndex);
   const unit = Math.min(place.width, place.height);
   const normal = getInnerEdgeOffset(tileIndex, 0);
-  const bounds = purpose === "building" ? {left:.32,right:.32,top:.76,bottom:.25}
-    : purpose === "dragon" ? {left:.54,right:.54,top:.72,bottom:.46}
-    : {left:occupiedByBuilding ? .98 : .52,right:occupiedByBuilding ? .98 : .52,top:.92,bottom:.44};
+  const bounds = {left:.54,right:.54,top:.72,bottom:.46};
   return {x:normal.x ? normal.x + Math.sign(normal.x)*unit*(normal.x>0 ? bounds.left : bounds.right) : 0,
     y:normal.y ? normal.y + Math.sign(normal.y)*unit*(normal.y>0 ? bounds.top : bounds.bottom) : 0};
 }
 
-/** Compact formations use the same geometry-derived anchor as the pointer. */
-export function getTokenSlotOffset(tileIndex: number, count: number, index: number, occupiedByBuilding = false) {
-  const normalized = ((tileIndex % 40) + 40) % 40;
-  const place = getTilePlacement(normalized);
-  const unit = Math.min(place.width, place.height);
-  const anchor = getTileInnerAnchor(normalized,"token",occupiedByBuilding);
-  if (count >= 5 && anchor.y) anchor.y += Math.sign(anchor.y) * unit * .35;
-  if (count >= 5 && place.side === "corner") {
-    const edge = getInnerEdgeOffset(normalized,0);
-    anchor.x = edge.x + Math.sign(edge.x) * unit * .31;
-  }
-  const formationUnit = Math.min(unit,BOARD_CELL_SIZE);
-  const columnGap = formationUnit * (count >= 5 && place.side !== "top" && place.side !== "bottom" ? .78 : .92);
-  const rowGap = formationUnit * (count >= 5 ? 1.75 : 1.4);
-  const columns = count >= 5 ? 3 : 2;
-  if (place.side === "corner") {
-    const sx = normalized === 0 || normalized === 33 ? -1 : 1;
-    const sy = normalized === 0 || normalized === 13 ? -1 : 1;
-    const slot = {x:(index % columns)*columnGap,y:Math.floor(index / columns)*rowGap};
-    return { x: anchor.x+sx*slot.x, y: anchor.y+sy*slot.y };
-  }
-  const horizontal = place.side === "bottom" || place.side === "top";
-  if(horizontal){
-    if (count >= 5) return {x:(index % columns - 1)*columnGap,y:anchor.y+Math.sign(anchor.y)*(Math.floor(index / columns)+(occupiedByBuilding ? 1 : 0))*rowGap};
-    const tangent = occupiedByBuilding ? unit*.64 : columnGap/2;
-    const column = count<=1 ? occupiedByBuilding ? (place.x>0 ? -tangent : tangent) : 0 : index%2 ? tangent : -tangent;
-    const row = count<=2 ? 0 : index>=2 ? rowGap : 0;
-    return {x:column,y:anchor.y+Math.sign(anchor.y)*row};
-  }
-  // On upright side fields, rotate the six-seat formation to two columns and three rows.
-  const column = count<=1 ? 0 : (index % 2)*columnGap;
-  const row = count >= 5 ? (Math.floor(index/2)-1)*rowGap : count<=2 ? 0 : index>=2 ? rowGap/2 : -rowGap/2;
-  const halfRows = count >= 5 ? rowGap : count>2 ? rowGap/2 : 0;
-  const minY = -BOARD_INNER_HALF_HEIGHT + unit*.92 + halfRows;
-  const maxY = BOARD_INNER_HALF_HEIGHT - unit*(count >= 5 ? .8 : .44) - halfRows;
-  const centerY = Math.max(minY,Math.min(maxY,place.y));
-  return {x:anchor.x+Math.sign(anchor.x)*column,y:centerY-place.y+row};
-}
-
 export function getDragonAnchor(tileIndex: number, visualScale = 1) {
-  const edge=getInnerEdgeOffset(tileIndex,0),anchor=getTileInnerAnchor(tileIndex,"dragon");
+  const edge=getInnerEdgeOffset(tileIndex,0),anchor=getTileInnerAnchor(tileIndex);
   return {x:edge.x+(anchor.x-edge.x)*visualScale,y:edge.y+(anchor.y-edge.y)*visualScale};
 }
 
@@ -166,7 +282,3 @@ export function getInnerEdgeOffset(tileIndex: number, extra = 12) {
   return { x: -place.width / 2 - extra, y: 0 };
 }
 
-export function getTokenLabelOffset(tileIndex: number) {
-  const place = getTilePlacement(tileIndex);
-  return { x:0,y:Math.min(place.width,place.height)*.25 };
-}

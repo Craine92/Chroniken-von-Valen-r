@@ -1,10 +1,13 @@
 import Phaser from "phaser";
 import { BOARD_TILES, type BuildingLevel, type GameState, type RegionType } from "@valenor/shared";
-import { getTileInnerAnchor, getTilePlacement } from "../board-layout";
+import { getBuildingSeat, getTilePlacement } from "../board-layout";
 import { getBuildingAsset } from "../assets/asset-manifest";
 import { fitImage, hasLoadedAsset } from "../assets/asset-runtime";
 import { BOARD_DEPTHS } from "./board-depths";
 import { CODEX_FONTS } from "../design-tokens";
+
+/** Anteil des Bauplatzes, den das Gebäude je Stufe einnimmt. */
+const BUILDING_LEVEL_FILL = [.7, .78, .86, .93, 1] as const;
 
 const REALM_LIGHT: Record<RegionType, number> = {
   elves: 0xb98cff,
@@ -16,7 +19,6 @@ const REALM_LIGHT: Record<RegionType, number> = {
 export class PropertyDevelopmentLayer {
   private readonly developments = new Map<number, Phaser.GameObjects.Container>();
   private readonly levels = new Map<number, BuildingLevel>();
-  private visualScale = 1;
 
   constructor(private readonly scene: Phaser.Scene) {}
 
@@ -53,67 +55,42 @@ export class PropertyDevelopmentLayer {
     this.levels.clear();
   }
 
-  setVisualScale(scale: number): void {
-    this.visualScale = scale;
-    this.developments.forEach((development) => development.setScale(scale));
-  }
-
   private createDevelopment(tileIndex: number, region: RegionType, level: BuildingLevel): Phaser.GameObjects.Container {
     const place = getTilePlacement(tileIndex);
-    const artScale = level === 5 ? 1.33 : 1.38;
-    const inner = getTileInnerAnchor(tileIndex,"building");
-    const container = this.scene.add.container(place.x + inner.x, place.y + inner.y).setRotation(place.rotation).setScale(this.visualScale).setDepth(BOARD_DEPTHS.buildings);
-    const shadow = this.scene.add.ellipse(2, 10, (level === 5 ? 48 : 37) * artScale, (level === 5 ? 19 : 13) * artScale, 0x000000, .55);
-    const ground = this.scene.add.ellipse(0, 7, (level === 5 ? 44 : 34) * artScale, (level === 5 ? 16 : 11) * artScale, region === "orcs" ? 0x583426 : region === "steppe" ? 0x74613b : 0x2d3a2d, .92).setStrokeStyle(2, REALM_LIGHT[region], .62);
-    const glow = this.scene.add.circle(0, 0, (level === 5 ? 26 : 19) * artScale, REALM_LIGHT[region], level === 5 ? .33 : .2);
-    container.add([shadow, ground, glow]);
+    const seat = getBuildingSeat(tileIndex);
+    // Der Bauplatz liegt an der Innenkante des Feldes; höhere Stufen füllen ihn weiter aus.
+    const fill = BUILDING_LEVEL_FILL[level - 1]!;
+    const width = seat.width * fill, height = seat.height * fill;
+    const container = this.scene.add.container(place.x + seat.x, place.y + seat.y - 3).setDepth(BOARD_DEPTHS.buildings);
+    const shadow = this.scene.add.ellipse(2, -2, width * .86, 12, 0x000000, .5);
+    const glow = this.scene.add.ellipse(0, -height * .45, width * .9, height * .8, REALM_LIGHT[region], level === 5 ? .22 : .12);
+    container.add([shadow, glow]);
     const artAsset = getBuildingAsset(region, level);
     if (artAsset && hasLoadedAsset(this.scene, artAsset)) {
-      const outlineExpansion = level === 5 ? 1.08 : 1.06;
-      const goldOutline = fitImage(
-        this.scene.add.image(0, -10, artAsset.key),
-        (level === 5 ? 46 : 38 + level) * artScale * outlineExpansion,
-        (level === 5 ? 62 : 50 + level) * artScale * outlineExpansion,
-        "contain"
-      ).setName("building-gold-outline").setOrigin(.5, .78).setRotation(-place.rotation).setTintFill(level === 5 ? 0xffdc72 : 0xd8b968);
-      const separator = fitImage(
-        this.scene.add.image(0, -10, artAsset.key),
-        (level === 5 ? 46 : 38 + level) * artScale * 1.025,
-        (level === 5 ? 62 : 50 + level) * artScale * 1.025,
-        "contain"
-      ).setName("building-dark-separator").setOrigin(.5, .78).setRotation(-place.rotation).setTintFill(0x08080b);
-      const building = fitImage(
-        this.scene.add.image(0, -10, artAsset.key),
-        (level === 5 ? 46 : 38 + level) * artScale,
-        (level === 5 ? 62 : 50 + level) * artScale,
-        "contain"
-      ).setName("building-art").setOrigin(.5, .78).setRotation(-place.rotation);
-      const rank = this.scene.add.graphics().setPosition(0, 10).setRotation(-place.rotation);
-      const pipCount = level === 5 ? 1 : level;
-      for (let index = 0; index < pipCount; index += 1) {
-        const x = (index - (pipCount - 1) / 2) * 7;
-        rank.fillStyle(level === 5 ? 0xf3d681 : REALM_LIGHT[region], .95).fillCircle(x, 0, level === 5 ? 3.5 : 2.2);
-      }
-      container.add([goldOutline, separator, building, rank]);
-      this.addLevelBadge(container, place.rotation, level);
-      return container;
+      const art = (expansion: number) => fitImage(this.scene.add.image(0, 0, artAsset.key), width * expansion, height * expansion, "contain").setOrigin(.5, 1);
+      const goldOutline = art(1.06).setName("building-gold-outline").setY(1.5).setTintFill(level === 5 ? 0xffdc72 : 0xd8b968).setAlpha(.9);
+      const separator = art(1.03).setName("building-dark-separator").setY(.5).setTintFill(0x08080b);
+      const building = art(1).setName("building-art");
+      container.add([goldOutline, separator, building]);
+    } else {
+      const fallback = this.scene.add.container(0, -height * .45).setName("building-art").setScale(Math.min(width, height) / 52);
+      container.add(fallback);
+      if (level === 5) this.drawGrandStructure(fallback, region);
+      else this.drawSettlement(fallback, region, level);
     }
-    const art = this.scene.add.container(0, 0).setName("building-art").setScale(artScale);
-    container.add(art);
-    if (level === 5) this.drawGrandStructure(art, region);
-    else this.drawSettlement(art, region, level);
-    this.addLevelBadge(container, place.rotation, level);
+    this.addLevelBadge(container, width / 2 - 9, -9, level);
     return container;
   }
 
-  private addLevelBadge(container: Phaser.GameObjects.Container, rotation: number, level: BuildingLevel): void {
-    const badge = this.scene.add.graphics().setName("building-level-badge").setPosition(0, 8).setRotation(-rotation);
-    badge.fillStyle(level === 5 ? 0x261d0d : 0x08080b, .96).fillRoundedRect(-17, -12, 34, 24, 5);
-    badge.lineStyle(level === 5 ? 2.5 : 2, level === 5 ? 0xf3d681 : 0xd8bd78, .98).strokeRoundedRect(-17, -12, 34, 24, 5);
-    const label = this.scene.add.text(0, 8, `${level}`, {
-      color: level === 5 ? "#fff0a8" : "#fff7dc", fontFamily: CODEX_FONTS.text, fontSize: "16px", fontStyle: "bold",
+  /** Kleine Stufenmarke unten am Gebäude; bleibt neben den Figuren gut lesbar. */
+  private addLevelBadge(container: Phaser.GameObjects.Container, x: number, y: number, level: BuildingLevel): void {
+    const badge = this.scene.add.graphics().setName("building-level-badge").setPosition(x, y);
+    badge.fillStyle(level === 5 ? 0x261d0d : 0x08080b, .96).fillRoundedRect(-10, -9, 20, 18, 4);
+    badge.lineStyle(level === 5 ? 2 : 1.5, level === 5 ? 0xf3d681 : 0xd8bd78, .98).strokeRoundedRect(-10, -9, 20, 18, 4);
+    const label = this.scene.add.text(x, y, `${level}`, {
+      color: level === 5 ? "#fff0a8" : "#fff7dc", fontFamily: CODEX_FONTS.text, fontSize: "12px", fontStyle: "bold",
       stroke: "#000000", strokeThickness: 2
-    }).setName("building-level-label").setOrigin(.5).setRotation(-rotation).setResolution(2);
+    }).setName("building-level-label").setOrigin(.5).setResolution(2);
     container.add([badge, label]);
   }
 
@@ -181,9 +158,9 @@ export class PropertyDevelopmentLayer {
   }
 
   private animateBuild(container: Phaser.GameObjects.Container, region: RegionType, grand: boolean): void {
-    container.setAlpha(0).setScale(this.visualScale * (grand ? 0.35 : 0.55));
+    container.setAlpha(0).setScale(grand ? 0.35 : 0.55);
     const duration = grand ? 1_050 : 540;
-    this.scene.tweens.add({ targets: container, alpha: 1, scale: this.visualScale, duration, ease: "Back.Out" });
+    this.scene.tweens.add({ targets: container, alpha: 1, scale: 1, duration, ease: "Back.Out" });
     if (grand) this.scene.cameras.main.flash(180, 217, 187, 120, false, undefined, this);
     const ring = this.scene.add.circle(container.x, container.y, grand ? 9 : 5, REALM_LIGHT[region], 0)
       .setStrokeStyle(grand ? 3 : 2, REALM_LIGHT[region], 0.9)

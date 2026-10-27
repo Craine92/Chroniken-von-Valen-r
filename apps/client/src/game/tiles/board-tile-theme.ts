@@ -177,6 +177,16 @@ export function getTilePrimaryAction(tile: BoardTile): string {
   return "";
 }
 
+const FIELD_SYMBOLS: Readonly<Record<Exclude<BoardTile["type"], "property">, IconName>> = {
+  start: "rune", dungeon: "dungeon", goToDungeon: "dungeon", rest: "tavern", adventure: "adventure",
+  fate: "fate", harbor: "harbor", utility: "utility", tax: "crown"
+};
+
+/** Kleines Symbol im Band der Bildfelder: Gruppensiegel bei Grundstücken, sonst das Zeichen der Feldart. */
+export function getFieldSymbol(tile: BoardTile): IconName {
+  return tile.type === "property" ? getPropertyGroupVisual(tile.propertyGroup).icon : FIELD_SYMBOLS[tile.type];
+}
+
 export function getRegionAccent(region: RegionType | undefined): number {
   return region ? REGION_PALETTES[region].accent : 0xd6bd78;
 }

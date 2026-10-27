@@ -2040,17 +2040,19 @@ body {
 }
 
 /* Presentation pass 2: the upper table margin stays outside the printed board. */
-.board-top-hud { position:absolute; z-index:18; top:3px; left:50%; translate:-50% 0; box-sizing:border-box; height:max(0px,calc(var(--board-top-space,52px) - 6px)); max-height:104px; max-width:calc(100% - 1rem); display:flex; align-items:center; gap:clamp(.5rem,1vw,1.2rem); padding:0 clamp(.7rem,1vw,1.3rem); color:var(--c-gold-200); background:linear-gradient(120deg,rgb(var(--c-leather-700-rgb) / .91),rgb(var(--c-ink-900-rgb) / .961)); border:2px solid var(--c-gold-500); border-radius:var(--radius-md); box-shadow:0 6px 16px rgb(var(--c-black-rgb) / .533),inset 0 0 0 2px rgb(var(--c-gold-400-rgb) / .094); overflow:hidden; pointer-events:none; }
+/* Das höhere Brett lässt oben weniger Rand; die Zuganzeige behält trotzdem eine lesbare Mindesthöhe und ragt höchstens in den Rahmen. */
+.board-stage { --board-hud-space:max(46px,var(--board-top-space,52px)); }
+.board-top-hud { position:absolute; z-index:18; top:3px; left:50%; translate:-50% 0; box-sizing:border-box; height:max(0px,calc(var(--board-hud-space,52px) - 6px)); max-height:104px; max-width:calc(100% - 1rem); display:flex; align-items:center; gap:clamp(.5rem,1vw,1.2rem); padding:0 clamp(.7rem,1vw,1.3rem); color:var(--c-gold-200); background:linear-gradient(120deg,rgb(var(--c-leather-700-rgb) / .91),rgb(var(--c-ink-900-rgb) / .961)); border:2px solid var(--c-gold-500); border-radius:var(--radius-md); box-shadow:0 6px 16px rgb(var(--c-black-rgb) / .533),inset 0 0 0 2px rgb(var(--c-gold-400-rgb) / .094); overflow:hidden; pointer-events:none; }
 .board-stage::before { content:""; position:absolute; z-index:1; top:0; left:0; right:0; height:var(--board-top-space,52px); pointer-events:none; opacity:.14; background:radial-gradient(ellipse at 50% 90%,rgb(var(--c-gold-500-rgb) / .2),transparent 60%),linear-gradient(rgb(var(--c-ink-950-rgb) / .851),var(--c-ink-950)),url('/assets/board/realms/realm-human.webp') 50% 38% / cover; }
 .board-top-hud__dice { display:flex; align-items:center; gap:var(--space-2); height:100%; }
-.dice-face { display:grid; place-items:center; width:clamp(28px,calc(var(--board-top-space,52px) * .7),70px); height:clamp(28px,calc(var(--board-top-space,52px) * .7),70px); flex-shrink:0; color:var(--c-leather-800); font:clamp(29px,calc(var(--board-top-space,52px) * .66),64px)/1 'Segoe UI Symbol',Arial,sans-serif; background:linear-gradient(135deg,var(--c-parchment-100),var(--c-parchment-300)); border:1px solid var(--c-gold-400); border-radius:var(--radius-md); box-shadow:0 2px 0 var(--c-leather-500),inset 0 0 0 1px var(--c-parchment-50); }
+.dice-face { display:grid; place-items:center; width:clamp(28px,calc(var(--board-hud-space,52px) * .7),70px); height:clamp(28px,calc(var(--board-hud-space,52px) * .7),70px); flex-shrink:0; color:var(--c-leather-800); font:clamp(29px,calc(var(--board-hud-space,52px) * .66),64px)/1 'Segoe UI Symbol',Arial,sans-serif; background:linear-gradient(135deg,var(--c-parchment-100),var(--c-parchment-300)); border:1px solid var(--c-gold-400); border-radius:var(--radius-md); box-shadow:0 2px 0 var(--c-leather-500),inset 0 0 0 1px var(--c-parchment-50); }
 .board-top-hud__caption { display:grid; gap:var(--space-0-5); min-width:0; }
-.board-top-hud__caption small { color:var(--c-gold-400); font-size:clamp(9px,calc(var(--board-top-space,52px) * .2),16px); font-weight:800; letter-spacing:.1em; white-space:nowrap; }
-.board-top-hud__caption strong { overflow:hidden; font:700 clamp(12px,calc(var(--board-top-space,52px) * .3),24px)/1.1 var(--font-display); white-space:nowrap; text-overflow:ellipsis; }
-.board-top-hud__total { color:var(--c-gold-200); font:700 clamp(28px,calc(var(--board-top-space,52px) * .68),68px)/1 var(--font-display); padding-left:var(--space-2); border-left:1px solid rgb(var(--c-gold-700-rgb) / .533); }
-.board-top-hud__prompt { font:700 clamp(10px,calc(var(--board-top-space,52px) * .24),19px) var(--font-display); letter-spacing:.06em; }
-.board-top-hud > i { color:var(--c-gold-400); font:normal clamp(20px,calc(var(--board-top-space,52px) * .55),42px) var(--font-display); }
-.board-top-hud > em { color:var(--c-gold-300); font:700 clamp(10px,calc(var(--board-top-space,52px) * .22),18px) var(--font-display); }
+.board-top-hud__caption small { color:var(--c-gold-400); font-size:clamp(9px,calc(var(--board-hud-space,52px) * .2),16px); font-weight:800; letter-spacing:.1em; white-space:nowrap; }
+.board-top-hud__caption strong { overflow:hidden; font:700 clamp(12px,calc(var(--board-hud-space,52px) * .3),24px)/1.1 var(--font-display); white-space:nowrap; text-overflow:ellipsis; }
+.board-top-hud__total { color:var(--c-gold-200); font:700 clamp(28px,calc(var(--board-hud-space,52px) * .68),68px)/1 var(--font-display); padding-left:var(--space-2); border-left:1px solid rgb(var(--c-gold-700-rgb) / .533); }
+.board-top-hud__prompt { font:700 clamp(10px,calc(var(--board-hud-space,52px) * .24),19px) var(--font-display); letter-spacing:.06em; }
+.board-top-hud > i { color:var(--c-gold-400); font:normal clamp(20px,calc(var(--board-hud-space,52px) * .55),42px) var(--font-display); }
+.board-top-hud > em { color:var(--c-gold-300); font:700 clamp(10px,calc(var(--board-hud-space,52px) * .22),18px) var(--font-display); }
 .board-top-hud.is-rolling .dice-face { animation:topDiceRoll var(--dur-base) ease-in-out infinite alternate; }
 @keyframes topDiceRoll { from { transform:rotate(-7deg); opacity:.7; } to { transform:rotate(7deg); opacity:1; } }
 .board-stage:has(.board-top-hud) .board-notification-lane { top:calc(var(--board-top-space,52px) + 145px * var(--board-scale,1)); }
@@ -2092,13 +2094,13 @@ body {
 .board-stage::before { display:none; }
 
 /* Final polish keeps the table margin and printed board unchanged. */
-.board-top-hud { top:2px; height:max(0px,calc(var(--board-top-space,52px) - 4px)); width:clamp(360px,calc(var(--board-top-space,52px) * 7.2),580px); justify-content:space-between; padding:0 clamp(1rem,1.5vw,2rem); border-color:var(--c-gold-500); box-shadow:0 7px 18px rgb(var(--c-black-rgb) / .533),inset 0 0 0 2px rgb(var(--c-gold-400-rgb) / .133); }
-.board-top-hud.has-result { width:clamp(560px,calc(var(--board-top-space,52px) * 10.8),950px); }
-.board-top-hud__caption strong { font-size:clamp(20px,calc(var(--board-top-space,52px) * .42),32px); }
-.board-top-hud__caption small { font-size:clamp(12px,calc(var(--board-top-space,52px) * .24),18px); }
-.board-top-hud__prompt { font-size:clamp(15px,calc(var(--board-top-space,52px) * .32),24px); }
-.board-top-hud__total { font-size:clamp(40px,calc(var(--board-top-space,52px) * .85),78px); }
-.board-top-hud > em { font-size:clamp(12px,calc(var(--board-top-space,52px) * .26),20px); }
+.board-top-hud { top:2px; height:max(0px,calc(var(--board-hud-space,52px) - 4px)); width:clamp(360px,calc(var(--board-hud-space,52px) * 7.2),580px); justify-content:space-between; padding:0 clamp(1rem,1.5vw,2rem); border-color:var(--c-gold-500); box-shadow:0 7px 18px rgb(var(--c-black-rgb) / .533),inset 0 0 0 2px rgb(var(--c-gold-400-rgb) / .133); }
+.board-top-hud.has-result { width:clamp(560px,calc(var(--board-hud-space,52px) * 10.8),950px); }
+.board-top-hud__caption strong { font-size:clamp(20px,calc(var(--board-hud-space,52px) * .42),32px); }
+.board-top-hud__caption small { font-size:clamp(12px,calc(var(--board-hud-space,52px) * .24),18px); }
+.board-top-hud__prompt { font-size:clamp(15px,calc(var(--board-hud-space,52px) * .32),24px); }
+.board-top-hud__total { font-size:clamp(40px,calc(var(--board-hud-space,52px) * .85),78px); }
+.board-top-hud > em { font-size:clamp(12px,calc(var(--board-hud-space,52px) * .26),20px); }
 @media (min-width:721px) {
   .game-sidebar .game-hud__context[data-context-kind="neutral"] { position:relative; min-height:168px; gap:var(--space-1); }
   .game-sidebar .game-hud__context[data-context-kind="neutral"] > small { display:block; font-size:var(--fs-2xs); letter-spacing:.06em; }

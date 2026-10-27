@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import type { GameState, RegionType } from "@valenor/shared";
-import { BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, getTileInnerAnchor, getTilePlacement } from "../board-layout";
+import { BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, getBuildingSeat, getTilePlacement } from "../board-layout";
 import { codexColor } from "../design-tokens";
 import type { AmbientLifeBudget } from "../visual-config";
 import { chooseChimneyTiles } from "../living/ambient";
@@ -61,9 +61,9 @@ export class AmbientLifeLayer {
     this.smoke.length = 0;
     tiles.forEach((tileIndex, index) => {
       const place = getTilePlacement(tileIndex);
-      const inner = getTileInnerAnchor(tileIndex, "building");
-      // Drei versetzte Schwaden je Schornstein ergeben eine ruhige, durchgehende Säule.
-      for (let puffIndex = 0; puffIndex < 3; puffIndex += 1) this.addSmokePuff(place.x + inner.x, place.y + inner.y - 28, index * 3 + puffIndex);
+      const seat = getBuildingSeat(tileIndex);
+      // Drei versetzte Schwaden je Schornstein; sie bleiben im Bildbereich und ziehen nicht über den Feldnamen.
+      for (let puffIndex = 0; puffIndex < 3; puffIndex += 1) this.addSmokePuff(place.x + seat.x, place.y + seat.y - seat.height * .55, index * 3 + puffIndex);
     });
   }
 
@@ -87,10 +87,10 @@ export class AmbientLifeLayer {
     const puff = this.scene.add.circle(x, y, 8, codexColor("parchment200"), 1).setAlpha(0).setDepth(BOARD_DEPTHS.buildings + 1).setName("ambient-smoke");
     this.smoke.push(puff);
     this.scene.tweens.add({
-      targets: puff, y: y - 46, x: x + 16, scale: 2.6, duration: 3_600, delay: index * 1_200 % 3_600, repeat: -1, ease: "Sine.Out",
+      targets: puff, y: y - 24, x: x + 8, scale: 1.8, duration: 3_600, delay: index * 1_200 % 3_600, repeat: -1, ease: "Sine.Out",
       onRepeat: () => puff.setPosition(x, y),
       // Sichtbar nur in der Mitte des Wegs: auftauchen, ziehen, vergehen.
-      onUpdate: tween => puff.setAlpha(Math.sin(loopProgress(tween) * Math.PI) * .36)
+      onUpdate: tween => puff.setAlpha(Math.sin(loopProgress(tween) * Math.PI) * .3)
     });
   }
 

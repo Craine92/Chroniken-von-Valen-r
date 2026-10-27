@@ -5,10 +5,12 @@ import {
   QUICK_TRADE_MIN_PRICE,
   QUICK_TRADE_PRICE_RATING_BOUNDS,
   QUICK_TRADE_PRICE_RATING_LABELS,
+  QUICK_TRADE_PRICE_TONE_LABELS,
   formatQuickTradeHeadline,
   getEffectiveMortgageRedemptionCost,
   getOpenQuickTrade,
   getQuickTradeEligibility,
+  getQuickTradePriceVerdict,
   getQuickTradeSuggestion,
   getQuickTradeTerms,
   rateQuickTradePrice,
@@ -97,6 +99,26 @@ test("price rating bounds are shared constants relative to the fair price", () =
   assert.equal(rateQuickTradePrice(120, 100), "high");
   assert.equal(rateQuickTradePrice(50, 0), "fair");
   assert.deepEqual(QUICK_TRADE_PRICE_RATING_LABELS, { cheap: "günstig", fair: "fair", high: "hoch" });
+});
+
+test("the price verdict depends on the viewer's role while the bounds stay shared", () => {
+  const cases: [number, "buyer" | "seller", "offer" | "draft", string, string][] = [
+    [180, "seller", "offer", "good", "Sehr gutes Angebot"],
+    [180, "buyer", "offer", "poor", "Schwaches Angebot"],
+    [40, "seller", "offer", "poor", "Schwaches Angebot"],
+    [40, "buyer", "offer", "good", "Sehr gutes Angebot"],
+    [70, "seller", "offer", "fair", "Faires Angebot"],
+    [70, "buyer", "draft", "fair", "Fairer Preis"],
+    [180, "seller", "draft", "good", "Gut für dich"],
+    [180, "buyer", "draft", "poor", "Ungünstig für dich"]
+  ];
+  for (const [gold, role, context, tone, label] of cases) {
+    const verdict = getQuickTradePriceVerdict(gold, 70, role, context);
+    assert.equal(verdict.tone, tone, `${gold} ${role} ${context}`);
+    assert.equal(verdict.label, label, `${gold} ${role} ${context}`);
+    assert.equal(verdict.rating, rateQuickTradePrice(gold, 70), "the rating itself is role independent");
+  }
+  assert.deepEqual(QUICK_TRADE_PRICE_TONE_LABELS.offer, { good: "Sehr gutes Angebot", fair: "Faires Angebot", poor: "Schwaches Angebot" });
 });
 
 test("eligibility keeps building and bankruptcy rules and explains the block", () => {

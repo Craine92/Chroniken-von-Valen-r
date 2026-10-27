@@ -24,6 +24,26 @@ export function rateQuickTradePrice(gold: number, fairPrice: number): QuickTrade
   return "fair";
 }
 
+/**
+ * Wie ein Preis für den Betrachter ausfällt: Ein hoher Preis ist für den Verkäufer gut und für den Käufer schlecht.
+ * Die Grenzen kommen weiter aus QUICK_TRADE_PRICE_RATING_BOUNDS; nur Text und Farbe hängen von der Rolle ab.
+ */
+export type QuickTradeRole = "buyer" | "seller";
+export type QuickTradePriceTone = "good" | "fair" | "poor";
+export interface QuickTradePriceVerdict { rating: QuickTradePriceRating; tone: QuickTradePriceTone; label: string }
+
+/** "offer": ein eingehendes Angebot; "draft": der eigene Preis auf dem Preisbildschirm oder das eigene offene Angebot. */
+export const QUICK_TRADE_PRICE_TONE_LABELS: Record<"offer" | "draft", Record<QuickTradePriceTone, string>> = {
+  offer: { good: "Sehr gutes Angebot", fair: "Faires Angebot", poor: "Schwaches Angebot" },
+  draft: { good: "Gut für dich", fair: "Fairer Preis", poor: "Ungünstig für dich" }
+};
+
+export function getQuickTradePriceVerdict(gold: number, fairPrice: number, role: QuickTradeRole, context: "offer" | "draft"): QuickTradePriceVerdict {
+  const rating = rateQuickTradePrice(gold, fairPrice);
+  const tone: QuickTradePriceTone = rating === "fair" ? "fair" : (rating === "high") === (role === "seller") ? "good" : "poor";
+  return { rating, tone, label: QUICK_TRADE_PRICE_TONE_LABELS[context][tone] };
+}
+
 export interface QuickTradeRequest {
   tileIndex: number;
   gold: number;

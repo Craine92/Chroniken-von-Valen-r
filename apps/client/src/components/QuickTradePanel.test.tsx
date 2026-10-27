@@ -69,9 +69,27 @@ test("the recipient sees one clear sentence with accept, reject and change price
   assert.match(markup, /<button[^>]*class="controller-primary-action"[^>]*>Annehmen<\/button>/);
   assert.match(markup, />Ablehnen<\/button>/);
   assert.match(markup, />Preis ändern<\/button>/);
-  assert.match(markup, /Preis: <strong>hoch<\/strong>/, "150 Gold liegt deutlich über dem fairen Preis von 60 Gold");
+  assert.match(markup, /quick-trade-rating--good[^>]*><strong>Sehr gutes Angebot<\/strong>/, "150 Gold für ein 60-Gold-Grundstück ist für den Verkäufer sehr gut");
   assert.match(markup, /Vorschlag des Spiels: 60 Gold/);
   assert.doesNotMatch(markup, /DU GIBST|HINZUFÜGEN/);
+});
+
+test("the price verdict follows the viewer's role on the offer card and the price screen", () => {
+  // Hoher Preis: für den Verkäufer grün, für den Käufer rot.
+  const game = state();
+  const highBid = quickOffer();
+  assert.match(renderToStaticMarkup(<QuickTradeOfferCard state={game} playerId="p1" trade={highBid} actionsEnabled onDecision={noop} />), /quick-trade-rating--good[^>]*><strong>Sehr gutes Angebot/);
+  assert.match(renderToStaticMarkup(<QuickTradeOfferCard state={game} playerId="p2" trade={highBid} actionsEnabled onDecision={noop} />), /quick-trade-rating--poor[^>]*><strong>Ungünstig für dich/, "the buyer's own open offer");
+  const highAsk = quickOffer({ id: "q3", proposerId: "p2", recipientId: "p1", offer: { gold: 0, propertyTileIndices: [10] }, request: { gold: 300, propertyTileIndices: [] } });
+  assert.match(renderToStaticMarkup(<QuickTradeOfferCard state={game} playerId="p1" trade={highAsk} actionsEnabled onDecision={noop} />), /quick-trade-rating--poor[^>]*><strong>Schwaches Angebot/, "a high ask is poor for the receiving buyer");
+  // Niedriger Preis: für den Käufer grün, für den Verkäufer rot.
+  const lowAsk = quickOffer({ id: "q4", proposerId: "p2", recipientId: "p1", offer: { gold: 0, propertyTileIndices: [10] }, request: { gold: 60, propertyTileIndices: [] } });
+  assert.match(renderToStaticMarkup(<QuickTradeOfferCard state={game} playerId="p1" trade={lowAsk} actionsEnabled onDecision={noop} />), /quick-trade-rating--good[^>]*><strong>Sehr gutes Angebot/);
+  const lowBid = quickOffer({ id: "q5", offer: { gold: 20, propertyTileIndices: [] } });
+  assert.match(renderToStaticMarkup(<QuickTradeOfferCard state={game} playerId="p1" trade={lowBid} actionsEnabled onDecision={noop} />), /quick-trade-rating--poor[^>]*><strong>Schwaches Angebot/);
+  // Preisbildschirm: Verkäufer mit hohem Preis sieht Grün, Käufer mit hohem Preis Rot.
+  assert.match(renderToStaticMarkup(<QuickTradePriceScreen state={game} playerId="p1" draft={{ tileIndex: 1, buyerId: "p2", gold: 200 }} onChange={noop} onBack={noop} onSend={noop} />), /quick-trade-rating--good[^>]*><strong>Gut für dich/);
+  assert.match(renderToStaticMarkup(<QuickTradePriceScreen state={game} playerId="p1" draft={{ tileIndex: 10, gold: 300 }} onChange={noop} onBack={noop} onSend={noop} />), /quick-trade-rating--poor[^>]*><strong>Ungünstig für dich/);
 });
 
 test("counter offers are labelled and the receiving buyer cannot accept without enough gold", () => {
@@ -133,20 +151,20 @@ test("a new draft starts at the suggested price, capped by the buyer's purse", (
 });
 
 test("the price stepper uses big plus and minus buttons instead of a number field", () => {
-  const markup = renderToStaticMarkup(<QuickTradePriceStepper gold={140} fairPrice={140} maxPrice={500} onChange={noop} />);
+  const markup = renderToStaticMarkup(<QuickTradePriceStepper gold={140} fairPrice={140} maxPrice={500} role="buyer" onChange={noop} />);
   assert.doesNotMatch(markup, /<input/);
   assert.match(markup, /<b>140<\/b> GOLD/);
   for (const label of ["−50", "−10", "\\+10", "\\+50"]) assert.match(markup, new RegExp(`>${label}</button>`));
-  assert.match(markup, /Preis: <strong>fair<\/strong>/);
+  assert.match(markup, /quick-trade-rating--fair[^>]*><strong>Fairer Preis<\/strong>/);
   assert.doesNotMatch(markup, /Vorschlag übernehmen/);
 
-  const atBounds = renderToStaticMarkup(<QuickTradePriceStepper gold={10} fairPrice={140} maxPrice={10} onChange={noop} />);
+  const atBounds = renderToStaticMarkup(<QuickTradePriceStepper gold={10} fairPrice={140} maxPrice={10} role="buyer" onChange={noop} />);
   assert.equal((atBounds.match(/disabled=""/g) ?? []).length, 4);
-  assert.match(atBounds, /Preis: <strong>günstig<\/strong>/);
+  assert.match(atBounds, /quick-trade-rating--good[^>]*><strong>Gut für dich<\/strong>/, "a low price is good for the buyer");
   assert.doesNotMatch(atBounds, /Vorschlag übernehmen/, "the capped suggestion is already selected");
 
-  const high = renderToStaticMarkup(<QuickTradePriceStepper gold={200} fairPrice={140} maxPrice={500} onChange={noop} />);
-  assert.match(high, /Preis: <strong>hoch<\/strong>/);
+  const high = renderToStaticMarkup(<QuickTradePriceStepper gold={200} fairPrice={140} maxPrice={500} role="buyer" onChange={noop} />);
+  assert.match(high, /quick-trade-rating--poor[^>]*><strong>Ungünstig für dich<\/strong>/, "a high price is poor for the buyer");
   assert.match(high, />Vorschlag übernehmen<\/button>/);
 });
 

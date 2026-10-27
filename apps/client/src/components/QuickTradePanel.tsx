@@ -2,16 +2,16 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   BOARD_TILES,
   QUICK_TRADE_MIN_PRICE,
-  QUICK_TRADE_PRICE_RATING_LABELS,
   QUICK_TRADE_PRICE_STEPS,
   formatQuickTradeHeadline,
   getOpenQuickTrade,
   getQuickTradeEligibility,
   getQuickTradeSuggestion,
+  getQuickTradePriceVerdict,
   getQuickTradeTerms,
-  rateQuickTradePrice,
   type GameState,
   type QuickTradeRequest,
+  type QuickTradeRole,
   type TradeOffer
 } from "@valenor/shared";
 import { ControllerActionBar } from "./ControllerActionBar";
@@ -45,8 +45,13 @@ export function createQuickTradeDraft(state: GameState, playerId: string, tileIn
   return { tileIndex, ...(selling ? { buyerId: buyer } : {}), gold: clampPrice(suggestion?.fairPrice ?? QUICK_TRADE_MIN_PRICE, Math.max(QUICK_TRADE_MIN_PRICE, maxPrice)) };
 }
 
-export function QuickTradePriceStepper({ gold, fairPrice, maxPrice, onChange, disabled }: { gold: number; fairPrice: number; maxPrice: number; onChange: (gold: number) => void; disabled?: boolean }) {
-  const rating = rateQuickTradePrice(gold, fairPrice);
+/** Bewertung aus Sicht des Betrachters: grün, wenn der Preis für ihn gut ist, rot, wenn er für ihn ungünstig ist. */
+export function QuickTradePriceVerdictLine({ gold, fairPrice, role, context }: { gold: number; fairPrice: number; role: QuickTradeRole; context: "offer" | "draft" }) {
+  const verdict = getQuickTradePriceVerdict(gold, fairPrice, role, context);
+  return <p className={`quick-trade-rating quick-trade-rating--${verdict.tone}`} data-rating={verdict.rating}><strong>{verdict.label}</strong><span>Vorschlag des Spiels: {fairPrice} Gold</span></p>;
+}
+
+export function QuickTradePriceStepper({ gold, fairPrice, maxPrice, role, onChange, disabled }: { gold: number; fairPrice: number; maxPrice: number; role: QuickTradeRole; onChange: (gold: number) => void; disabled?: boolean }) {
   const [small, large] = QUICK_TRADE_PRICE_STEPS;
   const step = (delta: number) => onChange(clampPrice(gold + delta, maxPrice));
   return <section className="quick-trade-price" aria-label="Preis">
@@ -54,7 +59,7 @@ export function QuickTradePriceStepper({ gold, fairPrice, maxPrice, onChange, di
     <div className="quick-trade-price__steps">
       {[-large, -small, small, large].map(delta => <button type="button" key={delta} disabled={disabled || (delta < 0 ? gold <= QUICK_TRADE_MIN_PRICE : gold >= maxPrice)} onClick={() => step(delta)} aria-label={`${delta > 0 ? "Plus" : "Minus"} ${Math.abs(delta)} Gold`}>{delta > 0 ? "+" : "−"}{Math.abs(delta)}</button>)}
     </div>
-    <p className={`quick-trade-rating quick-trade-rating--${rating}`}><span>Preis: <strong>{QUICK_TRADE_PRICE_RATING_LABELS[rating]}</strong></span><span>Vorschlag des Spiels: {fairPrice} Gold</span></p>
+    <QuickTradePriceVerdictLine gold={gold} fairPrice={fairPrice} role={role} context="draft" />
     {gold !== Math.min(fairPrice, maxPrice) && <button type="button" className="quick-trade-reset" disabled={disabled} onClick={() => onChange(clampPrice(fairPrice, maxPrice))}>Vorschlag übernehmen</button>}
   </section>;
 }
@@ -70,7 +75,7 @@ export function QuickTradeOfferCard({ state, playerId, trade, actionsEnabled, di
   const incoming = trade.recipientId === playerId;
   const identity = propertyIdentity(terms.tileIndex);
   const fairPrice = getQuickTradeSuggestion(state, terms.tileIndex, terms.buyerId)?.fairPrice;
-  const rating = fairPrice ? rateQuickTradePrice(terms.gold, fairPrice) : undefined;
+  const viewerRole: QuickTradeRole = terms.sellerId === playerId ? "seller" : "buyer";
   const buyer = state.players.find(player => player.id === terms.buyerId);
   const missingGold = incoming && terms.buyerId === playerId && buyer ? Math.max(0, terms.gold - buyer.gold) : 0;
   const ownOpenOffer = incoming ? getOpenQuickTrade(state, playerId) : undefined;
@@ -81,7 +86,7 @@ export function QuickTradeOfferCard({ state, playerId, trade, actionsEnabled, di
     <small>{incoming ? trade.counterToTradeId ? "GEGENANGEBOT" : "HANDELSANGEBOT" : "DEIN OFFENES ANGEBOT"}</small>
     <h3>{formatQuickTradeHeadline(state, trade)}</h3>
     <div className="trade-property"><PropertyLabel state={state} index={terms.tileIndex} /></div>
-    {rating && <p className={`quick-trade-rating quick-trade-rating--${rating}`}><span>Preis: <strong>{QUICK_TRADE_PRICE_RATING_LABELS[rating]}</strong></span><span>Vorschlag des Spiels: {fairPrice} Gold</span></p>}
+    {fairPrice !== undefined && <QuickTradePriceVerdictLine gold={terms.gold} fairPrice={fairPrice} role={viewerRole} context={incoming ? "offer" : "draft"} />}
     {incoming ? <div className="quick-trade-offer__actions">
       <button type="button" className="controller-primary-action" disabled={!actionsEnabled || Boolean(acceptReason)} onClick={() => onDecision("accept", trade.id)}>Annehmen</button>
       <button type="button" disabled={!actionsEnabled} onClick={() => onDecision("reject", trade.id)}>Ablehnen</button>
@@ -124,7 +129,7 @@ export function QuickTradePriceScreen({ state, playerId, draft, disabledReason, 
     {selling && !counterTarget && <fieldset className="quick-trade-buyers"><legend>WER SOLL KAUFEN?</legend>
       {buyers.map(player => <button type="button" key={player.id} aria-pressed={player.id === buyerId} onClick={() => { const next = createQuickTradeDraft(state, playerId, draft.tileIndex, player.id); if (next) onChange(next); }}>{playerLabel(state, player.id)}<small>{player.gold} Gold</small></button>)}
     </fieldset>}
-    <QuickTradePriceStepper gold={draft.gold} fairPrice={suggestion?.fairPrice ?? draft.gold} maxPrice={maxPrice} disabled={!eligibility.allowed} onChange={gold => onChange({ ...draft, gold })} />
+    <QuickTradePriceStepper gold={draft.gold} fairPrice={suggestion?.fairPrice ?? draft.gold} maxPrice={maxPrice} role={selling ? "seller" : "buyer"} disabled={!eligibility.allowed} onChange={gold => onChange({ ...draft, gold })} />
     {suggestion && suggestion.factors.length > 1 && <ul className="quick-trade-factors" aria-label="So entsteht der Vorschlag">{suggestion.factors.map(factor => <li key={factor.label}><span>{factor.label}</span><b>{factor.amount > 0 && factor !== suggestion.factors[0] ? "+" : ""}{factor.amount}</b></li>)}</ul>}
     {sendReason && <p className="controller-disabled-reason">{sendReason}</p>}
     <ControllerActionBar label="Schnellhandel" primary={{ label: counterTarget ? "Neuen Preis senden" : "Angebot senden", onClick: send, disabled: Boolean(sendReason) }} secondary={{ label: "Zurück", onClick: onBack, tone: "secondary" }} />

@@ -1,9 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import type { GameState } from "@valenor/shared";
+import { EMOTE_LABELS, EMOTE_SHOUTS, type EmoteSignal, type GameState } from "@valenor/shared";
 import { WorldStatus } from "../components/WorldStatus";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 import { PlayerPortrait } from "../components/PlayerPortrait";
-import { Icon } from "../components/icons/Icon";
+import { EMOTE_ICONS, Icon } from "../components/icons/Icon";
+import { getPlayersInDanger } from "./living/drama";
+
+/** Aktuelle Reaktion je Spieler; der Host entfernt sie nach EMOTE_DISPLAY_MS wieder. */
+export type ActiveEmotes = Readonly<Record<string, EmoteSignal>>;
+
+export function EmoteBubble({ emote, playerName }: { emote: EmoteSignal; playerName: string }) {
+  return <span className={`hud-emote hud-emote--${emote.emoteId}`} role="status" aria-label={`${playerName}: ${EMOTE_LABELS[emote.emoteId]}`}>
+    <Icon name={EMOTE_ICONS[emote.emoteId]} />
+    <em aria-hidden="true">{EMOTE_SHOUTS[emote.emoteId]}</em>
+  </span>;
+}
 
 function GoldAmount({ gold }: { gold: number }) {
   const previous = useRef(gold);
@@ -19,7 +30,8 @@ function GoldAmount({ gold }: { gold: number }) {
   return <b><Icon name="gold" className="hud-gold-icon" />{gold.toLocaleString("de-DE")} <small>Gold</small>{delta !== 0 && <span className={`gold-delta ${delta > 0 ? "is-positive" : "is-negative"}`}>{delta > 0 ? "+" : ""}{delta}</span>}</b>;
 }
 
-export function GameHud({ gameState }: { gameState: GameState }) {
+export function GameHud({ gameState, emotes = {} }: { gameState: GameState; emotes?: ActiveEmotes | undefined }) {
+  const inDanger = getPlayersInDanger(gameState);
   const displayedPlayers = gameState.turnOrder.length
     ? gameState.turnOrder.map((id) => gameState.players.find((player) => player.id === id)!).filter(Boolean)
     : gameState.players;
@@ -32,15 +44,16 @@ export function GameHud({ gameState }: { gameState: GameState }) {
       <QuickGameClockDisplay clock={gameState.quickGameClock} />
       <div className="game-hud__players">
         {displayedPlayers.map((player, index) => (
-          <article key={player.id} className={`hud-player hud-player--${player.color} ${gameState.currentPlayerId === player.id ? "is-active" : ""} ${player.isBankrupt ? "is-bankrupt" : ""}`}>
+          <article key={player.id} className={`hud-player hud-player--${player.color} ${gameState.currentPlayerId === player.id ? "is-active" : ""} ${player.isBankrupt ? "is-bankrupt" : ""}${inDanger.has(player.id) ? " is-in-danger" : ""}`}>
             {gameState.turnOrder.length > 0 && <em>{index + 1}</em>}
             <PlayerPortrait characterId={player.characterId} />
             <div>
               <strong>{player.name}</strong>
               {/* Auf dem TV nur Ausnahmen zeigen; Besitz und Spielertyp stehen auf dem Handy. */}
-              {(player.isBankrupt || player.dungeon.inDungeon) && <span>{player.isBankrupt ? "Zuschauer" : `Im Kerker · ${player.dungeon.failedAttempts}/3`}</span>}
+              {(player.isBankrupt || player.dungeon.inDungeon || inDanger.has(player.id)) && <span>{player.isBankrupt ? "Zuschauer" : inDanger.has(player.id) ? "Bankrott droht" : `Im Kerker · ${player.dungeon.failedAttempts}/3`}</span>}
             </div>
             <GoldAmount gold={player.gold} />
+            {emotes[player.id] && <EmoteBubble key={emotes[player.id]!.id} emote={emotes[player.id]!} playerName={player.name} />}
           </article>
         ))}
 

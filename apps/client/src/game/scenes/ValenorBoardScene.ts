@@ -8,7 +8,11 @@ import { BoardArtLayer } from "../layers/BoardArtLayer";
 import { getCharacterAsset, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
 import { fitImage } from "../assets/asset-runtime";
 import { BOARD_DEPTHS } from "../layers/board-depths";
-import { DEFAULT_GRAPHICS_QUALITY, VISUAL_QUALITY, prefersReducedMotion } from "../visual-config";
+import { VISUAL_QUALITY, getGraphicsQuality, getLivingBoardSettings, prefersReducedMotion } from "../visual-config";
+import { AmbientLifeLayer } from "../layers/AmbientLifeLayer";
+import { DramaEffectsLayer } from "../layers/DramaEffectsLayer";
+import { deriveGameMoments } from "../living/moments";
+import { selectDramaticMoments } from "../living/drama";
 import { BoardTileRenderer } from "../tiles/BoardTileRenderer";
 import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
 import { CARD_DRAW_DURATION_MS, DEFAULT_BOARD_PRESENTATION_MODE, LANDING_CONNECTION_DURATION_MS, getBoardVisualScale, getCardPresentationKey, getBoardScreenLayout, type BoardPresentationMode } from "../board-presentation";
@@ -22,7 +26,7 @@ function getMovementSignature(state: GameState): string {
 }
 
 import { PLAYER_COLOR_VALUES as PLAYER_COLORS, PLAYER_CHARACTERS } from "@valenor/shared";
-import { CODEX_FONTS, codexColor } from "../design-tokens";
+import { CODEX_DURATIONS, CODEX_FONTS, codexColor } from "../design-tokens";
 import { addIconImage, type BoardIconName } from "../icon-textures";
 import { RELIC_ICONS } from "../../components/icons/Icon";
 
@@ -82,7 +86,11 @@ export class ValenorBoardScene extends Phaser.Scene {
   private readonly worldImpulseMarkers: Phaser.GameObjects.Graphics[] = [];
   private lastCelebrationId = "";
   private readonly reducedMotion = prefersReducedMotion();
-  private readonly visualQuality = VISUAL_QUALITY[DEFAULT_GRAPHICS_QUALITY];
+  private readonly graphicsQuality = getGraphicsQuality();
+  private readonly visualQuality = VISUAL_QUALITY[this.graphicsQuality];
+  private readonly living = getLivingBoardSettings(this.graphicsQuality, this.reducedMotion);
+  private ambientLayer: AmbientLifeLayer | undefined;
+  private dramaLayer: DramaEffectsLayer | undefined;
   private lastDiagnosticAt = 0;
   private readonly handleResize = () => { this.fitCamera(); this.syncRealmNames(); };
 
@@ -113,6 +121,13 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.propertyGroupLayer.setExternalFocus(this.externalPropertyGroupFocus);
     this.artLayer.renderRealmDecorations();
     this.artLayer.renderRealmAtmosphere(this.reducedMotion, this.visualQuality.animateAmbient);
+    this.ambientLayer = new AmbientLifeLayer(this, this.living.ambient);
+    this.ambientLayer.render();
+    this.ambientLayer.sync(this.state);
+    this.dramaLayer = new DramaEffectsLayer(this, this.living.drama);
+    this.game.canvas.dataset.graphicsQuality = this.graphicsQuality;
+    this.game.canvas.dataset.ambientLife = String(this.ambientLayer.isActive);
+    this.game.canvas.dataset.ambientObjects = String(this.ambientLayer.objectCount);
     this.drawRealmMiniatures(renderedRealmBackgrounds);
     this.artLayer.renderBoardEffects();
     this.drawCenterTitle();
@@ -157,6 +172,10 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.boardReady = false;
       this.game.canvas.dataset.boardReady = "false";
       this.developmentLayer?.destroy();
+      this.ambientLayer?.destroy();
+      this.dramaLayer?.destroy();
+      this.ambientLayer = undefined;
+      this.dramaLayer = undefined;
       this.mortgageOverlayLayer?.destroy();
       this.propertyGroupLayer?.destroy();
       this.artLayer?.destroy();
@@ -206,6 +225,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       else this.animateMovement(next);
     }
     const playerChanged = this.currentPlayerId !== next.currentPlayerId;
+    const moments = deriveGameMoments(this.state, next);
+    if (moments.length) this.game.canvas.dataset.lastMoments = moments.map(moment => moment.kind).join(",");
     this.state = next;
     this.syncCardDecks(next);
     this.propertyGroupLayer?.sync(next);
@@ -219,6 +240,10 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.syncWorldImpulse(next);
     this.syncMomentumCelebration(next);
     this.developmentLayer?.sync(next, true);
+    this.ambientLayer?.sync(next);
+    if (this.ambientLayer) this.game.canvas.dataset.ambientObjects = String(this.ambientLayer.objectCount);
+    selectDramaticMoments(moments).forEach(moment => this.dramaLayer?.play(moment));
+    moments.forEach(moment => { if (moment.kind === "purchase" || moment.kind === "auctionWon") this.reactToken(moment.playerId, "cheer"); });
     this.mortgageOverlayLayer?.sync(next);
     const ownershipSignature = next.propertyOwnerships.map((entry) => `${entry.tileIndex}:${entry.ownerId}:${entry.mortgaged}`).join("|");
     if (ownershipSignature !== this.ownershipSignature) this.drawOwnershipMarkers();
@@ -926,14 +951,43 @@ export class ValenorBoardScene extends Phaser.Scene {
             onComplete: () => {
               token.setScale(1);
               playArrivalAudio();
-              if (index === movement.path.length - 1) this.animateLanding(tileIndex, trailColor);
-              else step(index + 1);
+              if (index === movement.path.length - 1) {
+                this.animateLanding(tileIndex, trailColor);
+                this.reactToken(movement.playerId, "land");
+              } else step(index + 1);
             }
           });
         }
       });
     };
     step(0);
+  }
+
+  /**
+   * Kleine Persönlichkeit der Figuren: ein Federhüpfer beim Landen, ein doppelter Jubelsprung mit Funken beim Kauf.
+   * Bewegt nur die innere Figur (nie die Position auf dem Brett) und ist unter reduzierter Bewegung und Stufe „low“ aus.
+   */
+  private reactToken(playerId: string, kind: "land" | "cheer") {
+    if (!this.living.tokenReactions) return;
+    const visual = this.tokenVisuals.get(playerId);
+    const token = this.tokens.get(playerId);
+    if (!visual || !token) return;
+    this.tweens.killTweensOf(visual);
+    visual.setPosition(0, 0).setAngle(0);
+    const { fast, base } = CODEX_DURATIONS;
+    if (kind === "land") {
+      this.tweens.add({ targets: visual, y: -9, duration: fast, ease: "Quad.Out", yoyo: true });
+      return;
+    }
+    this.tweens.add({ targets: visual, y: -18, angle: { from: -5, to: 5 }, duration: base * .8, ease: "Quad.Out", yoyo: true, repeat: 1,
+      onComplete: () => visual.setPosition(0, 0).setAngle(0) });
+    const player = this.state.players.find(entry => entry.id === playerId);
+    const color = player ? PLAYER_COLORS[player.color] : codexColor("gold300");
+    for (let index = 0; index < 8; index += 1) {
+      const angle = -Math.PI / 2 + (index - 3.5) * .32;
+      const spark = this.add.star(token.x, token.y - 26, 4, 2, 5, index % 2 ? color : codexColor("gold200"), 1).setDepth(BOARD_DEPTHS.effects + 1);
+      this.tweens.add({ targets: spark, x: token.x + Math.cos(angle) * 46, y: token.y - 26 + Math.sin(angle) * 40, alpha: 0, angle: 120, duration: base * 3, ease: "Sine.Out", onComplete: () => spark.destroy() });
+    }
   }
 
   private hasBuilding(tileIndex: number) {

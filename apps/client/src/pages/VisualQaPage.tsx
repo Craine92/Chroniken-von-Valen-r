@@ -17,6 +17,8 @@ import { ControllerPossessions, ControllerPropertyDetails } from "../components/
 import { ControllerJournal } from "../components/ControllerJournal";
 import { PlayerPortrait } from "../components/PlayerPortrait";
 import { Icon } from "../components/icons/Icon";
+import { EmoteBar } from "../components/EmoteBar";
+import { LivingBoardQa, isLivingBoardScene } from "./LivingBoardQa";
 
 const PLAYERS: GamePlayerState[] = [
   { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1_725, position: 7, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
@@ -407,7 +409,14 @@ function ControllerImpulseShowcase({ variant = "golden" }: { variant?: "golden" 
   </main>;
 }
 
-function createResultState(): GameState {
+function MobileEmotesQa({ cooldown = false }: { cooldown?: boolean }) {
+  return <MobileQaShell>
+    <div className="turn-controls"><p className="waiting-copy">Justine ist am Zug</p><p className="controller-hint">Blick zum gemeinsamen Bildschirm …</p></div>
+    <EmoteBar connected onSend={(_, done) => done({ ok: true })} initialCooldownUntil={cooldown ? Date.now() + 3_400 : 0} />
+  </MobileQaShell>;
+}
+
+function createResultState(shared = false): GameState {
   const state = createShowcaseState("buildings");
   const scores = [
     { playerId: "p1", goldValue: 1_725, propertyValue: 620, buildingValue: 600, mortgageLiability: 0, netPropertyValue: 620, totalNetWorth: 2_945, propertyCount: 3, buildingCount: 11, developedPropertyCount: 3, completeGroupCount: 1, highestBuildingLevel: 5 as const, heldCardCount: 1 },
@@ -417,10 +426,12 @@ function createResultState(): GameState {
   state.players[2]!.isBankrupt = true;
   state.status = "finished";
   state.finishReason = "quickGameTimeExpired";
+  const winnerIds = shared ? ["p4", "p1"] : ["p4"];
+  if (shared) scores[0]!.totalNetWorth = 3_050;
   state.winnerId = "p4";
-  state.winnerIds = ["p4"];
+  state.winnerIds = winnerIds;
   state.finalScores = scores.sort((left, right) => right.totalNetWorth - left.totalNetWorth);
-  state.gameResult = { finishReason: "quickGameTimeExpired", winnerIds: ["p4"], finishedAt: Date.now(), roundsPlayed: 7, scores: state.finalScores };
+  state.gameResult = { finishReason: "quickGameTimeExpired", winnerIds, finishedAt: Date.now(), roundsPlayed: 7, scores: state.finalScores };
   return state;
 }
 
@@ -511,7 +522,11 @@ export function VisualQaPage() {
   if (scenario === "controller-impulse-live") return <ControllerImpulseShowcase variant="live" />;
   if (scenario === "controller-foreign") return <ControllerFeedbackShowcase foreign />;
   if (scenario === "controller-property") return <ControllerPropertyShowcase />;
-  if (scenario === "result") return <GameExperience gameState={createResultState()} boardPresentationMode={boardPresentationMode} />;
+  if (scenario === "result" || scenario === "victory-pose") return <GameExperience gameState={createResultState()} boardPresentationMode={boardPresentationMode} />;
+  if (scenario === "victory-pose-shared") return <GameExperience gameState={createResultState(true)} boardPresentationMode={boardPresentationMode} />;
+  if (scenario === "controller-emotes") return <MobileEmotesQa />;
+  if (scenario === "controller-emotes-cooldown") return <MobileEmotesQa cooldown />;
+  if (isLivingBoardScene(scenario)) return <LivingBoardQa scene={scenario} createBase={() => createShowcaseState("buildings")} />;
   if (scenario === "one") {
     const state = createShowcaseState("four");
     state.players = state.players.slice(0, 1);

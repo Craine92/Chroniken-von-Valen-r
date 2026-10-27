@@ -2,6 +2,7 @@ import type { AuctionBidIncrement } from "./economy";
 import type { GameConfig, GameRoom, GameState, MagicSignal, Player, PlayerColor, PlayerCharacterId, TradeAssets, TavernChoice, TradeMode } from "./game";
 import type { QuickTradeRequest } from "./quick-trade";
 import type { WorldImpulseChoice } from "./world-impulses";
+import type { EmoteId, EmoteSignal } from "./emotes";
 import type { PropertyGroupId } from "./property-groups";
 
 export const SOCKET_EVENTS = {
@@ -20,6 +21,7 @@ export const SOCKET_EVENTS = {
   playerUpdateCharacter: "player:updateCharacter",
   playerUpdateReady: "player:updateReady",
   playerMagicSignal: "player:magicSignal",
+  playerEmote: "player:emote",
   propertyGroupFocus: "property:groupFocus",
   gameStart: "game:start",
   gameState: "game:state",
@@ -65,6 +67,11 @@ export interface EventResult {
 
 export interface RoomMutationResult extends EventResult {
   room?: GameRoom;
+}
+
+/** Antwort auf ein Emote; bei Ablehnung wegen Abklingzeit steht die Restzeit in cooldownMs. */
+export interface EmoteResult extends EventResult {
+  cooldownMs?: number;
 }
 
 export interface CreateRoomRequest {
@@ -124,6 +131,7 @@ export interface ClientToServerEvents {
   "room:updateConfig": (config: GameConfig, callback: (result: RoomMutationResult) => void) => void;
   "player:join": (request: JoinRoomRequest, callback: (result: JoinRoomResult) => void) => void;
   "player:magicSignal": (callback: (result: EventResult) => void) => void;
+  "player:emote": (emoteId: EmoteId, callback: (result: EmoteResult) => void) => void;
   "player:updateColor": (color: PlayerColor, callback: (result: RoomMutationResult) => void) => void;
   "player:updateCharacter": (characterId: PlayerCharacterId, callback: (result: RoomMutationResult) => void) => void;
   "player:updateReady": (ready: boolean, callback: (result: RoomMutationResult) => void) => void;
@@ -170,6 +178,7 @@ export interface ServerToClientEvents {
   "player:disconnect": (player: Player) => void;
   "player:reconnect": (player: Player) => void;
   "player:magicSignal": (signal: MagicSignal) => void;
+  "player:emote": (signal: EmoteSignal) => void;
   "property:groupFocus": (signal: PropertyGroupFocusSignal) => void;
   "game:start": (gameState: GameState) => void;
   "game:state": (gameState: GameState) => void;

@@ -2,12 +2,14 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { QRCodeSVG } from "qrcode.react";
 import {
   SOCKET_EVENTS,
+  EMOTE_DISPLAY_MS,
   MIN_PLAYERS,
   MAX_PLAYERS,
   type CreateRoomRequest,
   type GameConfig,
   type GameRoom,
   type GameState,
+  type EmoteSignal,
   type MagicSignal,
   type PropertyGroupFocusSignal
 } from "@valenor/shared";
@@ -41,6 +43,8 @@ export function HostPage() {
   const [error, setError] = useState("");
   const [signal, setSignal] = useState<MagicSignal>();
   const [propertyGroupFocus, setPropertyGroupFocus] = useState<PropertyGroupFocusSignal>();
+  const [emotes, setEmotes] = useState<Readonly<Record<string, EmoteSignal>>>({});
+  const emoteTimers = useRef(new Map<string, number>());
   const [creditsOpen, setCreditsOpen] = useState(false);
   const closeCredits = useCallback(() => setCreditsOpen(false), []);
   const signalTimer = useRef<number | undefined>(undefined);
@@ -86,6 +90,14 @@ export function HostPage() {
       window.clearTimeout(signalTimer.current);
       signalTimer.current = window.setTimeout(() => setSignal(undefined), 3_600);
     };
+    const handleEmote = (emote: EmoteSignal) => {
+      setEmotes((current) => ({ ...current, [emote.playerId]: emote }));
+      window.clearTimeout(emoteTimers.current.get(emote.playerId));
+      emoteTimers.current.set(emote.playerId, window.setTimeout(() => {
+        emoteTimers.current.delete(emote.playerId);
+        setEmotes(({ [emote.playerId]: _expired, ...rest }) => rest);
+      }, EMOTE_DISPLAY_MS));
+    };
     const handlePropertyGroupFocus = (nextFocus: PropertyGroupFocusSignal) => {
       window.clearTimeout(propertyGroupFocusTimer.current);
       setPropertyGroupFocus((current) => nextFocus.active ? nextFocus : current?.groupId === nextFocus.groupId ? undefined : current);
@@ -113,6 +125,7 @@ export function HostPage() {
     socket.on(SOCKET_EVENTS.gameStart, handleGameState);
     socket.on(SOCKET_EVENTS.gameState, handleGameState);
     socket.on(SOCKET_EVENTS.playerMagicSignal, handleSignal);
+    socket.on(SOCKET_EVENTS.playerEmote, handleEmote);
     socket.on(SOCKET_EVENTS.propertyGroupFocus, handlePropertyGroupFocus);
     socket.connect();
 
@@ -125,6 +138,9 @@ export function HostPage() {
       socket.off(SOCKET_EVENTS.gameStart, handleGameState);
       socket.off(SOCKET_EVENTS.gameState, handleGameState);
       socket.off(SOCKET_EVENTS.playerMagicSignal, handleSignal);
+      socket.off(SOCKET_EVENTS.playerEmote, handleEmote);
+      emoteTimers.current.forEach((timer) => window.clearTimeout(timer));
+      emoteTimers.current.clear();
       socket.off(SOCKET_EVENTS.propertyGroupFocus, handlePropertyGroupFocus);
       socket.disconnect();
     };
@@ -192,7 +208,7 @@ export function HostPage() {
   if (gameState) {
     return (
       <Suspense fallback={<main className="board-page"><div className="game-loading">Das Runentor öffnet sich …</div></main>}>
-        <GameExperience gameState={gameState} onNewChronicle={startNewChronicle} onReturnToLobby={returnToLobby} focusedPropertyGroupId={propertyGroupFocus?.groupId} focusedPropertyGroupPlayerId={propertyGroupFocus?.playerId} />
+        <GameExperience gameState={gameState} onNewChronicle={startNewChronicle} onReturnToLobby={returnToLobby} focusedPropertyGroupId={propertyGroupFocus?.groupId} focusedPropertyGroupPlayerId={propertyGroupFocus?.playerId} emotes={emotes} />
         {error && <div className="error-toast" role="alert">{error}</div>}
       </Suspense>
     );

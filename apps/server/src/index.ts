@@ -8,6 +8,8 @@ import { Server } from "socket.io";
 import {
   SOCKET_EVENTS,
   getPropertyGroup,
+  type EmoteId,
+  type Player,
   type ClientToServerEvents,
   type InterServerEvents,
   type ServerToClientEvents,
@@ -18,6 +20,7 @@ import { RoomManager } from "./room-manager";
 import { EconomicAi, getAiEconomyProfile } from "./ai/economic-ai";
 import { chooseNpcTavernAction } from "./game/economy-service";
 import { chooseNpcGoldenMoment } from "./game/world-impulse-service";
+import { EmoteGate, pickComputerEmotes, validateEmoteRequest } from "./game/emote-service";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS ?? 5 * 60 * 1000);
@@ -34,11 +37,34 @@ const gameTimers = new Map<string, NodeJS.Timeout>();
 const aiBuildingCounts = new Map<string, number>();
 const aiRedemptionCounts = new Map<string, number>();
 const aiTradeOfferRounds = new Map<string, number>();
+const emoteGate = new EmoteGate();
+/** Bereits gesehene Protokolleinträge je Raum, damit Computer-Gegner auf jedes Ereignis höchstens einmal reagieren. */
+const emoteSeenLogIds = new Map<string, Set<string>>();
+
+function emitEmote(roomCode: string, player: Player, emoteId: EmoteId) {
+  const sentAt = Date.now();
+  io.to(roomCode).emit(SOCKET_EVENTS.playerEmote, { id: `${player.id}:${sentAt}`, playerId: player.id, emoteId, color: player.color, sentAt });
+}
+
+function scheduleComputerEmotes(roomCode: string, state: NonNullable<ReturnType<RoomManager["getGameState"]>>) {
+  const seen = emoteSeenLogIds.get(roomCode);
+  emoteSeenLogIds.set(roomCode, new Set(state.economyLog.map(entry => entry.id)));
+  // Beim ersten Stand eines Raums (oder nach einem Neustart) gibt es nichts Neues, worauf jemand reagieren könnte.
+  if (!seen || state.status !== "playing") return;
+  for (const { playerId, emoteId } of pickComputerEmotes(state, seen)) {
+    scheduleGameAction(roomCode, `computer-emote-${playerId}-${state.economyLog.at(-1)?.id}`, randomInt(600, 1_401), () => {
+      const player = rooms.getPlayer(roomCode, playerId);
+      // Auch Computer-Gegner halten die Abklingzeit ein.
+      if (player && emoteGate.tryEmote(roomCode, playerId, Date.now()).ok) emitEmote(roomCode, player, emoteId);
+    });
+  }
+}
 
 function publishGameState(roomCode: string, state: ReturnType<RoomManager["getGameState"]>) {
   if (!state) return;
   state.stateRevision = rooms.advanceStateRevision(roomCode);
   io.to(roomCode).emit(SOCKET_EVENTS.gameState, state);
+  scheduleComputerEmotes(roomCode, state);
 }
 
 function scheduleGameAction(roomCode: string, key: string, delay: number, action: () => void) {
@@ -63,6 +89,8 @@ function clearRoomGameTimers(roomCode: string) {
   for (const key of aiTradeOfferRounds.keys()) if (key.startsWith(prefix)) aiTradeOfferRounds.delete(key);
   for (const key of aiBuildingCounts.keys()) if (key.startsWith(prefix)) aiBuildingCounts.delete(key);
   for (const key of aiRedemptionCounts.keys()) if (key.startsWith(prefix)) aiRedemptionCounts.delete(key);
+  emoteGate.clearRoom(roomCode);
+  emoteSeenLogIds.delete(roomCode);
 }
 
 function isTradePhase(state: NonNullable<ReturnType<RoomManager["getGameState"]>>) {
@@ -671,6 +699,28 @@ io.on("connection", (socket) => {
       color: player.color,
       sentAt: Date.now()
     });
+    callback({ ok: true });
+  });
+
+  socket.on(SOCKET_EVENTS.playerEmote, (emoteId, callback) => {
+    const { roomCode, playerId } = socket.data;
+    if (typeof callback !== "function") return;
+    if (!roomCode || !playerId) {
+      callback({ ok: false, message: "Du bist mit keinem Spielraum verbunden." });
+      return;
+    }
+    const player = rooms.getPlayer(roomCode, playerId);
+    const invalid = validateEmoteRequest(emoteId, player, rooms.getRoom(roomCode)?.phase);
+    if (invalid !== undefined || !player) {
+      callback({ ok: false, message: invalid ?? "Deine Verbindung konnte nicht bestätigt werden." });
+      return;
+    }
+    const attempt = emoteGate.tryEmote(roomCode, playerId, Date.now());
+    if (!attempt.ok) {
+      callback({ ok: false, cooldownMs: attempt.cooldownMs, message: "Gönn deiner Stimme einen Atemzug." });
+      return;
+    }
+    emitEmote(roomCode, player, emoteId);
     callback({ ok: true });
   });
 

@@ -14,5 +14,7 @@ test("the chronicle panel shows the newest line first and waits quietly before t
   assert.ok(html.indexOf("Philipp zahlt") < html.indexOf("Rotfels fällt"), "newest first");
   assert.match(html, /chronicle-line--neutral" data-age="0">Philipp zahlt/);
   assert.match(html, /chronicle-line--gain" data-age="1">Rotfels/);
-  assert.match(html, /DER CHRONIST/);
+  assert.match(html, /DIE CHRONIK/);
+  const facts = renderToStaticMarkup(<ChroniclePanel lines={[{ id: "f", kind: "fact", tone: "neutral", text: "Ragna belehnt Rotfels." }]} />);
+  assert.match(facts, /chronicle-line--fact" data-age="0">Ragna belehnt Rotfels/);
 });

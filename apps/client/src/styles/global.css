@@ -812,7 +812,6 @@ button { touch-action: manipulation; }
 .economy-overlay > p { margin: 0; color: var(--c-parchment-400); text-align: center; font: italic var(--fs-sm) var(--font-text); }
 .auction-status { display: grid; gap: var(--space-1); text-align: center; }.auction-status small { color: var(--accent-deep); letter-spacing: .16em; }.auction-status strong { color: var(--accent-soft); font: 400 var(--fs-2xl) var(--font-display); }.auction-status span { color: var(--c-parchment-500); font-size:var(--fs-xs); }.auction-status em { color: var(--c-oxblood-300); font-size:var(--fs-xs); }
 .payment-required { position: absolute; left: 50%; bottom: 2rem; translate: -50% 0; display: grid; gap: var(--space-1); min-width: 320px; padding: var(--space-4) var(--space-5); text-align: center; background: rgb(var(--c-oxblood-800-rgb) / .95); border: 1px solid var(--c-player-red); }.payment-required strong { color: var(--c-oxblood-300); font: 400 var(--fs-lg) var(--font-display); }.payment-required span { color: var(--c-oxblood-300); font-size:var(--fs-xs); }
-.economy-log { position: absolute; z-index: 8; left: 1.25rem; bottom: 1.25rem; width: 310px; pointer-events: none; }.economy-log p { margin: var(--space-1) 0; padding: var(--space-2) var(--space-3); color: var(--c-parchment-400); background: rgb(var(--c-ink-950-rgb) / .86); border-left: 2px solid var(--accent-deep); font-size:var(--fs-2xs); }
 .controller-economy { width: 100%; display: grid; gap: var(--space-3); }
 .economy-secondary { min-height: 3rem; color: var(--c-parchment-200); background: rgb(var(--c-white-rgb) / .035); border: 1px solid var(--line); font-weight: 700; }.economy-secondary:disabled { opacity: .4; }
 .auction-bid { margin: 0; color: var(--c-parchment-500); }.auction-bid strong { display: block; color: var(--accent-soft); font: 400 var(--fs-xl) var(--font-display); }
@@ -841,7 +840,6 @@ button { touch-action: manipulation; }
 .dungeon-status,.double-notice,.dungeon-notice { position: absolute; z-index: 13; right: 1.5rem; top: 7rem; min-width: 280px; display: grid; gap: var(--space-1); padding: var(--space-4) var(--space-4); text-align: center; pointer-events: none; background: rgb(var(--c-ink-950-rgb) / .94); border: 1px solid rgb(var(--c-oxblood-500-rgb) / .56); box-shadow: 0 16px 42px rgb(var(--c-black-rgb) / .42); }.dungeon-status small,.dungeon-notice small { color: var(--c-oxblood-300); letter-spacing: .16em; }.dungeon-status strong,.dungeon-notice strong,.double-notice strong { color: var(--c-parchment-100); font: 400 var(--fs-lg) var(--font-display); }.dungeon-status span,.dungeon-notice span,.double-notice span { color: var(--c-parchment-500); font-size:var(--fs-xs); }.double-notice { border-color: var(--accent-deep); }.double-notice strong { color: var(--accent-soft); letter-spacing: .16em; }.dungeon-notice { animation: buildingNotice 2.4s ease both; }
 
 @media (max-width: 1050px) {
-  .economy-log { display: none; }
   .economy-overlay { right: .75rem; bottom: 7.2rem; }
 }
 
@@ -986,7 +984,7 @@ body {
 
 @media (max-width:1366px) {
   .game-hud__players{width:205px}.hud-player{min-height:55px;padding:var(--space-1-5) var(--space-2)}.hud-player__portrait{width:1.8rem;height:1.8rem}.hud-player strong{font-size:var(--fs-xs)}.hud-player b{font-size:var(--fs-xs)}
-  .quick-clock{right:.7rem;min-width:180px}.game-hud__mode{min-width:245px}.economy-log{font-size:var(--fs-2xs)}
+  .quick-clock{right:.7rem;min-width:180px}.game-hud__mode{min-width:245px}
 }
 @media (max-height:800px) and (min-width:900px) {
   .game-hud__players{gap:var(--space-1)}.hud-player{min-height:48px}.hud-player > div > span{display:none}.hud-player__portrait{width:1.65rem;height:1.65rem}.turn-banner{bottom:.35rem}
@@ -1253,8 +1251,6 @@ body {
 .game-sidebar .hud-player:has(> em) { grid-template-columns:auto auto minmax(0,1fr); }
 .game-sidebar .hud-player b { grid-column:3; justify-self:start; }
 .game-sidebar .hud-player.is-active::after { grid-column:3; justify-self:end; }
-.game-sidebar .economy-log { right:.7rem; bottom:.75rem; left:.7rem; width:auto; }
-.game-sidebar .economy-log p { background:rgb(var(--c-ink-950-rgb) / .72); }
 .dungeon-status em { color:var(--c-parchment-500); font:italic var(--fs-2xs) var(--font-text); }
 .board-group-focus-card { display:none; }
 
@@ -1278,7 +1274,6 @@ body {
 }
 
 @media (max-height:800px) and (min-width:721px) {
-  .game-sidebar .economy-log { display:none; }
   .game-sidebar .game-hud__players { top:11.8rem; }
 }
 
@@ -1377,7 +1372,6 @@ body {
   .game-sidebar .game-hud__turn,
   .game-sidebar .game-hud__mode,
   .game-sidebar .quick-clock,
-  .game-sidebar .economy-log { display:none; }
   .game-sidebar .game-hud__players {
     top:.45rem;
     right:.45rem;
@@ -1660,8 +1654,6 @@ body {
 }
 
 /* Playtest 11A: targeted readability and controller feedback. */
-.game-sidebar .economy-log { display:none; }
-.game-sidebar .economy-log p { color:var(--c-parchment-100); font-size:var(--fs-xs); line-height:1.35; border-left-width:3px; }
 .chronicle-log { display:grid; gap:var(--space-1-5); padding:var(--space-3); background:rgb(var(--c-white-rgb) / .025); border:1px solid rgb(var(--c-gold-400-rgb) / .15); }
 .chronicle-log > small { color:var(--c-gold-600); font-size:var(--fs-2xs); font-weight:800; letter-spacing:.18em; }
 .chronicle-log > p { margin:0; padding:var(--space-2) var(--space-2); color:var(--c-parchment-100); background:rgb(var(--c-black-rgb) / .42); border-left:2px solid rgb(var(--c-gold-400-rgb) / .55); font-size:var(--fs-xs); line-height:1.38; }
@@ -1742,32 +1734,6 @@ body {
 }
 .game-sidebar .hud-player.is-active::after { padding:var(--space-0-5) var(--space-1); background:color-mix(in srgb,currentColor 12%,var(--c-ink-950)); }
 
-.game-sidebar .economy-log {
-  display:grid;
-  gap:var(--space-1);
-  right:.65rem;
-  bottom:.7rem;
-  left:.65rem;
-  width:auto;
-  padding-top:var(--space-2);
-  border-top:1px solid rgb(var(--c-gold-400-rgb) / .24);
-}
-.game-sidebar .economy-log > strong { color:var(--c-parchment-300); font-size:var(--fs-2xs); font-weight:700; letter-spacing:.14em; }
-.game-sidebar .economy-log p {
-  margin:0;
-  padding:0 var(--space-2);
-  color:var(--c-parchment-100);
-  background:rgb(var(--c-ink-950-rgb) / .58);
-  border-left:3px solid rgb(var(--c-gold-400-rgb) / .62);
-  font-size:var(--fs-xs);
-  font-weight:600;
-  line-height:1.4;
-  overflow-wrap:anywhere;
-  display:-webkit-box;
-  -webkit-box-orient:vertical;
-  -webkit-line-clamp:3;
-  overflow:hidden;
-}
 
 .board-notification-lane {
   position:absolute;
@@ -1897,13 +1863,11 @@ body {
   .game-sidebar:has(.quick-clock) .game-hud__players { top:12.2rem; }
   .game-sidebar .hud-player,.game-sidebar .hud-player:has(> em) { min-height:45px; padding:var(--space-1-5) var(--space-1-5); }
   .game-sidebar .hud-player__portrait { width:1.65rem; height:1.65rem; }
-  .game-sidebar .economy-log p { padding:0 var(--space-1-5); font-size:var(--fs-xs); }
 }
 
 @media (max-height:800px) and (min-width:721px) {
   .game-sidebar .game-hud__players { gap:var(--space-1); }
   .game-sidebar :is(.active-chronicle,.weltenweg-pot,.wandering-dragon) { padding:var(--space-1-5); }
-  .game-sidebar .economy-log { display:grid; gap:var(--space-1); }
 }
 
 /* Reserve the action log's actual height inside the existing TV rail. */
@@ -1912,7 +1876,6 @@ body {
   .game-sidebar:has(.quick-clock) { --hud-players-top:13rem; }
   .game-sidebar .game-hud { position:relative; flex:1; min-height:0; }
   .game-sidebar .game-hud__players { max-height:calc(100% - var(--hud-players-top)); overflow-y:auto; pointer-events:auto; }
-  .game-sidebar .economy-log { position:relative; flex-shrink:0; right:auto; bottom:auto; left:auto; margin:var(--space-2) var(--space-3) var(--space-3); }
 }
 @media (min-width:721px) and (max-width:1366px) {
   .game-sidebar { --hud-players-top:8.4rem; }
@@ -1928,7 +1891,6 @@ body {
   .board-event-layer :is(.dice-result,.landed-card,.economy-overlay,.payment-required,.order-overlay,.dungeon-status,.double-notice,.dungeon-notice) { width:min(430px,calc(100% - 1rem)); }
   .board-event-layer .dice-result span { width:3.4rem; height:3.4rem; font-size:var(--fs-xl); }
   .board-event-layer .landed-card strong { font-size:var(--fs-xl); }
-  .game-sidebar .economy-log { display:none; }
 }
 
 @media (prefers-reduced-motion:reduce) {
@@ -2010,11 +1972,6 @@ body {
   .game-sidebar .active-chronicle span { font-size:var(--fs-2xs); line-height:1.2; }
   .game-sidebar .game-hud__context[data-context-kind="chronicle"],.game-sidebar .game-hud__context[data-context-kind="neutral"] { min-height:120px; }
   .game-sidebar .game-hud__context[data-context-kind="chronicle"] > small { display:none; }
-  .game-sidebar .economy-log { gap:var(--space-1-5); }
-  .game-sidebar .economy-log > strong { font-size:var(--fs-2xs); color:var(--c-gold-300); }
-  .game-sidebar .economy-log p { display:grid; grid-template-columns:16px minmax(0,1fr); align-items:start; gap:var(--space-1-5); padding:var(--space-1) var(--space-1-5); font-size:var(--fs-sm); font-weight:600; line-height:1.45; color:var(--c-parchment-100); border-left:2px solid var(--c-gold-600); background:linear-gradient(100deg,rgb(var(--c-ink-700-rgb) / .6),var(--c-ink-950)); }
-  .game-sidebar .economy-log p i { color:var(--c-gold-400); font:normal var(--fs-md)/1.45 var(--font-text); }
-  .game-sidebar .economy-log p span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; overflow-wrap:anywhere; }
   .board-event-layer .dice-result { top:28.5%; width:auto; grid-template-columns:auto auto auto auto; gap:var(--space-3) var(--space-4); padding:var(--space-3) var(--space-5) var(--space-4); border:3px solid var(--c-gold-600); border-radius:var(--radius-lg); background:radial-gradient(ellipse at top,rgb(var(--c-leather-500-rgb) / .4),transparent 70%),linear-gradient(135deg,rgb(var(--c-ink-750-rgb) / .98),rgb(var(--c-ink-950-rgb) / .98)); box-shadow:0 12px 30px rgb(var(--c-black-rgb) / .6),inset 0 0 0 2px rgb(var(--c-gold-400-rgb) / .22); }
   .board-event-layer .dice-result small { grid-column:1 / -1; display:flex; justify-content:center; align-items:center; gap:var(--space-4); color:var(--c-parchment-300); font-size:var(--fs-xs); font-weight:800; letter-spacing:.14em; }
   .board-event-layer .dice-result small em { color:var(--c-gold-300); font:700 var(--fs-md) var(--font-display); letter-spacing:.05em; }
@@ -2026,23 +1983,16 @@ body {
 @media (min-width:721px) and (max-height:800px) {
   .game-sidebar .hud-player,.game-sidebar .hud-player:has(> em) { min-height:62px; padding:var(--space-1-5) var(--space-2); }
   .game-sidebar .hud-player__portrait { height:45px; }
-  .game-sidebar .economy-log { gap:var(--space-1); }
-  .game-sidebar .economy-log p { padding:var(--space-1) var(--space-1-5); font-size:var(--fs-sm); }
-  .game-sidebar .economy-log p span { -webkit-line-clamp:2; }
   .game-sidebar .game-hud__context[data-context-kind="chronicle"],.game-sidebar .game-hud__context[data-context-kind="neutral"] { display:none; }
 }
 @media (min-width:2400px) {
   .board-page,.board-page.has-context-event,.board-page.is-context-idle { --gameplay-left-rail:280px; }
-  .game-sidebar .game-hud,.game-sidebar .economy-log { zoom:1.25; }
 }
 @media (min-width:3400px) {
   .board-page,.board-page.has-context-event,.board-page.is-context-idle { --gameplay-left-rail:396px; }
-  .game-sidebar .game-hud,.game-sidebar .economy-log { zoom:1.8; }
 }
 
 /* Presentation pass 2: the upper table margin stays outside the printed board. */
-/* Das höhere Brett lässt oben weniger Rand; die Zuganzeige behält trotzdem eine lesbare Mindesthöhe und ragt höchstens in den Rahmen. */
-.board-stage { --board-hud-space:max(46px,var(--board-top-space,52px)); }
 /* Das höhere Brett lässt oben weniger Rand; die Zuganzeige behält trotzdem eine lesbare Mindesthöhe und ragt höchstens in den Rahmen. */
 .board-stage { --board-hud-space:max(46px,var(--board-top-space,52px)); }
 .board-top-hud { position:absolute; z-index:18; top:3px; left:50%; translate:-50% 0; box-sizing:border-box; height:max(0px,calc(var(--board-hud-space,52px) - 6px)); max-height:104px; max-width:calc(100% - 1rem); display:flex; align-items:center; gap:clamp(.5rem,1vw,1.2rem); padding:0 clamp(.7rem,1vw,1.3rem); color:var(--c-gold-200); background:linear-gradient(120deg,rgb(var(--c-leather-700-rgb) / .91),rgb(var(--c-ink-900-rgb) / .961)); border:2px solid var(--c-gold-500); border-radius:var(--radius-md); box-shadow:0 6px 16px rgb(var(--c-black-rgb) / .533),inset 0 0 0 2px rgb(var(--c-gold-400-rgb) / .094); overflow:hidden; pointer-events:none; }
@@ -2122,7 +2072,6 @@ body {
   .game-sidebar .game-hud { flex:0 0 auto; }
   .game-sidebar .game-hud__players { overflow:visible; }
   .game-sidebar .game-hud__status { padding:var(--space-3) var(--space-3); }
-  .game-sidebar .economy-log { margin-top:auto; flex:0 0 auto; }
 }
 
 .player-theme--violet { --player-accent:var(--c-player-violet); }
@@ -2175,10 +2124,7 @@ body {
   .game-sidebar .hud-player > div > span { font: 600 var(--fs-md)/1.3 var(--font-text); }
   .game-sidebar .hud-player b { display: flex; align-items: center; color: var(--accent-soft); font: 800 var(--fs-xl)/1 var(--font-text); font-variant-numeric: tabular-nums; }
   .game-sidebar .hud-player__portrait { width: 2.75rem; height: 2.75rem; }
-  .game-sidebar .economy-log > strong { color: var(--text-muted); font: 700 var(--fs-sm) var(--font-text); letter-spacing: var(--tracking-caps); }
-  .game-sidebar .economy-log p { color: var(--text); font: 500 var(--fs-md)/1.35 var(--font-text); }
   /* Nur die zwei jüngsten Aktionen: weniger gleichzeitige Informationen. */
-  .game-sidebar .economy-log p:nth-of-type(n + 3) { display: none; }
 
   /* Landung, Kaufentscheidung und Auktion: die wichtigste Zahl ist die größte. */
   .board-event-layer .landed-card small,

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_TILES } from "@valenor/shared";
 import { CHRONICLE_LINES, REALM_FLOURISHES } from "./chronicle-lines";
-import { CHRONICLE_LINES_PER_UPDATE, ChronicleTracker, Chronicler, pickVariant } from "./chronicler";
+import { CHRONICLE_LINES_PER_UPDATE, ChronicleTracker, Chronicler, getInitialChronicleLines, pickVariant } from "./chronicler";
 import { deriveGameMoments, type GameMoment } from "./moments";
 import { livingTestState, logEntry, nextState } from "./living-fixtures";
 
@@ -137,4 +137,46 @@ test("the tracker narrates at most two moments per state, ignores the first stat
   assert.deepEqual(lines.map(line => line.kind), ["bankrupt", "dungeonEnter"]);
   assert.notEqual(lines[0]!.id, lines[1]!.id);
   assert.deepEqual(new ChronicleTracker().update(busy), [], "without a previous state there is nothing to compare");
+});
+
+test("one chronicle: what the chronicler does not tell appears as a plain log line, nothing twice", () => {
+  const start = livingTestState();
+  const tracker = new ChronicleTracker(start, new Chronicler(() => 0));
+  const next = nextState(start, draft => {
+    draft.economyLog.push(
+      logEntry("Philipp kauft Mondpfad.", "purchase", ["p1"], -60),
+      logEntry("Justine belehnt Rosenhain für 80 Gold.", "mortgage", ["p2"], 80),
+      logEntry("Ragna erfüllt den Auftrag „Landkäufer“.", "quest", ["p3"])
+    );
+    draft.propertyOwnerships.push({ tileIndex: 1, ownerId: "p1", buildingLevel: 0, mortgaged: false });
+  });
+  const lines = tracker.update(next);
+  assert.deepEqual(lines.map(line => line.kind), ["purchase", "fact", "fact"]);
+  assert.deepEqual(lines.filter(line => line.kind === "fact").map(line => line.text), ["Justine belehnt Rosenhain für 80 Gold.", "Ragna erfüllt den Auftrag „Landkäufer“."]);
+  assert.ok(!lines.some(line => line.kind === "fact" && line.text.includes("kauft")), "purchases are told, not repeated as a fact");
+  assert.deepEqual(tracker.update(next), [], "an unchanged state adds nothing");
+});
+
+test("a sold building level shows up as a fact, a new building is told by the chronicler", () => {
+  const start = livingTestState();
+  start.propertyOwnerships.push({ tileIndex: 1, ownerId: "p1", buildingLevel: 2, mortgaged: false });
+  const tracker = new ChronicleTracker(start, new Chronicler(() => 0));
+  const sold = nextState(start, draft => {
+    draft.economyLog.push(logEntry("Philipp verkauft eine Baustufe auf Mondpfad.", "building", ["p1"], 25));
+    draft.lastBuildingAction = { id: "sell-1", type: "sell", playerId: "p1", tileIndex: 1, fromLevel: 2, toLevel: 1, buildingName: "Baumhaus", amount: 25, createdAt: 2 };
+  });
+  assert.deepEqual(tracker.update(sold).map(line => [line.kind, line.text]), [["fact", "Philipp verkauft eine Baustufe auf Mondpfad."]]);
+  const built = nextState(sold, draft => {
+    draft.economyLog.push(logEntry("Philipp baut auf Mondpfad.", "building", ["p1"], -50));
+    draft.lastBuildingAction = { id: "build-1", type: "build", playerId: "p1", tileIndex: 1, fromLevel: 1, toLevel: 2, buildingName: "Baumhaus", amount: 50, createdAt: 3 };
+  });
+  assert.deepEqual(tracker.update(built).map(line => line.kind), ["build"]);
+});
+
+test("a TV joining mid-game starts the chronicle with the three newest log lines", () => {
+  const state = livingTestState();
+  state.economyLog = ["a", "b", "c", "d"].map(id => logEntry(`Eintrag ${id}`, "system", []));
+  assert.deepEqual(getInitialChronicleLines(state).map(line => line.text), ["Eintrag b", "Eintrag c", "Eintrag d"]);
+  assert.ok(getInitialChronicleLines(state).every(line => line.kind === "fact"));
+  assert.deepEqual(getInitialChronicleLines(livingTestState()), []);
 });

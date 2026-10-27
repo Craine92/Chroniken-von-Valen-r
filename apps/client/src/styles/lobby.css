@@ -40,3 +40,20 @@
   background: linear-gradient(90deg, transparent, rgb(var(--c-ink-950-rgb) / .78) 18% 82%, transparent);
   text-shadow: 0 1px 6px var(--c-black);
 }
+
+/* --- Lobby auf flachen TV-Bildschirmen (z. B. 1366 × 768) ------------------
+   Alles passt ohne Scrollen auf den Bildschirm, damit die Start-Tafel nicht
+   abgeschnitten wird; nur Abstände und die Höhe der Modus-Karten schrumpfen. */
+@media (min-width: 861px) and (max-height: 820px) {
+  .host-page--setup .host-header { padding-top: var(--space-3); padding-bottom: var(--space-2); }
+  .host-page--setup .setup-layout { padding-top: var(--space-3); padding-bottom: var(--space-2); }
+  .host-page--setup .mode-panel { padding: var(--space-4) var(--space-5); }
+  .host-page--setup .mode-card { min-height: 150px; padding: var(--space-3); gap: var(--space-2); }
+  .host-page--setup .mode-panel__heading h2 { margin-bottom: var(--space-3); }
+  .host-page--setup .setup-final-column { gap: var(--space-3); }
+  .host-page--setup .start-panel { min-height: 92px; padding: var(--space-4) var(--space-5); }
+  .host-page--setup .host-footer { padding-top: var(--space-1); padding-bottom: var(--space-2); }
+}
+
+/* „Spielerplatz frei“ bricht nur an der Silbe (weiches Trennzeichen im Text), nicht mitten im Wort. */
+.player-grid--setup .player-slot--empty h3 { overflow-wrap: normal; word-break: normal; hyphens: manual; }

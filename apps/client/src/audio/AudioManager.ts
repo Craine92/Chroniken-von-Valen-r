@@ -7,6 +7,7 @@ import {
   DEFAULT_UI_VOLUME,
   DEFAULT_VOICE_VOLUME,
   isAudioEventAllowedForRole,
+  TURN_CHIME,
   VOICE_MUSIC_DUCK,
   MUSIC_TRACK,
   type AudioEvent,
@@ -28,6 +29,8 @@ export interface AudioSettings {
   voiceEnabled: boolean;
   masterMuted: boolean;
   hapticsEnabled: boolean;
+  /** Kurzer Ton auf dem Handy, wenn man am Zug ist. */
+  turnChimeEnabled: boolean;
 }
 
 export const DEFAULT_AUDIO_SETTINGS: Readonly<AudioSettings> = {
@@ -41,7 +44,8 @@ export const DEFAULT_AUDIO_SETTINGS: Readonly<AudioSettings> = {
   uiEnabled: true,
   voiceEnabled: true,
   masterMuted: false,
-  hapticsEnabled: true
+  hapticsEnabled: true,
+  turnChimeEnabled: true
 };
 
 const clampVolume = (value: unknown, fallback: number): number =>
@@ -60,7 +64,8 @@ export function normalizeAudioSettings(value: unknown): AudioSettings {
     uiEnabled: typeof input.uiEnabled === "boolean" ? input.uiEnabled : true,
     voiceEnabled: typeof input.voiceEnabled === "boolean" ? input.voiceEnabled : true,
     masterMuted: typeof input.masterMuted === "boolean" ? input.masterMuted : false,
-    hapticsEnabled: typeof input.hapticsEnabled === "boolean" ? input.hapticsEnabled : true
+    hapticsEnabled: typeof input.hapticsEnabled === "boolean" ? input.hapticsEnabled : true,
+    turnChimeEnabled: typeof input.turnChimeEnabled === "boolean" ? input.turnChimeEnabled : true
   };
 }
 
@@ -167,6 +172,7 @@ export class AudioManager {
       if (!this.audioContext || this.audioContext.state !== "running") return;
       this.unlocked = true;
       this.ensureGainGraph();
+      this.playSilentPrimer();
       // Warm timing-sensitive buffers after consent, before dice and field arrivals.
       if (this.outputRole === "board") {
         void this.loadCue("DICE_ROLL");
@@ -232,6 +238,25 @@ export class AudioManager {
       this.setVoiceDucking(true);
       source.start();
     }));
+  }
+
+  /** Kurzer, heller Zwei-Ton auf dem Handy, wenn man am Zug ist. Im Browser erzeugt, damit er auch auf iPhones klingt. */
+  playTurnChime(): void {
+    if (this.outputRole !== "controller" || !this.unlocked || !this.audioContext || !this.uiGain || this.settings.masterMuted || !this.settings.turnChimeEnabled) return;
+    const context = this.audioContext;
+    const start = context.currentTime + 0.01;
+    TURN_CHIME.notes.forEach(({ frequency, at, duration }) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, start + at);
+      gain.gain.linearRampToValueAtTime(TURN_CHIME.volume, start + at + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + at + duration);
+      oscillator.connect(gain).connect(this.masterGain!);
+      oscillator.start(start + at);
+      oscillator.stop(start + at + duration + 0.02);
+    });
   }
 
   resetMusic(): void {
@@ -410,6 +435,19 @@ export class AudioManager {
     if (this.voiceDucking === active) return;
     this.voiceDucking = active;
     if (this.music) this.fadeMusicTo(this.musicTargetVolume(), active ? 220 : 650);
+  }
+
+  /** iOS schaltet Web Audio erst frei, wenn innerhalb einer Berührung tatsächlich etwas abgespielt wird. */
+  private playSilentPrimer(): void {
+    if (!this.audioContext || !this.masterGain) return;
+    try {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate);
+      source.connect(this.masterGain);
+      source.start();
+    } catch {
+      // Ohne Primer klingt der erste Ton eventuell erst nach der nächsten Berührung.
+    }
   }
 
   private warnOnce(key: string, message: string): void {

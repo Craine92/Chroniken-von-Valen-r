@@ -136,14 +136,17 @@ test("the chronicler never speaks two sentences at once and never repeats a vari
   assert.equal(started.length, 2, "unknown keys are ignored");
 });
 
-test("voice has its own settings and a silent voice never blocks the queue", async () => {
+test("voice and turn chime have their own settings and a silent voice never blocks the queue", async () => {
   const { AudioManager, DEFAULT_AUDIO_SETTINGS, normalizeAudioSettings } = await import("./AudioManager");
   assert.equal(DEFAULT_AUDIO_SETTINGS.voiceEnabled, true);
-  const settings = normalizeAudioSettings({ voiceEnabled: false, voiceVolume: 3, musicEnabled: false });
+  assert.equal(DEFAULT_AUDIO_SETTINGS.turnChimeEnabled, true);
+  const settings = normalizeAudioSettings({ voiceEnabled: false, voiceVolume: 3, turnChimeEnabled: "nein", musicEnabled: false });
   assert.equal(settings.voiceEnabled, false);
   assert.equal(settings.voiceVolume, 1, "volume is clamped");
+  assert.equal(settings.turnChimeEnabled, true, "invalid values fall back to the default");
   assert.equal(settings.musicEnabled, false, "voice settings stay separate from music");
   // Ohne Freischaltung (oder mit ausgeschalteter Stimme) ist ein Satz sofort „fertig“, damit die Schlange weiterläuft.
   const manager = new AudioManager();
   await manager.playVoice("/assets/audio/voice/pasch.mp3");
+  assert.doesNotThrow(() => manager.playTurnChime());
 });

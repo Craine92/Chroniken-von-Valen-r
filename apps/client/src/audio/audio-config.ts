@@ -81,6 +81,19 @@ export const AUDIO_CUES: Readonly<Record<AudioEvent, AudioCueConfig>> = {
   DEFEAT: { paths: [sfx("victory", "defeat.ogg")], group: "SFX", audience: "board", volume: 0.85, cooldownMs: 5_000, duckMusic: true }
 };
 
+/** Zug-Ton auf dem Handy: zwei weiche Glockentöne (Quinte aufwärts), zusammen gut eine halbe Sekunde. */
+export const TURN_CHIME = {
+  volume: 0.32,
+  notes: [
+    { frequency: 659.25, at: 0, duration: 0.32 },
+    { frequency: 987.77, at: 0.14, duration: 0.42 }
+  ]
+} as const;
+
+/**
+ * Die Stimme des Chronisten: vom Projektinhaber mit ElevenLabs gesprochene Sätze. Der Dateiname ohne
+ * „-1/-2/-3“ ist der Schlüssel; mehrere Dateien mit demselben Schlüssel sind Varianten desselben Satzes.
+ */
 export const VOICE_FILES = [
   "auktion", "bankrott-1", "bankrott-2", "bankrott-3",
   "bau-max-elfen", "bau-max-menschen", "bau-max-orks", "bau-max-steppe",

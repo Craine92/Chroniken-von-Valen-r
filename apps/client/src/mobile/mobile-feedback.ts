@@ -7,7 +7,7 @@ export interface MobileFeedback {
   type: MobileFeedbackType;
   title: string;
   message: string;
-  hapticPattern?: number | number[] | undefined;
+  hapticPattern?: number | readonly number[] | undefined;
   duration?: number;
   accent?: string | undefined;
   icon?: IconName;
@@ -20,15 +20,20 @@ export function openControllerTrade(): void {
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
+/** „Du bist am Zug“: zweimal kurz brummen, deutlich spürbarer als ein einzelner Impuls. */
+export const TURN_HAPTIC_PATTERN = [120, 80, 120] as const;
+
 export function playMobileFeedback(
   feedback: MobileFeedback,
-  manager: Pick<typeof audioManager, "getSettings"> = audioManager,
+  manager: Pick<typeof audioManager, "getSettings"> & Partial<Pick<typeof audioManager, "playTurnChime">> = audioManager,
   device: Pick<Navigator, "vibrate"> | undefined = typeof navigator === "undefined" ? undefined : navigator
 ): void {
   const settings: AudioSettings = manager.getSettings();
   if (feedback.hapticPattern && settings.hapticsEnabled && device && "vibrate" in device && typeof device.vibrate === "function") {
-    try { device.vibrate(feedback.hapticPattern); } catch { /* Optional browser enhancement. */ }
+    try { device.vibrate(typeof feedback.hapticPattern === "number" ? feedback.hapticPattern : [...feedback.hapticPattern]); } catch { /* Optional browser enhancement. */ }
   }
+  // iPhones vibrieren aus dem Browser nicht; der Zug-Ton meldet sich trotzdem (eigener Schalter im Audio-Menü).
+  if (feedback.type === "turn") manager.playTurnChime?.();
 }
 
 export const TOAST_FADE_MS = 220;

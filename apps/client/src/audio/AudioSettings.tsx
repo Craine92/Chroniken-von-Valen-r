@@ -38,6 +38,7 @@ export function AudioSettingsPanel({ role = "board" }: { role?: AudioOutputRole 
             <button type="button" aria-pressed={settings.uiEnabled} onClick={() => update({ uiEnabled: !settings.uiEnabled })}><i />UI {settings.uiEnabled ? "an" : "aus"}</button>
             {role === "board" && <button type="button" aria-pressed={settings.voiceEnabled} onClick={() => update({ voiceEnabled: !settings.voiceEnabled })}><i />Stimme {settings.voiceEnabled ? "an" : "aus"}</button>}
             {role === "controller" && <button type="button" aria-pressed={settings.hapticsEnabled} onClick={() => update({ hapticsEnabled: !settings.hapticsEnabled })}><i />Haptik {settings.hapticsEnabled ? "an" : "aus"}</button>}
+            {role === "controller" && <button type="button" aria-pressed={settings.turnChimeEnabled} onClick={() => update({ turnChimeEnabled: !settings.turnChimeEnabled })}><i />Zug-Ton {settings.turnChimeEnabled ? "an" : "aus"}</button>}
           </div>
           <button className="audio-settings__mute" type="button" aria-pressed={settings.masterMuted} data-audio-cue={settings.masterMuted ? "UI_CONFIRM" : "UI_CANCEL"} onClick={() => update({ masterMuted: !settings.masterMuted })}>{settings.masterMuted ? "Ton wieder einschalten" : "Alles stummschalten"}</button>
         </aside>

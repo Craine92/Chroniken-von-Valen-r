@@ -44,6 +44,8 @@ import { PlayerPortrait } from "../components/PlayerPortrait";
 import { MobileWorldImpulseToast, WorldImpulseDecisionPanel } from "../components/WorldImpulseUi";
 import { ControllerActionBar, type ControllerAction } from "../components/ControllerActionBar";
 import { Icon, dieIcon } from "../components/icons/Icon";
+import { audioManager } from "../audio/AudioManager";
+import { useScreenWakeLock } from "../mobile/wake-lock";
 
 export { resolveRoomGameState } from "../lib/authoritative-game-state";
 
@@ -226,6 +228,8 @@ export function ControllerPage() {
     return () => window.removeEventListener("hashchange", updateTab);
   }, []);
   const mobileFeedback = useMobileFeedback(gameState, player?.id);
+  // Solange man im Spiel ist, schläft der Bildschirm nicht ein.
+  useScreenWakeLock(gameState?.status === "playing" && Boolean(player));
   const [feedbackHeight, setFeedbackHeight] = useState(0);
   const playerRef = useRef<Player | undefined>(undefined);
   const nameRef = useRef("");
@@ -348,6 +352,8 @@ export function ControllerPage() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    // Das Tippen auf „Valenør betreten“ schaltet den Ton frei; iPhones spielen Browser-Töne erst nach einer Berührung.
+    void audioManager.unlock();
     const cleanedName = name.trim();
     nameRef.current = cleanedName;
     roomRef.current = roomCode;

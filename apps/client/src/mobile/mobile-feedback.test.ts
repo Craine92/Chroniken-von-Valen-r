@@ -135,7 +135,7 @@ test("own turn feedback occurs once per turn number, including consecutive turns
   const ownTurn = tracker.update(structuredClone(next), "p1")[0];
   assert.equal(ownTurn?.type, "turn");
   assert.equal("sound" in ownTurn!, false);
-  assert.equal(ownTurn?.hapticPattern, 80);
+  assert.deepEqual(ownTurn?.hapticPattern, [120, 80, 120], "two clear buzzes instead of a single 80 ms tap");
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
   next.turnPhase = "rolling"; next.turnContext.rollSequence++;
   assert.deepEqual(tracker.update(structuredClone(next), "p1"), []);
@@ -218,14 +218,16 @@ test("own card-draw log IDs announce repeated cards once each, without duplicati
   assert.ok(repeatedDraws.every((event) => !("sound" in event)));
 });
 
-test("mobile feedback never plays audio and respects the haptics setting", () => {
+test("mobile feedback plays only the turn chime, never game sounds, and respects the haptics setting", () => {
   const calls: string[] = [];
-  const feedback = { ...notice("turn"), hapticPattern: 80 };
-  const manager = { getSettings: () => ({ ...DEFAULT_AUDIO_SETTINGS, hapticsEnabled: false }), play: () => { calls.push("sound"); } };
+  const feedback = { ...notice("turn", "turn"), hapticPattern: 80 };
+  const manager = { getSettings: () => ({ ...DEFAULT_AUDIO_SETTINGS, hapticsEnabled: false }), play: () => { calls.push("sound"); }, playTurnChime: () => { calls.push("chime"); } };
   const device = { vibrate: () => { calls.push("haptic"); return true; } };
-  playMobileFeedback(feedback, manager, device); assert.deepEqual(calls, []);
+  playMobileFeedback(feedback, manager, device); assert.deepEqual(calls, ["chime"]);
   manager.getSettings = () => ({ ...DEFAULT_AUDIO_SETTINGS, hapticsEnabled: true });
-  playMobileFeedback(feedback, manager, device); assert.deepEqual(calls, ["haptic"]);
+  playMobileFeedback(feedback, manager, device); assert.deepEqual(calls, ["chime", "haptic", "chime"]);
+  calls.length = 0;
+  playMobileFeedback({ ...notice("buy", "purchase"), hapticPattern: 60 }, manager, device); assert.deepEqual(calls, ["haptic"], "only the turn has a sound");
   assert.equal(normalizeAudioSettings({ hapticsEnabled: false }).hapticsEnabled, false);
   assert.equal(normalizeAudioSettings({ hapticsEnabled: "invalid" }).hapticsEnabled, true);
 });

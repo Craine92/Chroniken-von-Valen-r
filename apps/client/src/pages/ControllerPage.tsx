@@ -34,6 +34,7 @@ import { CardReveal } from "../components/CardReveal";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 import { GameResultPanel } from "../components/GameResultPanel";
 import { createValenorSocket } from "../lib/socket";
+import { EmoteBar, type SendEmote } from "../components/EmoteBar";
 import { resolveRoomGameState, shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
 import { MobileLiveEvents } from "../components/MobileLiveEvents";
@@ -112,7 +113,7 @@ export function PaymentManagement({
   );
 }
 
-export function BankruptcySpectator({ gameState, player, connected }: { gameState: GameState; player: Player; connected: boolean }) {
+export function BankruptcySpectator({ gameState, player, connected, onSendEmote }: { gameState: GameState; player: Player; connected: boolean; onSendEmote?: SendEmote | undefined }) {
   const current = gameState.players.find((candidate) => candidate.id === gameState.currentPlayerId);
   return (
     <main className={`controller-page controller-page--active player-theme--${player.color}`}>
@@ -123,6 +124,7 @@ export function BankruptcySpectator({ gameState, player, connected }: { gameStat
         <h1>Du bist ausgeschieden.</h1>
         <p>Zuschauerstatus · {current?.name ?? "Ein Gefährte"} ist am Zug.</p>
         <div className="spectator-players">{gameState.players.filter((entry) => !entry.isBankrupt).map((entry) => <span key={entry.id}>{entry.name} · {entry.gold} Gold</span>)}</div>
+        {onSendEmote && <EmoteBar connected={connected} onSend={onSendEmote} />}
         <ConnectionBadge connected={connected} />
       </section>
     </main>
@@ -380,6 +382,14 @@ export function ControllerPage() {
     socket.emit(SOCKET_EVENTS.playerUpdateReady, !player.ready, finishLobbyUpdate);
   };
 
+  const sendEmote: SendEmote = (emoteId, done) => {
+    socket.emit(SOCKET_EVENTS.playerEmote, emoteId, (result) => {
+      // Die Abklingzeit ist kein Fehler; die Leiste zeigt sie selbst an.
+      if (!result.ok && !result.cooldownMs) setError(result.message ?? "Die Reaktion konnte nicht gesendet werden.");
+      done(result);
+    });
+  };
+
   const sendMagicSignal = () => {
     socket.emit(SOCKET_EVENTS.playerMagicSignal, (result) => {
       if (!result.ok) {
@@ -583,7 +593,7 @@ export function ControllerPage() {
       return <main className={`controller-page controller-page--active player-theme--${player.color}`}><Ambience /><section className="controller-card controller-card--started end-controller"><BrandMark compact /><GameResultPanel gameState={gameState} viewerId={player.id} /><ConnectionBadge connected={connected} /></section></main>;
     }
     if (activePlayer.isBankrupt) {
-      return <BankruptcySpectator gameState={gameState} player={player} connected={connected} />;
+      return <BankruptcySpectator gameState={gameState} player={player} connected={connected} onSendEmote={sendEmote} />;
     }
     const isCurrent = current?.id === player.id;
     const orderEntry = gameState.orderRolls.find((entry) => entry.playerId === player.id);
@@ -736,6 +746,7 @@ export function ControllerPage() {
             </div>
           )}
           {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} autoMortgagePlan={autoMortgagePlan} onAutoMortgage={() => manageFinance(SOCKET_EVENTS.financeAutoMortgageForPayment)} onDeclareBankruptcy={declareBankruptcy} showActions={false} />}
+          <EmoteBar connected={connected} onSend={sendEmote} />
           </div>
           <div hidden={controllerTab !== "property"}><ControllerPossessions state={gameState} playerId={player.id} connected={connected} selectedGroupId={selectedPropertyGroupId} onSelectGroup={selectPropertyGroup} onBuild={manageBuilding} onMortgage={manageMortgage} onRedeemAllMortgages={() => manageFinance(SOCKET_EVENTS.financeRedeemAllMortgages)} onOfferTrade={offerPropertyTrade} /></div>
           <div id="controller-trade" hidden={controllerTab !== "trade"}><TradeTab state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onQuickCreate={createQuickTrade} onDecision={decideTrade} quickIntent={quickTradeIntent} onQuickIntentHandled={() => setQuickTradeIntent(undefined)} /></div>

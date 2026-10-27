@@ -1,4 +1,4 @@
-import type { PropertyGroupId, QuestId, RelicId } from "@valenor/shared";
+import type { EmoteId, PropertyGroupId, QuestId, RelicId } from "@valenor/shared";
 import { ICON_PATHS, ICON_VIEWBOX, type IconName } from "./icon-data";
 
 export type { IconName } from "./icon-data";
@@ -22,6 +22,10 @@ export const RELIC_ICONS: Record<RelicId, IconName> = {
 
 export const QUEST_ICONS: Record<QuestId, IconName> = {
   traveler: "rune", landbuyer: "property", seafarer: "harbor", builder: "building", landlord: "crown", dragonfriend: "dragon", fortunehunter: "tavern", tollpayer: "gold"
+};
+
+export const EMOTE_ICONS: Record<EmoteId, IconName> = {
+  cheer: "emote-cheer", curse: "emote-curse", laugh: "emote-laugh", awe: "emote-awe"
 };
 
 export const DIE_ICONS: readonly IconName[] = ["die-1", "die-2", "die-3", "die-4", "die-5", "die-6"];

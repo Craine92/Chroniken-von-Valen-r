@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BOARD_TILES, RELIC_DEFINITIONS, canBuildOnProperty, getActiveChronicleEvent, getPropertyGroup, getPropertyGroupTiles, type GameState, type PropertyGroupId } from "@valenor/shared";
-import { GameHud } from "./GameHud";
+import { GameHud, type ActiveEmotes } from "./GameHud";
 import { ChroniclePanel, useChronicleLines } from "../components/ChroniclePanel";
 import { getGraphicsQuality } from "./visual-config";
 import { getCurrentBoardContext } from "./board-context";
@@ -23,7 +23,7 @@ export const DOUBLE_BANNER_DURATION_MS = 2_200;
 export const CHRONICLE_NOTICE_DURATION_MS = 3_000;
 export const TAVERN_NOTICE_DURATION_MS = 4_000;
 
-export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE, suppressIntro = false }: { gameState: GameState; onNewChronicle?: () => void; onReturnToLobby?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined; suppressIntro?: boolean | undefined }) {
+export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE, suppressIntro = false, emotes }: { gameState: GameState; onNewChronicle?: () => void; onReturnToLobby?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined; suppressIntro?: boolean | undefined; emotes?: ActiveEmotes | undefined }) {
   const chronicleLines = useChronicleLines(gameState);
   const [graphicsQuality] = useState(getGraphicsQuality);
   const [introVisible, setIntroVisible] = useState(!suppressIntro);
@@ -147,7 +147,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
   return (
     <main className={`board-page board-page--${boardPresentationMode} ${hasContextEvent ? "has-context-event" : "is-context-idle"}`} data-testid="valenor-game-view" data-context-state={hasContextEvent ? "active" : "idle"} data-quality={graphicsQuality}>
       <aside className="game-sidebar" aria-label="Spielstatus">
-        <GameHud gameState={gameState} />
+        <GameHud gameState={gameState} emotes={emotes} />
         <ChroniclePanel lines={chronicleLines} />
         <RecentActions state={gameState} />
       </aside>

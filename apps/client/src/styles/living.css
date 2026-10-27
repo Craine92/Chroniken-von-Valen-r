@@ -71,3 +71,111 @@
 
 @media (prefers-reduced-motion: reduce) { .chronicle-line[data-age="0"] { animation: none; } }
 .board-page[data-quality="low"] .chronicle-line { animation: none; }
+
+/* --- Reaktionen: Blase am Porträt (TV) ---------------------------------- */
+.hud-player { position: relative; }
+.hud-emote {
+  position: absolute;
+  text-transform: none;
+  letter-spacing: normal;
+  z-index: 3;
+  top: 50%;
+  left: 3.4rem;
+  right: var(--space-1-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.6rem;
+  padding: var(--space-1) var(--space-2);
+  color: currentColor;
+  background: linear-gradient(140deg, var(--c-parchment-50), var(--c-parchment-200));
+  border: 2px solid currentColor;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  translate: 0 -50%;
+  animation: emote-pop 3200ms var(--ease-seal) both;
+}
+/* Zipfel zum Porträt */
+.hud-emote::before {
+  content: "";
+  position: absolute;
+  left: -.6rem;
+  top: 50%;
+  translate: 0 -50%;
+  border: .5rem solid transparent;
+  border-left: 0;
+  border-right-color: currentColor;
+}
+.hud-emote .icon { flex: none; font-size: 1.75rem; }
+.hud-emote--cheer .icon { color: var(--c-gold-600); }
+.hud-emote--curse .icon { color: var(--c-oxblood-500); }
+.hud-emote--laugh .icon { color: var(--c-verdigris-500); }
+.hud-emote--awe .icon { color: var(--c-arcane-500); }
+/* Der Ausruf darf zweizeilig werden; die Blase ist schmal, weil die Leiste nichts über ihren Rand lässt. */
+.hud-emote em { min-width: 0; color: var(--c-leather-900); font: italic 800 var(--fs-sm)/1.05 var(--font-text); overflow-wrap: anywhere; }
+@media (min-width: 1367px) { .hud-emote em { font-size: var(--fs-md); } .hud-emote .icon { font-size: 2rem; } }
+@keyframes emote-pop {
+  0% { opacity: 0; scale: .6; }
+  9% { opacity: 1; scale: 1.06; }
+  15% { scale: 1; }
+  88% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* --- Reaktionen: Leiste auf dem Handy ----------------------------------- */
+.emote-bar {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.emote-bar__buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
+.controller-page .emote-button {
+  display: grid;
+  place-items: center;
+  gap: var(--space-0-5);
+  min-width: 0;
+  min-height: 3.5rem;
+  padding: var(--space-1);
+  color: var(--text);
+  background: var(--surface-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font: 700 var(--fs-xs) var(--font-text);
+  letter-spacing: .03em;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: scale var(--dur-fast) var(--ease-out), opacity var(--dur-base) var(--ease-out);
+}
+.controller-page .emote-button .icon { font-size: 1.6rem; }
+.controller-page .emote-button--cheer .icon { color: var(--c-gold-400); }
+.controller-page .emote-button--curse .icon { color: var(--c-oxblood-400); }
+.controller-page .emote-button--laugh .icon { color: var(--c-verdigris-300); }
+.controller-page .emote-button--awe .icon { color: var(--c-arcane-300); }
+.controller-page .emote-button:active:not(:disabled) { scale: .95; }
+.controller-page .emote-button:disabled { opacity: .42; cursor: default; }
+.controller-page .emote-button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.emote-bar__status { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); text-align: center; }
+.emote-bar__cooldown {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--accent);
+  transform-origin: left;
+  animation: emote-cooldown var(--emote-cooldown, 5s) linear forwards;
+}
+@keyframes emote-cooldown { from { scale: 1 1; } to { scale: 0 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-emote { animation: none; }
+  .emote-bar__cooldown { display: none; }
+  .controller-page .emote-button { transition: none; }
+}
+.board-page[data-quality="low"] .hud-emote { animation: none; }

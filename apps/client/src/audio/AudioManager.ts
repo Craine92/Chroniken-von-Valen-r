@@ -5,7 +5,10 @@ import {
   DEFAULT_MUSIC_VOLUME,
   DEFAULT_SFX_VOLUME,
   DEFAULT_UI_VOLUME,
+  DEFAULT_VOICE_VOLUME,
   isAudioEventAllowedForRole,
+  TURN_CHIME,
+  VOICE_MUSIC_DUCK,
   MUSIC_TRACK,
   type AudioEvent,
   type AudioOutputRole
@@ -18,11 +21,16 @@ export interface AudioSettings {
   musicVolume: number;
   sfxVolume: number;
   uiVolume: number;
+  /** Die Stimme des Chronisten (nur TV). */
+  voiceVolume: number;
   musicEnabled: boolean;
   sfxEnabled: boolean;
   uiEnabled: boolean;
+  voiceEnabled: boolean;
   masterMuted: boolean;
   hapticsEnabled: boolean;
+  /** Kurzer Ton auf dem Handy, wenn man am Zug ist. */
+  turnChimeEnabled: boolean;
 }
 
 export const DEFAULT_AUDIO_SETTINGS: Readonly<AudioSettings> = {
@@ -30,11 +38,14 @@ export const DEFAULT_AUDIO_SETTINGS: Readonly<AudioSettings> = {
   musicVolume: DEFAULT_MUSIC_VOLUME,
   sfxVolume: DEFAULT_SFX_VOLUME,
   uiVolume: DEFAULT_UI_VOLUME,
+  voiceVolume: DEFAULT_VOICE_VOLUME,
   musicEnabled: true,
   sfxEnabled: true,
   uiEnabled: true,
+  voiceEnabled: true,
   masterMuted: false,
-  hapticsEnabled: true
+  hapticsEnabled: true,
+  turnChimeEnabled: true
 };
 
 const clampVolume = (value: unknown, fallback: number): number =>
@@ -47,11 +58,14 @@ export function normalizeAudioSettings(value: unknown): AudioSettings {
     musicVolume: clampVolume(input.musicVolume, DEFAULT_AUDIO_SETTINGS.musicVolume),
     sfxVolume: clampVolume(input.sfxVolume, DEFAULT_AUDIO_SETTINGS.sfxVolume),
     uiVolume: clampVolume(input.uiVolume, DEFAULT_AUDIO_SETTINGS.uiVolume),
+    voiceVolume: clampVolume(input.voiceVolume, DEFAULT_AUDIO_SETTINGS.voiceVolume),
     musicEnabled: typeof input.musicEnabled === "boolean" ? input.musicEnabled : true,
     sfxEnabled: typeof input.sfxEnabled === "boolean" ? input.sfxEnabled : true,
     uiEnabled: typeof input.uiEnabled === "boolean" ? input.uiEnabled : true,
+    voiceEnabled: typeof input.voiceEnabled === "boolean" ? input.voiceEnabled : true,
     masterMuted: typeof input.masterMuted === "boolean" ? input.masterMuted : false,
-    hapticsEnabled: typeof input.hapticsEnabled === "boolean" ? input.hapticsEnabled : true
+    hapticsEnabled: typeof input.hapticsEnabled === "boolean" ? input.hapticsEnabled : true,
+    turnChimeEnabled: typeof input.turnChimeEnabled === "boolean" ? input.turnChimeEnabled : true
   };
 }
 
@@ -71,9 +85,13 @@ export class AudioManager {
   private masterGain: GainNode | undefined;
   private sfxGain: GainNode | undefined;
   private uiGain: GainNode | undefined;
+  private voiceGain: GainNode | undefined;
+  private voiceSource: AudioBufferSourceNode | undefined;
   private music: HTMLAudioElement | undefined;
   private musicFadeTimer: number | undefined;
   private musicDuckMultiplier = 1;
+  /** Solange der Chronist spricht, bleibt die Musik deutlich leiser. */
+  private voiceDucking = false;
   private duckRestoreTimer: number | undefined;
   private readonly bufferLoads = new Map<string, Promise<AudioBuffer | undefined>>();
   private readonly cueLoads = new Map<AudioEvent, Promise<readonly { path: string; buffer: AudioBuffer }[]>>();
@@ -154,6 +172,7 @@ export class AudioManager {
       if (!this.audioContext || this.audioContext.state !== "running") return;
       this.unlocked = true;
       this.ensureGainGraph();
+      this.playSilentPrimer();
       // Warm timing-sensitive buffers after consent, before dice and field arrivals.
       if (this.outputRole === "board") {
         void this.loadCue("DICE_ROLL");
@@ -190,6 +209,56 @@ export class AudioManager {
     }).catch(() => undefined);
   }
 
+  /**
+   * Ein Satz des Chronisten, nur auf dem TV. Löst sich auf, wenn der Satz zu Ende ist – oder sofort, wenn die Stimme
+   * aus, stumm oder noch nicht freigeschaltet ist. Die Musik wird währenddessen leiser.
+   */
+  playVoice(path: string): Promise<void> {
+    if (!this.voiceAllowed()) return Promise.resolve();
+    return this.loadBuffer(path).then((buffer) => new Promise<void>((resolve) => {
+      if (!buffer || !this.audioContext || !this.voiceGain || !this.voiceAllowed()) { resolve(); return; }
+      const source = this.audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(this.voiceGain);
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        window.clearTimeout(safety);
+        this.activeSources.delete(source);
+        if (this.voiceSource === source) this.voiceSource = undefined;
+        this.setVoiceDucking(false);
+        resolve();
+      };
+      // Falls onended ausbleibt (z. B. bei angehaltenem Kontext), geht es trotzdem weiter.
+      const safety = window.setTimeout(finish, buffer.duration * 1_000 + 1_500);
+      source.onended = finish;
+      this.activeSources.add(source);
+      this.voiceSource = source;
+      this.setVoiceDucking(true);
+      source.start();
+    }));
+  }
+
+  /** Kurzer, heller Zwei-Ton auf dem Handy, wenn man am Zug ist. Im Browser erzeugt, damit er auch auf iPhones klingt. */
+  playTurnChime(): void {
+    if (this.outputRole !== "controller" || !this.unlocked || !this.audioContext || !this.uiGain || this.settings.masterMuted || !this.settings.turnChimeEnabled) return;
+    const context = this.audioContext;
+    const start = context.currentTime + 0.01;
+    TURN_CHIME.notes.forEach(({ frequency, at, duration }) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, start + at);
+      gain.gain.linearRampToValueAtTime(TURN_CHIME.volume, start + at + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + at + duration);
+      oscillator.connect(gain).connect(this.masterGain!);
+      oscillator.start(start + at);
+      oscillator.stop(start + at + duration + 0.02);
+    });
+  }
+
   resetMusic(): void {
     this.pauseMusic();
     if (this.duckRestoreTimer !== undefined) window.clearTimeout(this.duckRestoreTimer);
@@ -208,6 +277,7 @@ export class AudioManager {
     }
     if (typeof document !== "undefined" && this.uiClickHandler) document.removeEventListener("click", this.uiClickHandler, true);
     this.activeSources.forEach((source) => { try { source.stop(); } catch { /* Already stopped. */ } });
+    this.voiceDucking = false;
     void this.audioContext?.close().catch(() => undefined);
     this.armed = false;
     this.unlocked = false;
@@ -233,8 +303,10 @@ export class AudioManager {
     this.masterGain = this.audioContext.createGain();
     this.sfxGain = this.audioContext.createGain();
     this.uiGain = this.audioContext.createGain();
+    this.voiceGain = this.audioContext.createGain();
     this.sfxGain.connect(this.masterGain);
     this.uiGain.connect(this.masterGain);
+    this.voiceGain.connect(this.masterGain);
     this.masterGain.connect(this.audioContext.destination);
     this.syncVolumes();
   }
@@ -246,13 +318,16 @@ export class AudioManager {
       this.masterGain.gain.setTargetAtTime(master, at, 0.025);
       this.sfxGain.gain.setTargetAtTime(this.settings.sfxEnabled ? this.settings.sfxVolume : 0, at, 0.025);
       this.uiGain.gain.setTargetAtTime(this.settings.uiEnabled ? this.settings.uiVolume : 0, at, 0.025);
+      this.voiceGain?.gain.setTargetAtTime(this.settings.voiceEnabled ? this.settings.voiceVolume : 0, at, 0.025);
     }
+    // Stimme aus: einen laufenden Satz beenden, damit die Musik sofort zurückkommt.
+    if (!this.voiceAllowed() && this.voiceSource) { try { this.voiceSource.stop(); } catch { /* Already stopped. */ } }
     if (this.music) this.fadeMusicTo(this.musicTargetVolume(), 180);
   }
 
   private musicTargetVolume(): number {
     if (this.settings.masterMuted || !this.settings.musicEnabled || this.outputRole !== "board") return 0;
-    return this.settings.masterVolume * this.settings.musicVolume * this.musicDuckMultiplier;
+    return this.settings.masterVolume * this.settings.musicVolume * Math.min(this.musicDuckMultiplier, this.voiceDucking ? VOICE_MUSIC_DUCK : 1);
   }
 
   private async startMusic(): Promise<void> {
@@ -350,6 +425,29 @@ export class AudioManager {
         this.musicFadeTimer = undefined;
       }
     }, 30);
+  }
+
+  private voiceAllowed(): boolean {
+    return this.unlocked && this.outputRole === "board" && this.settings.voiceEnabled && !this.settings.masterMuted && Boolean(this.audioContext);
+  }
+
+  private setVoiceDucking(active: boolean): void {
+    if (this.voiceDucking === active) return;
+    this.voiceDucking = active;
+    if (this.music) this.fadeMusicTo(this.musicTargetVolume(), active ? 220 : 650);
+  }
+
+  /** iOS schaltet Web Audio erst frei, wenn innerhalb einer Berührung tatsächlich etwas abgespielt wird. */
+  private playSilentPrimer(): void {
+    if (!this.audioContext || !this.masterGain) return;
+    try {
+      const source = this.audioContext.createBufferSource();
+      source.buffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate);
+      source.connect(this.masterGain);
+      source.start();
+    } catch {
+      // Ohne Primer klingt der erste Ton eventuell erst nach der nächsten Berührung.
+    }
   }
 
   private warnOnce(key: string, message: string): void {

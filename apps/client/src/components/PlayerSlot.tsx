@@ -18,7 +18,7 @@ export function PlayerSlot({ player, index, onAddComputer, onRemovePlayer, disab
         <span className="player-slot__number">0{index + 1}</span>
         <div className="player-slot__sigil" aria-hidden="true"><Icon name="companion" /></div>
         <div className="player-slot__identity">
-          <h3>Spielerplatz frei</h3>
+          <h3>Spieler&shy;platz frei</h3>
           <button className="slot-action" type="button" onClick={onAddComputer} disabled={disabled}>
             + Computer hinzufügen
           </button>

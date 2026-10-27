@@ -2,6 +2,9 @@ export const DEFAULT_MASTER_VOLUME = 1;
 export const DEFAULT_MUSIC_VOLUME = 0.25;
 export const DEFAULT_SFX_VOLUME = 0.8;
 export const DEFAULT_UI_VOLUME = 0.5;
+export const DEFAULT_VOICE_VOLUME = 0.9;
+/** Musik-Faktor, solange der Chronist spricht. */
+export const VOICE_MUSIC_DUCK = 0.3;
 
 export const AUDIO_SETTINGS_STORAGE_KEY = "valenor:audio-settings:v1";
 
@@ -77,6 +80,39 @@ export const AUDIO_CUES: Readonly<Record<AudioEvent, AudioCueConfig>> = {
   VICTORY: { paths: [sfx("victory", "victory.ogg")], group: "SFX", audience: "board", volume: 0.95, cooldownMs: 5_000, duckMusic: true },
   DEFEAT: { paths: [sfx("victory", "defeat.ogg")], group: "SFX", audience: "board", volume: 0.85, cooldownMs: 5_000, duckMusic: true }
 };
+
+/** Zug-Ton auf dem Handy: zwei weiche Glockentöne (Quinte aufwärts), zusammen gut eine halbe Sekunde. */
+export const TURN_CHIME = {
+  volume: 0.32,
+  notes: [
+    { frequency: 659.25, at: 0, duration: 0.32 },
+    { frequency: 987.77, at: 0.14, duration: 0.42 }
+  ]
+} as const;
+
+/**
+ * Die Stimme des Chronisten: vom Projektinhaber mit ElevenLabs gesprochene Sätze. Der Dateiname ohne
+ * „-1/-2/-3“ ist der Schlüssel; mehrere Dateien mit demselben Schlüssel sind Varianten desselben Satzes.
+ */
+export const VOICE_FILES = [
+  "auktion", "bankrott-1", "bankrott-2", "bankrott-3",
+  "bau-max-elfen", "bau-max-menschen", "bau-max-orks", "bau-max-steppe",
+  "drache-1", "drache-2", "drache-3",
+  "ereignis-blutmond", "ereignis-erlass-der-krone", "ereignis-fest-der-haendler", "ereignis-frieden",
+  "ereignis-goldene-baukonjunktur", "ereignis-rohstoffknappheit", "ereignis-segen-der-baumeister", "ereignis-segen-des-runentors",
+  "gruppe-elfen", "gruppe-menschen", "gruppe-orks", "gruppe-steppe",
+  "handel-1", "handel-2",
+  "impuls-baueifer", "impuls-drachenruf", "impuls-goldener-augenblick", "impuls-haendlerglueck", "impuls-hafenwind",
+  "impuls-kronengunst", "impuls-marktschrei", "impuls-runenfunke", "impuls-schicksalswende", "impuls-weltenweg-spende",
+  "kerker-raus-1", "kerker-raus-2", "kerker-rein-1", "kerker-rein-2",
+  "letzte-runde", "miete-hoch-1", "miete-hoch-2", "pasch",
+  "sieg-elfen-zauberwirker", "sieg-gemeinsam", "sieg-nachtelf", "sieg-ork-kriegsherr", "sieg-ritter",
+  "sieg-steppen-schamane", "sieg-tauren", "sieg-troll", "sieg-zwerg",
+  "start-1", "start-2",
+  "taverne-gewinn-1", "taverne-gewinn-2", "taverne-verlust"
+] as const;
+
+export const VOICE_PATH = (file: string) => `/assets/audio/voice/${file}.mp3`;
 
 export function isAudioEventAllowedForRole(event: AudioEvent, role: AudioOutputRole): boolean {
   return AUDIO_CUES[event].audience === role;

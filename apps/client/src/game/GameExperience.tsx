@@ -10,6 +10,7 @@ import { GameResultPanel } from "../components/GameResultPanel";
 import { DEFAULT_BOARD_PRESENTATION_MODE, getCardPresentationKey, type BoardPresentationMode } from "./board-presentation";
 import { audioManager } from "../audio/AudioManager";
 import { GameAudioEventTracker } from "../audio/game-audio-events";
+import { useChroniclerVoice } from "../audio/useChroniclerVoice";
 import { MomentumCelebrationBanner, WorldImpulseBanner } from "../components/WorldImpulseUi";
 import { TvQuickTradeBanner, isQuickTradeAction } from "./TvQuickTrade";
 import { Icon, dieIcon, GROUP_ICONS } from "../components/icons/Icon";
@@ -37,6 +38,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
   const chronicleKey = chronicle ? `${chronicle.id}:${chronicle.startedAtRound}` : undefined;
   const [dismissedDoubleNoticeId, setDismissedDoubleNoticeId] = useState<string>();
   const audioTracker = useRef(new GameAudioEventTracker(gameState));
+  useChroniclerVoice(gameState);
   const audioTimers = useRef(new Set<number>());
 
   useEffect(() => {

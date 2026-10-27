@@ -31,6 +31,14 @@ Vom Projektinhaber mit ChatGPT erstellt und für dieses Projekt bereitgestellt. 
 | Gebäude (12 Baustufen: Wurzelhütte, Baumhalle, Sternenzitadelle, Gehöft, Herrenhaus, Königsburg, Raiderlager, Kriegslager, Eisenfestung, Wanderzelt, Große Halle, Himmelsfeste) | `apps/client/public/assets/buildings/{elven,human,orc,steppe}/*.webp` (Manifest: `VALENOR_ASSETS.buildings`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | auf den Umriss zugeschnitten, auf 256 px Breite verkleinert, WebP mit Transparenz | 2026-10-27 |
 | Titelbild der TV-Lobby | `apps/client/public/assets/ui/title/titelbild-valenor.webp` (Manifest: `LOBBY_ASSETS.title`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | WebP in Originalgröße (1536 × 1024 px) | 2026-10-27 |
 
+## Stimme des Chronisten
+
+Vom Projektinhaber mit ElevenLabs erstellt und für dieses Projekt bereitgestellt. Für das Spiel in kleine MP3-Dateien umgewandelt; Inhalt unverändert.
+
+| Asset | Files | Creator | Source | License | Modified | Date |
+| --- | --- | --- | --- | --- | --- | --- |
+| Sprachaufnahmen des Chronisten (57 Sätze: Spielbeginn, Sieg je Figur, Bankrott, Drache, Gruppen, Bauten der Stufe 5, Chronik-Ereignisse, Weltimpulse und weitere) | `apps/client/public/assets/audio/voice/*.mp3` (Manifest: `VOICE_FILES` in `apps/client/src/audio/audio-config.ts`) | vom Projektinhaber mit ElevenLabs erstellt | Projektinhaber | wie dieses Projekt | mono, 24 kHz, 48 kbit/s, Stille am Anfang und Ende gekürzt | 2026-10-27 |
+
 ## Fonts (design system "Codex")
 
 Bundled locally under `apps/client/public/assets/fonts/`, loaded by `apps/client/src/styles/fonts.css`. No runtime hotlinks. The full license text sits next to each family as `OFL.txt`.

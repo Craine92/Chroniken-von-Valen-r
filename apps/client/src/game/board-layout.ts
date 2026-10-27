@@ -157,7 +157,16 @@ export interface TokenSeat {
   scale: number;
   row: number;
   front: boolean;
+  /** Auf vollen Feldern: nur ein Wappen mit Porträt statt der Figur; x/y ist dann die Mitte des Wappens, scale sein Durchmesser. */
+  crest?: boolean;
 }
+
+/** Ab so vielen Figuren auf einem Feld steht nur noch eine als Figur; die anderen zeigen ein Wappen am Fuß des Feldes. */
+export const CREST_FIELD_THRESHOLD = 4;
+/** Durchmesser eines Wappens in Weltpixeln. */
+export const CREST_SIZE = 26;
+/** Die stehende Figur auf einem vollen Feld bleibt etwas kleiner als eine Figur allein. */
+const CROWDED_LEAD_MAX_SCALE = .82;
 
 function splitRows(count: number, rows: number, columns: number): number[] {
   if (rows === 1) return [count];
@@ -218,14 +227,32 @@ export function getTokenSeat(tileIndex: number, count: number, index: number, op
     else zone.left = zones.building.right;
   }
   const total = Math.min(6, Math.max(1, count));
-  const seats = layoutSeats(zone, total);
   const active = options.activeIndex !== undefined && options.activeIndex >= 0 && options.activeIndex < total ? options.activeIndex : undefined;
+  // Auf vollen Feldern stehen nur Wappen und eine Figur; oben und unten darf diese vor das Gebäude treten.
+  if (total >= CREST_FIELD_THRESHOLD) return getCrowdedSeat(zones.kind === "landscape" ? zone : zones.tokens, total, index, active ?? 0);
+  const seats = layoutSeats(zone, total);
   const seatIndex = active === undefined ? index : index === active ? 0 : index < active ? index + 1 : index;
   const seat = seats[Math.min(seats.length - 1, Math.max(0, seatIndex))]!;
   if (active === undefined || index !== active || total === 1) return seat;
   // Größer als die anderen, aber nie über die Standfläche hinaus (sonst verdeckt der Kopf den Feldnamen).
   const fits = (seat.y - zone.top) / TOKEN_FOOTPRINT.above;
   return { ...seat, scale: Math.max(seat.scale, Math.min(seat.scale * ACTIVE_TOKEN_SCALE_BOOST, fits)) };
+}
+
+/**
+ * Volles Feld: Die führende Figur (die aktive, sonst die als Nächste am Zug ist) steht hinter einer Reihe kleiner Wappen;
+ * die Wappen der anderen stehen in Spielreihenfolge am Fuß der Standfläche und dürfen sich leicht überlappen.
+ */
+function getCrowdedSeat(zone: FieldRect, total: number, index: number, lead: number): TokenSeat {
+  const crestY = zone.bottom - CREST_SIZE / 2;
+  if (index === lead) {
+    const [seat] = layoutSeats({ ...zone, bottom: zone.bottom - CREST_SIZE * .45 }, 1);
+    return { ...seat!, scale: Math.min(seat!.scale, CROWDED_LEAD_MAX_SCALE), front: true };
+  }
+  const crests = total - 1, position = index < lead ? index : index - 1;
+  const width = zone.right - zone.left, centerX = (zone.left + zone.right) / 2;
+  const spacing = crests > 1 ? Math.min(CREST_SIZE * 1.12, (width - CREST_SIZE) / (crests - 1)) : 0;
+  return { x: centerX + (position - (crests - 1) / 2) * spacing, y: crestY, scale: CREST_SIZE, row: 1, front: true, crest: true };
 }
 
 /** Bauplatz in Feldkoordinaten: Fußpunkt (Mitte unten) und das Rechteck, in das das Gebäudebild passt. */

@@ -1,5 +1,5 @@
 import { BOARD_TILES, RELIC_DEFINITIONS, QUEST_DEFINITIONS, formatQuickTradeHeadline, getActiveChronicleEvent, getChronicleRegionLabel, getPropertyGroup, type GameState } from "@valenor/shared";
-import { openControllerTrade, type MobileFeedback } from "./mobile-feedback";
+import { openControllerTrade, TURN_HAPTIC_PATTERN, type MobileFeedback } from "./mobile-feedback";
 import { RELIC_ICONS, tileIcon } from "../components/icons/Icon";
 
 // Reads server-confirmed records only. No actions, balances or game rules are changed.
@@ -31,7 +31,7 @@ export class MobileFeedbackEventTracker {
 
     if (state.currentPlayerId === playerId && state.turnPhase !== "determiningOrder" && state.turnPhase !== "turnTransition") {
       add({ id: `turn:${state.turnNumber}:${playerId}`, type: "turn", title: "DU BIST AM ZUG",
-        message: "Dein Abenteuer geht weiter.", hapticPattern: 80, icon: "crown" }, true);
+        message: "Dein Abenteuer geht weiter.", hapticPattern: TURN_HAPTIC_PATTERN, icon: "crown" }, true);
     }
     for (const trade of state.trades) {
       if (trade.recipientId !== playerId && trade.proposerId !== playerId) continue;

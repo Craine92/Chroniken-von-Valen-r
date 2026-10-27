@@ -1,4 +1,4 @@
-import { getWorldImpulseDefinition, type GameState, type PropertyGroupId, type RelicId } from "@valenor/shared";
+import { getWorldImpulseDefinition, type BuildingLevel, type GameState, type PropertyGroupId, type RelicId, type WorldImpulseId } from "@valenor/shared";
 
 /**
  * Was zwischen zwei Spielständen passiert ist, in einer Form, aus der Chronist und Effekte lesen.
@@ -12,7 +12,7 @@ export type GameMoment =
   | { kind: "dragon"; playerId: string; tileIndex?: number; relicId?: RelicId }
   | { kind: "auctionWon"; playerId: string; tileIndex: number; amount: number }
   | { kind: "purchase"; playerId: string; tileIndex: number; amount: number }
-  | { kind: "build"; playerId: string; tileIndex: number; buildingName: string }
+  | { kind: "build"; playerId: string; tileIndex: number; buildingName: string; level: BuildingLevel }
   | { kind: "rent"; payerId: string; ownerId: string; amount: number; tileIndex?: number; payerGoldBefore: number }
   | { kind: "dungeonEnter"; playerId: string }
   | { kind: "dungeonLeave"; playerId: string }
@@ -21,8 +21,8 @@ export type GameMoment =
   | { kind: "tax"; playerId: string; amount: number }
   | { kind: "startPass"; playerId: string; amount: number }
   | { kind: "double"; playerId: string }
-  | { kind: "chronicleEvent"; title: string }
-  | { kind: "worldImpulse"; title: string }
+  | { kind: "chronicleEvent"; title: string; eventId: string }
+  | { kind: "worldImpulse"; title: string; impulseId: WorldImpulseId }
   | { kind: "lastRound" };
 
 export type GameMomentKind = GameMoment["kind"];
@@ -74,7 +74,7 @@ export function deriveGameMoments(previous: GameState, next: GameState): GameMom
 
   const building = next.lastBuildingAction;
   if (building && building.id !== previous.lastBuildingAction?.id && building.type === "build") {
-    moments.push({ kind: "build", playerId: building.playerId, tileIndex: building.tileIndex, buildingName: building.buildingName });
+    moments.push({ kind: "build", playerId: building.playerId, tileIndex: building.tileIndex, buildingName: building.buildingName, level: building.toLevel });
   }
   const celebration = next.lastMomentumCelebration;
   if (celebration && celebration.id !== previous.lastMomentumCelebration?.id && celebration.type === "completeGroup") {
@@ -102,9 +102,9 @@ export function deriveGameMoments(previous: GameState, next: GameState): GameMom
   }
 
   const chronicle = next.activeChronicleEvent;
-  if (chronicle && chronicle.startedAt !== previous.activeChronicleEvent?.startedAt) moments.push({ kind: "chronicleEvent", title: chronicle.title });
+  if (chronicle && chronicle.startedAt !== previous.activeChronicleEvent?.startedAt) moments.push({ kind: "chronicleEvent", title: chronicle.title, eventId: chronicle.id });
   const impulse = next.activeWorldImpulse;
-  if (impulse?.startedAt && impulse.startedAt !== previous.activeWorldImpulse?.startedAt) moments.push({ kind: "worldImpulse", title: impulse.title || getWorldImpulseDefinition(impulse.id).title });
+  if (impulse?.startedAt && impulse.startedAt !== previous.activeWorldImpulse?.startedAt) moments.push({ kind: "worldImpulse", title: impulse.title || getWorldImpulseDefinition(impulse.id).title, impulseId: impulse.id });
   if (next.quickGameClock?.expired && !previous.quickGameClock?.expired && next.status === "playing") moments.push({ kind: "lastRound" });
   if (next.status === "finished" && previous.status !== "finished") {
     const winnerIds = next.gameResult?.winnerIds ?? next.winnerIds ?? (next.winnerId ? [next.winnerId] : []);

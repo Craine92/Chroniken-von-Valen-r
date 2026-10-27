@@ -2,7 +2,7 @@ import { BOARD_TILES, type BuildingLevel, type GamePlayerState, type GameState, 
 import { GameExperience } from "../game/GameExperience";
 
 /** Szenen für Feldbilder, Figuren auf dem Feld und Gebäude je Baustufe. */
-export const BOARD_FIELD_SCENES = ["board-empty", "board-tokens-1", "board-tokens-4", "board-tokens-6", "board-tokens-6-side", "board-corners", "board-corner-6", "board-buildings"] as const;
+export const BOARD_FIELD_SCENES = ["board-empty", "board-tokens-1", "board-tokens-4", "board-tokens-6", "board-tokens-6-side", "board-tokens-5-waiting", "board-corners", "board-corner-6", "board-buildings"] as const;
 export type BoardFieldScene = typeof BOARD_FIELD_SCENES[number];
 
 export function isBoardFieldScene(scene: string): scene is BoardFieldScene {
@@ -50,6 +50,11 @@ function createBoardState(scene: BoardFieldScene): GameState {
   } else if (scene === "board-tokens-6-side") {
     place([37, 37, 37, 37, 37, 37]);
     propertyOwnerships = [own(37, "p4", 5), own(39, "p4", 5)];
+    currentPlayerId = "p2";
+  } else if (scene === "board-tokens-5-waiting") {
+    // Volles Feld, die aktive Figur steht woanders: vorne steht, wer als Nächste dran ist (p3 nach p2).
+    place([9, 0, 9, 9, 9, 9]);
+    propertyOwnerships = [own(9, "p1", 4)];
     currentPlayerId = "p2";
   } else if (scene === "board-corners") {
     place([0, 13, 20, 20, 33, 33]);

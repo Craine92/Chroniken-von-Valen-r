@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_CORNER_TILE_INDICES, BOARD_TILES } from "@valenor/shared";
 import { getBoardTileVisualLayout } from "./board-tile-layout";
-import { ACTIVE_TOKEN_SCALE_BOOST, BOARD_FIELD_DEPTH, BOARD_HEIGHT, BOARD_WIDTH, getBoardFitZoom, getBuildingSeat, getDragonAnchor, getFieldZones, getTileInnerAnchor, getTilePlacement, getTokenSeat, TOKEN_FOOTPRINT } from "../board-layout";
+import { ACTIVE_TOKEN_SCALE_BOOST, BOARD_FIELD_DEPTH, CREST_FIELD_THRESHOLD, CREST_SIZE, BOARD_HEIGHT, BOARD_WIDTH, getBoardFitZoom, getBuildingSeat, getDragonAnchor, getFieldZones, getTileInnerAnchor, getTilePlacement, getTokenSeat, TOKEN_FOOTPRINT } from "../board-layout";
 import { getBoardVisualScale } from "../board-presentation";
 import { getFieldSymbol, getPropertyGroupVisual, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, getTileVariant } from "./board-tile-theme";
-import { showsTokenName } from "../tokens/token-visuals";
+import { pickLeadIndex, showsTokenName } from "../tokens/token-visuals";
 
 test("all forty fields receive a complete data-driven visual definition", () => {
   assert.equal(BOARD_TILES.length, 40);
@@ -153,10 +153,12 @@ test("calibrated inner anchors preserve all field bounds and point inward on eve
   }
 });
 
-const tokenBox = (seat: { x: number; y: number; scale: number }) => ({
-  left: seat.x - TOKEN_FOOTPRINT.width * seat.scale / 2, right: seat.x + TOKEN_FOOTPRINT.width * seat.scale / 2,
-  top: seat.y - TOKEN_FOOTPRINT.above * seat.scale, bottom: seat.y + TOKEN_FOOTPRINT.below * seat.scale
-});
+const tokenBox = (seat: { x: number; y: number; scale: number; crest?: boolean }) => seat.crest
+  ? { left: seat.x - seat.scale / 2, right: seat.x + seat.scale / 2, top: seat.y - seat.scale / 2, bottom: seat.y + seat.scale / 2 }
+  : {
+    left: seat.x - TOKEN_FOOTPRINT.width * seat.scale / 2, right: seat.x + TOKEN_FOOTPRINT.width * seat.scale / 2,
+    top: seat.y - TOKEN_FOOTPRINT.above * seat.scale, bottom: seat.y + TOKEN_FOOTPRINT.below * seat.scale
+  };
 
 test("fields are 190 deep and name and price bands cover at most a third of every field", () => {
   assert.equal(BOARD_FIELD_DEPTH, 190);
@@ -188,7 +190,7 @@ test("one to six tokens stand on their own field, below the name band and with d
 });
 
 test("the active token stands in front and a little larger; alone it keeps the normal size", () => {
-  for (const tileIndex of [3, 16, 24, 0, 37]) for (let count = 2; count <= 6; count += 1) {
+  for (const tileIndex of [3, 16, 24, 0, 37]) for (let count = 2; count < CREST_FIELD_THRESHOLD; count += 1) {
     const activeIndex = count - 1;
     const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index, { activeIndex }));
     const active = seats[activeIndex]!;
@@ -203,8 +205,9 @@ test("the active token stands in front and a little larger; alone it keeps the n
 
 test("tokens shrink as a field fills up, and crowded fields show only the active name", () => {
   for (const tileIndex of [3, 16, 0]) {
-    const scales = [1, 2, 3, 4, 5, 6].map(count => getTokenSeat(tileIndex, count, 0).scale);
+    const scales = [1, 2, 3].map(count => getTokenSeat(tileIndex, count, 0).scale);
     scales.slice(1).forEach((scale, index) => assert.ok(scale <= scales[index]! + .001));
+    assert.ok(getTokenSeat(tileIndex, 6, 0, { activeIndex: 0 }).scale <= scales[0]!, "the standing figure on a full field is never larger than a lone one");
   }
   assert.equal(showsTokenName(1, false), true);
   assert.equal(showsTokenName(2, false), false);
@@ -237,4 +240,29 @@ test("every field kind has a small symbol for its band", () => {
   BOARD_TILES.forEach(tile => assert.ok(getFieldSymbol(tile).length > 0, tile.name));
   assert.equal(getFieldSymbol(BOARD_TILES.find(tile => tile.type === "harbor")!), "harbor");
   assert.match(getFieldSymbol(BOARD_TILES.find(tile => tile.type === "property")!), /^group-/);
+});
+
+test("from four tokens on, only the leading figure stands; the others show crests in a row at the foot of the field", () => {
+  assert.equal(CREST_FIELD_THRESHOLD, 4);
+  for (let tileIndex = 0; tileIndex < 40; tileIndex += 1) for (const built of [false, true]) for (let count = 4; count <= 6; count += 1) for (const lead of [0, 2, count - 1]) {
+    const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index, { activeIndex: lead, occupiedByBuilding: built }));
+    const figures = seats.filter(seat => !seat.crest), crests = seats.filter(seat => seat.crest);
+    assert.equal(figures.length, 1, `Feld ${tileIndex}: genau eine Figur`);
+    assert.equal(seats[lead]!.crest, undefined, "the leading player is the figure");
+    assert.equal(crests.length, count - 1);
+    // Eine Reihe, gleich groß, von links nach rechts in Spielreihenfolge.
+    assert.equal(new Set(crests.map(crest => crest.y)).size, 1);
+    assert.ok(crests.every(crest => crest.scale === CREST_SIZE));
+    crests.slice(1).forEach((crest, index) => assert.ok(crest.x > crests[index]!.x));
+    // Die Wappen stehen vor den Füßen der Figur.
+    assert.ok(crests[0]!.y > figures[0]!.y);
+  }
+});
+
+test("the active player leads a full field; otherwise the one whose turn comes next", () => {
+  const order = ["p1", "p2", "p3", "p4", "p5", "p6"];
+  assert.equal(pickLeadIndex(["p2", "p3", "p5", "p6"], "p5", order), 2, "active player present");
+  assert.equal(pickLeadIndex(["p2", "p3", "p5", "p6"], "p4", order), 2, "p5 plays right after p4");
+  assert.equal(pickLeadIndex(["p1", "p2", "p3", "p5"], "p6", order), 0, "wraps around to p1");
+  assert.equal(pickLeadIndex(["p2", "p3"], "p4", order), -1, "small fields keep everybody standing");
 });

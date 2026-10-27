@@ -1840,7 +1840,8 @@ body {
 .board-event-layer .payment-required { padding:var(--space-5) var(--space-6); }
 .board-event-layer .order-overlay { max-height:80vh; overflow:auto; padding:var(--space-5); background:rgb(var(--c-ink-950-rgb) / .96); }
 .board-event-layer :is(.dungeon-status,.double-notice,.dungeon-notice) { min-width:0; padding:var(--space-4) var(--space-5); background:rgb(var(--c-ink-950-rgb) / .96); }
-.board-event-layer > :is(.last-round-banner,.building-notice) { top:1.2rem; left:50%; translate:-50% 0; width:min(520px,calc(100% - 3rem)); box-sizing:border-box; }
+/* Meldungen beginnen unter der oberen Feldreihe, damit sie keine Felder verdecken. */
+.board-event-layer > :is(.last-round-banner,.building-notice) { top:calc(var(--board-inner-top,1.2rem) + .75rem); left:50%; translate:-50% 0; width:min(520px,calc(100% - 3rem)); box-sizing:border-box; }
 .board-event-layer > :is(.chronicle-notice,.tavern-notice,.dragon-notice) { top:50%; translate:-50% -50%; min-width:0; padding:var(--space-6); animation:boardEventIn var(--dur-base) ease both; }
 :is(.chronicle-notice,.tavern-notice,.dragon-notice) small { color:var(--c-gold-400); font-weight:800; letter-spacing:.12em; }
 :is(.chronicle-notice,.tavern-notice,.dragon-notice) strong { font-size:var(--fs-2xl); overflow-wrap:anywhere; }
@@ -2042,6 +2043,8 @@ body {
 /* Presentation pass 2: the upper table margin stays outside the printed board. */
 /* Das höhere Brett lässt oben weniger Rand; die Zuganzeige behält trotzdem eine lesbare Mindesthöhe und ragt höchstens in den Rahmen. */
 .board-stage { --board-hud-space:max(46px,var(--board-top-space,52px)); }
+/* Das höhere Brett lässt oben weniger Rand; die Zuganzeige behält trotzdem eine lesbare Mindesthöhe und ragt höchstens in den Rahmen. */
+.board-stage { --board-hud-space:max(46px,var(--board-top-space,52px)); }
 .board-top-hud { position:absolute; z-index:18; top:3px; left:50%; translate:-50% 0; box-sizing:border-box; height:max(0px,calc(var(--board-hud-space,52px) - 6px)); max-height:104px; max-width:calc(100% - 1rem); display:flex; align-items:center; gap:clamp(.5rem,1vw,1.2rem); padding:0 clamp(.7rem,1vw,1.3rem); color:var(--c-gold-200); background:linear-gradient(120deg,rgb(var(--c-leather-700-rgb) / .91),rgb(var(--c-ink-900-rgb) / .961)); border:2px solid var(--c-gold-500); border-radius:var(--radius-md); box-shadow:0 6px 16px rgb(var(--c-black-rgb) / .533),inset 0 0 0 2px rgb(var(--c-gold-400-rgb) / .094); overflow:hidden; pointer-events:none; }
 .board-stage::before { content:""; position:absolute; z-index:1; top:0; left:0; right:0; height:var(--board-top-space,52px); pointer-events:none; opacity:.14; background:radial-gradient(ellipse at 50% 90%,rgb(var(--c-gold-500-rgb) / .2),transparent 60%),linear-gradient(rgb(var(--c-ink-950-rgb) / .851),var(--c-ink-950)),url('/assets/board/realms/realm-human.webp') 50% 38% / cover; }
 .board-top-hud__dice { display:flex; align-items:center; gap:var(--space-2); height:100%; }
@@ -2055,7 +2058,7 @@ body {
 .board-top-hud > em { color:var(--c-gold-300); font:700 clamp(10px,calc(var(--board-hud-space,52px) * .22),18px) var(--font-display); }
 .board-top-hud.is-rolling .dice-face { animation:topDiceRoll var(--dur-base) ease-in-out infinite alternate; }
 @keyframes topDiceRoll { from { transform:rotate(-7deg); opacity:.7; } to { transform:rotate(7deg); opacity:1; } }
-.board-stage:has(.board-top-hud) .board-notification-lane { top:calc(var(--board-top-space,52px) + 145px * var(--board-scale,1)); }
+.board-stage:has(.board-top-hud) .board-notification-lane { top:calc(var(--board-inner-top,190px) + .75rem); }
 .board-card-event { --draw-x:calc(0px - var(--card-source-x,390px)); }
 .board-card-event[data-deck="fate"] { --draw-x:var(--card-source-x,390px); }
 .board-card-event .card-reveal { animation:deckCardDraw .76s cubic-bezier(.2,.72,.2,1) both; transform-origin:50% 50%; }

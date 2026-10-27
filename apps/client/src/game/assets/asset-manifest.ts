@@ -1,4 +1,4 @@
-import { BOARD_TILES, PLAYER_CHARACTERS, type PlayerCharacterId, type BuildingLevel, type RegionType, type RelicId } from "@valenor/shared";
+import { BOARD_TILES, PLAYER_CHARACTERS, type BoardTile, type PlayerCharacterId, type BuildingLevel, type RegionType, type RelicId } from "@valenor/shared";
 
 export type AssetAvailability = "slot" | "ready";
 
@@ -45,6 +45,8 @@ const atlasSlot = (key: string, basePath: string, prefix: string, end: number, w
   animation: { key: `${key}-loop`, prefix, start: 0, end, zeroPad: 2, frameRate: 10 }
 });
 
+const FIELD_ART_IDS = [...BOARD_TILES.filter(tile => tile.type !== "fate" && tile.type !== "adventure").map(tile => tile.id), "schicksal", "abenteuer"];
+
 export const VALENOR_ASSETS = {
   board: {
     table: imageSlot("board-table", "/assets/board/table/table-background.webp", 1672, 941, "ready"),
@@ -52,6 +54,8 @@ export const VALENOR_ASSETS = {
     innerBackground: imageSlot("board-inner", "/assets/board/realms/board-inner-background.webp", 1200, 1200),
     corners: imageSlot("board-corners", "/assets/board/corners/ornaments.webp", 1024, 1024)
   },
+  // Feldbilder (512 x 512) je Feld-ID; alle Schicksal- und alle Abenteuerfelder teilen sich ein Bild.
+  fields: Object.fromEntries(FIELD_ART_IDS.map(id => [id, imageSlot(`field-${id}`, `/assets/board/fields/${id}.webp`, 512, 512, "ready")])) as Readonly<Record<string, ImageAssetDefinition>>,
   realms: {
     elven: { background: imageSlot("realm-elven", "/assets/board/realms/realm-elven.webp", 1254, 1254, "ready") },
     human: { background: imageSlot("realm-human", "/assets/board/realms/realm-human.webp", 1254, 1254, "ready") },
@@ -105,23 +109,36 @@ export const VALENOR_ASSETS = {
     crownTax: imageSlot("special-crown-tax", "/assets/board/special-tiles/crown-tax.webp", 512, 512),
     dragonTithe: imageSlot("special-dragon-tithe", "/assets/board/special-tiles/dragon-tithe.webp", 512, 512)
   },
+  // Ein Bild je Baustufe in der Reihenfolge von REALM_BUILDING_THEMES.
   buildings: {
-    elven: {
-      settlement: imageSlot("building-elven-settlement", "/assets/buildings/elven/treehouse-sanctuary.png", 362, 543, "ready"),
-      grandStructure: imageSlot("building-elven-grand", "/assets/buildings/elven/glowing-shrine.png", 362, 543, "ready")
-    },
-    human: {
-      settlement: imageSlot("building-human-settlement", "/assets/buildings/human/cottage.png", 362, 543, "ready"),
-      grandStructure: imageSlot("building-human-grand", "/assets/buildings/human/keep-tower.png", 362, 543, "ready")
-    },
-    orc: {
-      settlement: imageSlot("building-orc-settlement", "/assets/buildings/orc/hut.png", 362, 543, "ready"),
-      grandStructure: imageSlot("building-orc-grand", "/assets/buildings/orc/fortress-tower.png", 362, 543, "ready")
-    },
-    steppe: {
-      settlement: imageSlot("building-steppe-settlement", "/assets/buildings/steppe/yurt-hall.png", 362, 527, "ready"),
-      grandStructure: imageSlot("building-steppe-grand", "/assets/buildings/steppe/totem-hall.png", 362, 531, "ready")
-    }
+    elven: [
+      imageSlot("building-elven-1", "/assets/buildings/elven/wurzelhuette.webp", 256, 316, "ready"),
+      imageSlot("building-elven-2", "/assets/buildings/elven/treehouse-sanctuary.png", 362, 543, "ready"),
+      imageSlot("building-elven-3", "/assets/buildings/elven/glowing-shrine.png", 362, 543, "ready"),
+      imageSlot("building-elven-4", "/assets/buildings/elven/baumhalle.webp", 256, 380, "ready"),
+      imageSlot("building-elven-5", "/assets/buildings/elven/sternenzitadelle.webp", 256, 381, "ready")
+    ],
+    human: [
+      imageSlot("building-human-1", "/assets/buildings/human/cottage.png", 362, 543, "ready"),
+      imageSlot("building-human-2", "/assets/buildings/human/gehoeft.webp", 256, 289, "ready"),
+      imageSlot("building-human-3", "/assets/buildings/human/herrenhaus.webp", 256, 348, "ready"),
+      imageSlot("building-human-4", "/assets/buildings/human/keep-tower.png", 362, 543, "ready"),
+      imageSlot("building-human-5", "/assets/buildings/human/koenigsburg.webp", 256, 378, "ready")
+    ],
+    orc: [
+      imageSlot("building-orc-1", "/assets/buildings/orc/hut.png", 362, 543, "ready"),
+      imageSlot("building-orc-2", "/assets/buildings/orc/raiderlager.webp", 256, 360, "ready"),
+      imageSlot("building-orc-3", "/assets/buildings/orc/kriegslager.webp", 256, 381, "ready"),
+      imageSlot("building-orc-4", "/assets/buildings/orc/fortress-tower.png", 362, 543, "ready"),
+      imageSlot("building-orc-5", "/assets/buildings/orc/eisenfestung.webp", 256, 380, "ready")
+    ],
+    steppe: [
+      imageSlot("building-steppe-1", "/assets/buildings/steppe/wanderzelt.webp", 256, 338, "ready"),
+      imageSlot("building-steppe-2", "/assets/buildings/steppe/yurt-hall.png", 362, 527, "ready"),
+      imageSlot("building-steppe-3", "/assets/buildings/steppe/totem-hall.png", 362, 531, "ready"),
+      imageSlot("building-steppe-4", "/assets/buildings/steppe/grosse-halle.webp", 256, 247, "ready"),
+      imageSlot("building-steppe-5", "/assets/buildings/steppe/himmelsfeste.webp", 256, 256, "ready")
+    ]
   },
   relics: {
     runestone: imageSlot("relic-runestone", "/assets/Relicts/Runenstein.png", 1254, 1254, "ready"),
@@ -145,8 +162,8 @@ export const VALENOR_ASSETS = {
     fateFrame: imageSlot("card-fate-frame", "/assets/cards/CardSchicksal.png", 1058, 1487, "ready")
   },
   ui: {
-    boardFieldHorizontal: imageSlot("field-base-horizontal", "/assets/ui/board/field_base_horizontal.png", 1086, 1448, "ready"),
-    boardFieldVertical: imageSlot("field-base-vertical", "/assets/ui/board/field_base_vertical.png", 1448, 1086, "ready"),
+    boardFieldHorizontal: imageSlot("field-base-horizontal", "/assets/ui/board/field_base_horizontal.png", 1086, 1448),
+    boardFieldVertical: imageSlot("field-base-vertical", "/assets/ui/board/field_base_vertical.png", 1448, 1086),
     goldFrame: imageSlot("ui-gold-frame", "/assets/ui/gold-frame.webp", 1024, 256),
     parchment: imageSlot("ui-parchment", "/assets/ui/parchment.webp", 1024, 1024),
     panelCorners: imageSlot("ui-panel-corners", "/assets/ui/panel-corners.webp", 512, 512),
@@ -205,9 +222,19 @@ export function getPreloadAssets(): ValenorAssetDefinition[] {
 export function getBuildingAsset(region: RegionType, level: BuildingLevel): ImageAssetDefinition | undefined {
   if (level === 0) return undefined;
   const assetRealm = { elves: "elven", humans: "human", orcs: "orc", steppe: "steppe" } as const;
-  const set = VALENOR_ASSETS.buildings[assetRealm[region]];
-  return level === 5 ? set.grandStructure : set.settlement;
+  return VALENOR_ASSETS.buildings[assetRealm[region]][level - 1];
 }
+
+/** Feldbild für das Brett; Schicksal und Abenteuer nutzen je ein gemeinsames Bild. */
+export function getFieldArtAsset(tile: BoardTile): ImageAssetDefinition | undefined {
+  const id = tile.type === "fate" ? "schicksal" : tile.type === "adventure" ? "abenteuer" : tile.id;
+  return VALENOR_ASSETS.fields[id];
+}
+
+/** Bilder außerhalb des Bretts, die als CSS-Hintergrund geladen werden (nicht über Phaser). */
+export const LOBBY_ASSETS = {
+  title: imageSlot("lobby-title", "/assets/ui/title/titelbild-valenor.webp", 1536, 1024, "ready")
+} as const;
 
 export const CHARACTER_ASSETS = PLAYER_CHARACTERS.map(character => VALENOR_ASSETS.characters[character.id]);
 export function getCharacterAsset(characterId: PlayerCharacterId): ImageAssetDefinition {

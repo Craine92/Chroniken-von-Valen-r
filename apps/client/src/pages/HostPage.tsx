@@ -22,6 +22,8 @@ import { shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-sta
 import { audioManager } from "../audio/AudioManager";
 import { Icon } from "../components/icons/Icon";
 
+const CreditsOverlay = lazy(() => import("../components/credits/CreditsOverlay"));
+
 const GameExperience = lazy(() =>
   import("../game/GameExperience").then((module) => ({ default: module.GameExperience }))
 );
@@ -39,6 +41,8 @@ export function HostPage() {
   const [error, setError] = useState("");
   const [signal, setSignal] = useState<MagicSignal>();
   const [propertyGroupFocus, setPropertyGroupFocus] = useState<PropertyGroupFocusSignal>();
+  const [creditsOpen, setCreditsOpen] = useState(false);
+  const closeCredits = useCallback(() => setCreditsOpen(false), []);
   const signalTimer = useRef<number | undefined>(undefined);
   const propertyGroupFocusTimer = useRef<number | undefined>(undefined);
   const lastRoomPhase = useRef<GameRoom["phase"] | undefined>(undefined);
@@ -294,7 +298,8 @@ export function HostPage() {
         </div>
       )}
       {error && <div className="error-toast" role="alert">{error}</div>}
-      <footer className="host-footer">CHRONIKEN VON VALENØR · SPIELVORBEREITUNG</footer>
+      <footer className="host-footer"><span>CHRONIKEN VON VALENØR · SPIELVORBEREITUNG</span><button type="button" className="host-footer__credits" onClick={() => setCreditsOpen(true)}>Mitwirkende</button></footer>
+      {creditsOpen && <Suspense fallback={null}><CreditsOverlay onClose={closeCredits} /></Suspense>}
     </main>
   );
 }

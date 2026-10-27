@@ -8,6 +8,7 @@ Creator, original source URL, license terms and modification history were not in
 
 The code-generated procedural board art and the system font fallbacks (Georgia, Segoe UI) remain available as runtime fallbacks and dynamic effects.
 
+<!-- credits:skip-start: Hinweise für die Pflege dieser Datei, im Spiel ausgeblendet -->
 For every future imported asset, record:
 
 - file path and manifest key
@@ -18,6 +19,7 @@ For every future imported asset, record:
 - date retrieved
 
 Only locally present, reviewed files may be marked as `ready` in the asset manifest. Runtime hotlinks and paid assets are not allowed for the current project phase.
+<!-- credits:skip-end -->
 
 ## Fonts (design system "Codex")
 

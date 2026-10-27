@@ -31,6 +31,7 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
       const layout = getBoardScreenLayout(stage.clientWidth, stage.clientHeight);
       stage.style.setProperty("--board-top-space", `${layout.topSpace}px`);
       stage.style.setProperty("--board-scale", String(layout.zoom));
+      stage.style.setProperty("--board-inner-top", `${layout.innerTop}px`);
       stage.style.setProperty("--card-source-x", `${layout.deckX}px`);
       stage.style.setProperty("--card-source-y", `${layout.deckY}px`);
       stage.style.setProperty("--card-start-scale", String(layout.cardScale));

@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { BOARD_TILES, getPropertyGroupTiles, DUNGEON_TILE_INDEX, MAX_RELICS, RELIC_DEFINITIONS, isRelicArmed, type GameState, type PropertyGroupId, type RegionType } from "@valenor/shared";
-import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, getTileInnerAnchor, getTilePlacement, getTileWorldPosition, getTokenLabelOffset, getTokenSlotOffset } from "../board-layout";
+import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, getFieldZones, getTilePlacement, getTileWorldPosition, getTokenSeat, TOKEN_FOOTPRINT, type TokenSeat } from "../board-layout";
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { MortgageOverlayLayer } from "../layers/MortgageOverlayLayer";
 import { PropertyGroupLayer } from "../layers/PropertyGroupLayer";
@@ -15,8 +15,8 @@ import { deriveGameMoments } from "../living/moments";
 import { selectDramaticMoments } from "../living/drama";
 import { BoardTileRenderer } from "../tiles/BoardTileRenderer";
 import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
-import { CARD_DRAW_DURATION_MS, DEFAULT_BOARD_PRESENTATION_MODE, LANDING_CONNECTION_DURATION_MS, getBoardVisualScale, getCardPresentationKey, getBoardScreenLayout, type BoardPresentationMode } from "../board-presentation";
-import { getTokenPointerGeometry, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
+import { CARD_DRAW_DURATION_MS, DEFAULT_BOARD_PRESENTATION_MODE, getBoardVisualScale, getCardPresentationKey, getBoardScreenLayout, type BoardPresentationMode } from "../board-presentation";
+import { showsTokenName, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
 import { audioManager } from "../../audio/AudioManager";
 import { deriveMovementStepAudioEvents } from "../../audio/game-audio-events";
 
@@ -42,7 +42,6 @@ export class ValenorBoardScene extends Phaser.Scene {
   private readonly tokens = new Map<string, Phaser.GameObjects.Container>();
   private readonly tokenVisuals = new Map<string, Phaser.GameObjects.Container>();
   private readonly tokenNameLabels = new Map<string, Phaser.GameObjects.Container>();
-  private readonly tokenPointers = new Map<string, Phaser.GameObjects.Graphics>();
   private readonly tokenRelics = new Map<string, Phaser.GameObjects.Container>();
   private relicSignature = "";
   private relicBadgeSize = 24;
@@ -57,8 +56,6 @@ export class ValenorBoardScene extends Phaser.Scene {
   private landingTimer: Phaser.Time.TimerEvent | undefined;
   private lastLandingSignature = "";
   private lastImpactSignature = "";
-  private connectionTimer: Phaser.Time.TimerEvent | undefined;
-  private connectionPlayerId: string | undefined;
   private activeField: Phaser.GameObjects.Graphics | undefined;
   private activeFieldSignature = "";
   private tavernGlow: Phaser.GameObjects.Graphics | undefined;
@@ -160,7 +157,6 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE,this.handleResize);
       this.clearLandingHighlight();
-      this.clearLandingConnection();
       this.resetCardDecks();
       this.cardDecks.clear();
       this.cardSignature="";
@@ -253,7 +249,6 @@ export class ValenorBoardScene extends Phaser.Scene {
         this.lastLandingSignature = movementSignature;
         const player = next.players.find(player => player.id === next.lastMovement!.playerId);
         this.highlightTile(next.lastMovement.to, player ? PLAYER_COLORS[player.color] : 0xf1d89b);
-        this.showLandingConnection(next.lastMovement.playerId);
       }
     }
     if (next.turnPhase === "waitingForRoll" || next.turnPhase === "determiningOrder") {
@@ -570,19 +565,15 @@ export class ValenorBoardScene extends Phaser.Scene {
 
   private drawPlayerTokens() {
     this.state.players.forEach((player, index) => {
-      const sameTile = this.state.players.filter((candidate) => candidate.position === player.position);
-      const formationIndex = sameTile.findIndex((candidate) => candidate.id === player.id);
-      const offset = this.getTokenOffset(player.position, sameTile.length, formationIndex);
-      const labelOffset = getTokenLabelOffset(player.position);
-      const position = getTileWorldPosition(player.position);
+      const { seat } = this.getTokenSeatFor(player.id, player.position);
+      const target = this.getTokenWorldPosition(player.position, seat);
       const color = PLAYER_COLORS[player.color];
-      const token = this.add.container(position.x + offset.x, position.y + offset.y).setAlpha(0).setDepth(BOARD_DEPTHS.players);
-      const pointer = this.add.graphics().setAlpha(player.id === this.state.currentPlayerId
-        ? TOKEN_VISUAL_CONFIG.pointer.activeAlpha
-        : TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha);
-      this.drawTokenPointer(pointer, player.position, sameTile.length, formationIndex, color);
-      const shadowSoft = this.add.ellipse(4, 15, TOKEN_VISUAL_CONFIG.shadow.softWidth, TOKEN_VISUAL_CONFIG.shadow.softHeight, 0x000000, .32);
+      const token = this.add.container(target.x, target.y).setAlpha(0).setDepth(BOARD_DEPTHS.players);
+      // Kräftiger Schatten, damit die Figur sich vom detailreichen Feldbild abhebt.
+      const shadowSoft = this.add.ellipse(3, 12, TOKEN_VISUAL_CONFIG.shadow.softWidth * 1.25, TOKEN_VISUAL_CONFIG.shadow.softHeight * 1.5, 0x000000, .5);
       const shadowCore = this.add.ellipse(3, 14, TOKEN_VISUAL_CONFIG.shadow.coreWidth, TOKEN_VISUAL_CONFIG.shadow.coreHeight, 0x000000, .65);
+      // Dunkler Schein hinter dem Körper: hebt die Figur vom detailreichen Feldbild ab, auch wenn mehrere dicht stehen.
+      const backdrop = this.add.container(0, -30, [this.add.ellipse(0, 0, 66, 106, 0x050407, .2), this.add.ellipse(0, 2, 48, 86, 0x050407, .28)]);
       const glow = this.add.circle(0, 7, 29, color, 0.14 * this.visualQuality.glowAlpha);
       const baseLower = this.add.ellipse(0, 13, 44, 12, 0x050507, .92);
       const baseOuter = this.add.ellipse(0, 10, TOKEN_VISUAL_CONFIG.base.outerWidth, TOKEN_VISUAL_CONFIG.base.outerHeight, 0x15151a, 1).setStrokeStyle(4, color, 1);
@@ -630,8 +621,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       namePlate.fillStyle(0x000000, .45).fillRoundedRect(-nameWidth / 2+2, -8, nameWidth, 22, 5);
       namePlate.fillStyle(0x07070a, .97).fillRoundedRect(-nameWidth / 2, -11, nameWidth, 22, 5);
       namePlate.lineStyle(2, color, 1).strokeRoundedRect(-nameWidth / 2, -11, nameWidth, 22, 5);
-      const nameLabel = this.add.container(labelOffset.x,labelOffset.y,[namePlate,nameText]);
-      nameLabel.setScale(sameTile.length > 1 ? .8 : 1);
+      const nameLabel = this.add.container(0, 0, [namePlate, nameText]);
       const dungeonMarker = this.add.container(0, -4).setVisible(player.dungeon.inDungeon);
       const bars = this.add.graphics();
       bars.lineStyle(2, 0xc56464, 0.95);
@@ -640,7 +630,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const chain = addIconImage(this, 0, -28, "dungeon", 15, codexColor("oxblood300"));
       dungeonMarker.add([bars, chain]);
       const tokenVisual = this.add.container(0, 0).setName("token-visual");
-      tokenVisual.add([pointer, shadowSoft, shadowCore, glow, baseLower, baseOuter, baseInner, baseRune, miniatureVisual, dungeonMarker, activeRing, nameLabel]);
+      tokenVisual.add([backdrop, shadowSoft, shadowCore, glow, baseLower, baseOuter, baseInner, baseRune, miniatureVisual, dungeonMarker, activeRing, nameLabel]);
       const relicBadges = this.add.container(0, 0).setName(`relics-${player.id}`);
       tokenVisual.add(relicBadges);
       this.tokenRelics.set(player.id, relicBadges);
@@ -648,10 +638,11 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.tokens.set(player.id, token);
       this.tokenVisuals.set(player.id, tokenVisual);
       this.tokenNameLabels.set(player.id, nameLabel);
-      this.tokenPointers.set(player.id, pointer);
       this.activeRings.set(player.id, activeRing);
       this.dungeonMarkers.set(player.id, dungeonMarker);
-      this.tweens.add({ targets: token, alpha: 1, y: token.y - 5, duration: this.reducedMotion ? 80 : 700, delay: this.reducedMotion ? 0 : 2500 + index * 180, ease: "Back.Out" });
+      this.applyTokenSeat(player.id, player.position, false);
+      // Nur einblenden, nicht verschieben: Bewegt sich die Figur schon vorher, bliebe sie sonst an ihrer alten Höhe hängen.
+      this.tweens.add({ targets: token, alpha: 1, duration: this.reducedMotion ? 80 : 700, delay: this.reducedMotion ? 0 : 2500 + index * 180, ease: "Sine.Out" });
       if (!this.reducedMotion) {
         this.tweens.add({ targets: glow, alpha: 0.24, scale: 1.14, duration: 1300, yoyo: true, repeat: -1, delay: 3200 + index * 120 });
         this.tweens.add({ targets: miniatureVisual, y: -4, duration: 1500 + index * 170, yoyo: true, repeat: -1, ease: "Sine.InOut" });
@@ -668,21 +659,10 @@ export class ValenorBoardScene extends Phaser.Scene {
       const row = this.tokenRelics.get(player.id);
       if (!row) return;
       row.removeAll(true);
-      const sameTile = state.players.filter(other => other.position === player.position);
-      const slot = sameTile.findIndex(other => other.id === player.id);
-      const offsets = sameTile.map((_, index) => this.getTokenOffset(player.position, sameTile.length, index));
-      const minX = Math.min(...offsets.map(offset => offset.x));
-      const maxX = Math.max(...offsets.map(offset => offset.x));
-      const ownX = offsets[slot]!.x;
-      const side = getTilePlacement(player.position).side;
-      // Fan badges away from the neighboring miniature, using its existing slot.
-      const direction = maxX > minX ? (ownX === minX ? -1 : 1) : side === "left" ? -1 : 1;
-      const startX = Math.max(48, direction > 0 ? maxX - ownX + 48 : ownX - minX + 48);
+      // Neben der Figur übereinander, damit sie auf dem Feld bleiben und keine Nachbarfigur verdecken.
       (player.relics ?? []).slice(0, MAX_RELICS).forEach((id, index) => {
         const size = this.relicBadgeSize;
-        const crowded = sameTile.length >= 5;
-        const badge = this.add.container(crowded ? (index - (Math.min(MAX_RELICS, (player.relics ?? []).length) - 1) / 2) * (size + 4) : direction * (startX + index * (size + 5)),
-          crowded ? getTokenLabelOffset(player.position).y + 22 : -30).setName(`relic-${id}`);
+        const badge = this.add.container(0, -index * (size + 3)).setName(`relic-${id}`);
         const shadow = this.add.circle(1, 3, size / 2 + 2, 0x000000, .5);
         const armed = isRelicArmed(player, id);
         if (armed) badge.add(this.add.circle(0, 0, size / 2 + 5, 0xeabc5c, .16).setStrokeStyle(2, 0xf5d17c, .9));
@@ -695,23 +675,6 @@ export class ValenorBoardScene extends Phaser.Scene {
       });
     });
     if (import.meta.env.DEV) this.game.canvas.dataset.relicIconCount = String(iconCount);
-  }
-
-  private drawTokenPointer(
-    graphics: Phaser.GameObjects.Graphics,
-    tileIndex: number,
-    count: number,
-    index: number,
-    color: number
-  ) {
-    const visualScale=getBoardVisualScale(this.getBoardZoom(),this.scale.width).visualTokenScale;
-    graphics.setScale(1/visualScale);
-    const pointer = getTokenPointerGeometry(tileIndex,count,index,visualScale,this.hasBuilding(tileIndex));
-    graphics.clear();
-    graphics.lineStyle(TOKEN_VISUAL_CONFIG.pointer.outlineWidth, 0x020204, .62).lineBetween(pointer.start.x, pointer.start.y, pointer.lineEnd.x, pointer.lineEnd.y);
-    graphics.lineStyle(TOKEN_VISUAL_CONFIG.pointer.lineWidth, color, 1).lineBetween(pointer.start.x, pointer.start.y, pointer.lineEnd.x, pointer.lineEnd.y);
-    graphics.fillStyle(color, 1).fillTriangle(pointer.tip.x, pointer.tip.y, pointer.wingA.x, pointer.wingA.y, pointer.wingB.x, pointer.wingB.y);
-    graphics.lineStyle(1, 0x07070a, .72).strokeTriangle(pointer.tip.x, pointer.tip.y, pointer.wingA.x, pointer.wingA.y, pointer.wingB.x, pointer.wingB.y);
   }
 
   private createMiniature(index: number, playerColor: number): Phaser.GameObjects.Container {
@@ -748,14 +711,10 @@ export class ValenorBoardScene extends Phaser.Scene {
   }
 
   private syncActivePlayer(playerId: string | undefined) {
-    if(this.connectionPlayerId && this.connectionPlayerId !== playerId)this.clearLandingConnection();
     this.currentPlayerId = playerId;
     this.activeRings.forEach((ring, id) => {
       const active = id === playerId;
-      const player = this.state.players.find(candidate => candidate.id === id);
-      const crowded = this.state.players.filter(candidate => candidate.position === player?.position).length > 1;
-      this.tokenNameLabels.get(id)?.setScale(crowded ? .8 : active ? 1.08 : 1).setAlpha(active ? 1 : .9);
-      if(id !== this.connectionPlayerId)this.tokenPointers.get(id)?.setAlpha(active ? TOKEN_VISUAL_CONFIG.pointer.activeAlpha : TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha);
+      this.tokenNameLabels.get(id)?.setAlpha(active ? 1 : .9);
       if(ring.getData("active") === active)return;
       ring.setData("active",active).setVisible(active).setScale(1).setAlpha(active ? .9 : 0);
       if (active && !this.reducedMotion) {
@@ -775,34 +734,14 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.state.players.forEach(player=>{
       const token=this.tokens.get(player.id),visual=this.tokenVisuals.get(player.id);
       if(!token || !visual)return;
-      const occupants=this.state.players.filter(candidate=>candidate.position === player.position);
-      const slot=this.getTokenOffset(player.position,occupants.length,occupants.findIndex(candidate=>candidate.id === player.id));
-      const field=getTileWorldPosition(player.position);
+      const target=this.getTokenWorldPosition(player.position,this.getTokenSeatFor(player.id,player.position).seat);
       const character=visual.getByName("token-character") as Phaser.GameObjects.Container;
       for(const object of [character,this.tokenNameLabels.get(player.id),this.tokenRelics.get(player.id)])if(object){
-        const box=object.getBounds();box.x+=field.x+slot.x-token.x;box.y+=field.y+slot.y-5-token.y;
+        const box=object.getBounds();box.x+=target.x-token.x;box.y+=target.y-token.y;
         blockers.push(box);
       }
     });
     this.artLayer?.syncRealmLabels(blockers);
-  }
-
-  private clearLandingConnection() {
-    this.connectionTimer?.remove(false);this.connectionTimer=undefined;
-    if(this.connectionPlayerId){const pointer=this.tokenPointers.get(this.connectionPlayerId);if(pointer){this.tweens.killTweensOf(pointer);pointer.setAlpha(0);}}
-    this.connectionPlayerId=undefined;
-  }
-
-  private showLandingConnection(playerId: string) {
-    this.clearLandingConnection();
-    const pointer=this.tokenPointers.get(playerId);
-    if(!pointer || this.reducedMotion)return;
-    this.connectionPlayerId=playerId;
-    pointer.setAlpha(.6);
-    this.connectionTimer=this.time.delayedCall(LANDING_CONNECTION_DURATION_MS-500,()=>{
-      this.connectionTimer=undefined;
-      this.tweens.add({targets:pointer,alpha:playerId === this.state.currentPlayerId ? TOKEN_VISUAL_CONFIG.pointer.activeAlpha : TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha,duration:500,ease:"Sine.Out",onComplete:()=>{this.connectionPlayerId=undefined;}});
-    });
   }
 
   private syncFieldFeedback() {
@@ -846,54 +785,76 @@ export class ValenorBoardScene extends Phaser.Scene {
       }
       const ownershipFrame = this.add.rectangle(0, 0, place.width - 7, place.height - 7, 0x000000, 0)
         .setName("ownership-frame").setStrokeStyle(5, PLAYER_COLORS[owner.color], 1);
-      const inner = place.side === "bottom" ? {x:0,y:-place.height/2+9,w:place.width-14,h:4} : place.side === "top" ? {x:0,y:place.height/2-9,w:place.width-14,h:4} : place.side === "left" ? {x:place.width/2-9,y:0,w:4,h:place.height-14} : {x:-place.width/2+9,y:0,w:4,h:place.height-14};
-      const strip = this.add.rectangle(inner.x,inner.y,inner.w,inner.h,PLAYER_COLORS[owner.color],.95).setName("ownership-strip");
-      const badgeX = -place.width / 2 + 18;
-      const badgeY = place.height / 2 - 17;
-      const glow = this.add.circle(badgeX, badgeY, 14, PLAYER_COLORS[owner.color], .28);
-      const banner = this.add.rectangle(badgeX, badgeY, 28, 21, 0x09090c, .96)
-        .setStrokeStyle(3, PLAYER_COLORS[owner.color], 1);
+      // Wappen im Preisband (oben/unten) bzw. in der äußeren unteren Ecke der Seitenfelder; die Gruppenleiste bleibt frei.
+      const zones = getFieldZones(ownership.tileIndex);
+      const badgeX = zones.kind === "landscape" && zones.inward.x < 0 ? place.width / 2 - 18 : -place.width / 2 + 18;
+      const badgeY = zones.priceBand ? (zones.priceBand.top + zones.priceBand.bottom) / 2 - (zones.inward.y > 0 ? 2 : 0) : place.height / 2 - 16;
+      const glow = this.add.circle(badgeX, badgeY, 13, PLAYER_COLORS[owner.color], .28);
+      const banner = this.add.rectangle(badgeX, badgeY, 24, 18, 0x09090c, .96)
+        .setStrokeStyle(2.5, PLAYER_COLORS[owner.color], 1);
       const initials = owner.name.trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "V";
       const rune = this.add.text(badgeX, badgeY, initials, { color: "#fff3cf", fontFamily: CODEX_FONTS.text, fontSize: "10px", fontStyle: "bold", stroke: "#080709", strokeThickness: 2 }).setOrigin(.5);
       if(ownership.mortgaged)marker.add(this.add.rectangle(0,0,place.width-9,place.height-9,0x000000,.28).setName("mortgage-shade"));
-      marker.add([ownershipFrame, strip, glow, banner, rune]);
+      marker.add([ownershipFrame, glow, banner, rune]);
       const group = BOARD_TILES[ownership.tileIndex]?.propertyGroup;
       if(group && getPropertyGroupTiles(group).every(tile=>this.state.propertyOwnerships.some(entry=>entry.tileIndex===tile.index && entry.ownerId===owner.id))) {
-        const landscape=place.side === "left" || place.side === "right";
-        marker.add(addIconImage(this,badgeX+35,landscape?19:26,"crown",landscape?13:19,codexColor("gold300")).setName("complete-group-crown"));
+        marker.add(addIconImage(this,badgeX,badgeY-19,"crown",15,codexColor("gold300")).setName("complete-group-crown"));
       }
       if (ownership.mortgaged) {
         glow.setFillStyle(0x292a31, 0.65);
         banner.setAlpha(.85);
         rune.setAlpha(.9);
-        marker.add(addIconImage(this, badgeX-3, 24, "mortgage", 16, codexColor("parchment100")).setName("mortgage-lock"));
+        marker.add(addIconImage(this, 0, 0, "mortgage", 22, codexColor("parchment100")).setName("mortgage-lock"));
       }
       this.ownershipMarkers.set(ownership.tileIndex, marker);
     });
   }
 
   private arrangeTokens(animate: boolean) {
-    const byPosition = new Map<number, typeof this.state.players>();
-    this.state.players.forEach((player) => {
-      const group = byPosition.get(player.position) ?? [];
-      group.push(player);
-      byPosition.set(player.position, group);
-    });
-    byPosition.forEach((players, tileIndex) => {
-      const position = getTileWorldPosition(tileIndex);
-      players.forEach((player, index) => {
-        const token = this.tokens.get(player.id);
-        if (!token) return;
-        const offset = this.getTokenOffset(tileIndex, players.length, index);
-        const labelOffset = getTokenLabelOffset(tileIndex);
-        this.tokenNameLabels.get(player.id)?.setPosition(labelOffset.x,labelOffset.y).setVisible(true).setScale(players.length > 1 ? .8 : player.id === this.state.currentPlayerId ? 1.08 : 1);
-        const pointer = this.tokenPointers.get(player.id);
-        if (pointer) this.drawTokenPointer(pointer, tileIndex, players.length, index, PLAYER_COLORS[player.color]);
-        const target = { x: position.x + offset.x, y: position.y + offset.y - 5 };
-        if (animate) this.tweens.add({ targets: token, ...target, duration: 280, ease: "Sine.Out" });
-        else token.setPosition(target.x, target.y);
-      });
-    });
+    this.state.players.forEach(player => this.applyTokenSeat(player.id, player.position, animate));
+  }
+
+  /** Platz einer Figur auf ihrem Feld; die aktive Figur steht vorne und etwas größer, der Bauplatz bleibt frei. */
+  private getTokenSeatFor(playerId: string, tileIndex: number) {
+    const occupants = this.state.players.filter(candidate => candidate.position === tileIndex);
+    const index = Math.max(0, occupants.findIndex(candidate => candidate.id === playerId));
+    const activeIndex = occupants.findIndex(candidate => candidate.id === this.state.currentPlayerId);
+    return { seat: getTokenSeat(tileIndex, occupants.length, index, { activeIndex, occupiedByBuilding: this.hasBuilding(tileIndex) }), occupants: occupants.length };
+  }
+
+  /** Weltposition des Figuren-Containers: Die Füße (Sockelmitte) stehen genau auf dem Platz. */
+  private getTokenWorldPosition(tileIndex: number, seat: TokenSeat) {
+    const field = getTileWorldPosition(tileIndex);
+    return { x: field.x + seat.x, y: field.y + seat.y - TOKEN_VISUAL_CONFIG.base.centerY * TOKEN_FOOTPRINT.nominalVisualScale * seat.scale };
+  }
+
+  /** Größe der Figur für ihren Platz; Namensschild und Relikte behalten dabei ihre lesbare Größe. */
+  private styleTokenForSeat(playerId: string, seat: TokenSeat, occupants: number): number {
+    const scale = TOKEN_FOOTPRINT.nominalVisualScale * seat.scale;
+    this.tokenVisuals.get(playerId)?.setData("seatScale", scale);
+    const showName = showsTokenName(occupants, playerId === this.state.currentPlayerId);
+    this.tokenNameLabels.get(playerId)?.setVisible(showName).setScale(TOKEN_VISUAL_CONFIG.labelScale / seat.scale)
+      .setPosition(0, TOKEN_VISUAL_CONFIG.base.centerY + 9 / scale);
+    this.tokenRelics.get(playerId)?.setVisible(showName).setScale(TOKEN_VISUAL_CONFIG.relicScale / scale)
+      .setPosition(TOKEN_VISUAL_CONFIG.base.outerWidth / 2 + 4, -6);
+    return scale;
+  }
+
+  private applyTokenSeat(playerId: string, tileIndex: number, animate: boolean) {
+    const token = this.tokens.get(playerId), visual = this.tokenVisuals.get(playerId);
+    if (!token || !visual) return;
+    const { seat, occupants } = this.getTokenSeatFor(playerId, tileIndex);
+    const target = this.getTokenWorldPosition(tileIndex, seat);
+    const scale = this.styleTokenForSeat(playerId, seat, occupants);
+    // Vordere Figuren liegen über den hinteren.
+    token.setDepth(BOARD_DEPTHS.players + (target.y + BOARD_HALF_HEIGHT) / 100_000);
+    if (animate && !this.reducedMotion) {
+      this.tweens.add({ targets: token, ...target, duration: 280, ease: "Sine.Out" });
+      this.tweens.add({ targets: visual, scale, duration: 280, ease: "Sine.Out" });
+    } else {
+      token.setPosition(target.x, target.y);
+      visual.setScale(scale);
+    }
   }
 
   private animateMovement(next: GameState) {
@@ -905,12 +866,9 @@ export class ValenorBoardScene extends Phaser.Scene {
     const step = (index: number) => {
       const tileIndex = movement.path[index];
       if (tileIndex === undefined) return;
-      const fieldPosition = getTileWorldPosition(tileIndex);
-      const slot = this.getTokenOffset(tileIndex, 1, 0);
-      const movingPlayer = next.players.find((player) => player.id === movement.playerId);
-      const pointer = this.tokenPointers.get(movement.playerId);
-      if (pointer && movingPlayer) this.drawTokenPointer(pointer, tileIndex, 1, 0, PLAYER_COLORS[movingPlayer.color]);
-      const position = { x: fieldPosition.x + slot.x, y: fieldPosition.y + slot.y };
+      const stepSeat = getTokenSeat(tileIndex, 1, 0, { occupiedByBuilding: this.hasBuilding(tileIndex) });
+      const position = this.getTokenWorldPosition(tileIndex, stepSeat);
+      this.tokenVisuals.get(movement.playerId)?.setScale(this.styleTokenForSeat(movement.playerId, stepSeat, 1));
       const region = BOARD_TILES[tileIndex]?.region;
       const playArrivalAudio = () => {
         deriveMovementStepAudioEvents(tileIndex, movement.passedStart && !startPassPlayed)
@@ -923,14 +881,15 @@ export class ValenorBoardScene extends Phaser.Scene {
       const trail = this.add.circle(token.x, token.y, region === "orcs" ? 3.5 : 4.5, trailColor, 0.42).setDepth(BOARD_DEPTHS.effects);
       this.tweens.add({ targets: trail, alpha: 0, scale: region === "orcs" ? 3 : 2.2, y: trail.y - 8, duration: 420, onComplete: () => trail.destroy() });
       if (this.reducedMotion) {
-        token.setPosition(position.x, position.y - 5);
+        token.setPosition(position.x, position.y);
         playArrivalAudio();
+        // Ohne Bewegung läuft der Weg sofort durch; die Aufstellung folgt mit dem neuen Spielstand.
         if (index === movement.path.length - 1) this.animateLanding(tileIndex, trailColor);
         else step(index + 1);
         return;
       }
       const middleX = (token.x + position.x) / 2;
-      const middleY = (token.y + position.y - 5) / 2 - 12;
+      const middleY = (token.y + position.y) / 2 - 12;
       this.tweens.add({
         targets: token,
         x: middleX,
@@ -943,7 +902,7 @@ export class ValenorBoardScene extends Phaser.Scene {
           this.tweens.add({
             targets: token,
             x: position.x,
-            y: position.y - 5,
+            y: position.y,
             scaleX: 1.05,
             scaleY: .94,
             duration: 100,
@@ -953,6 +912,8 @@ export class ValenorBoardScene extends Phaser.Scene {
               playArrivalAudio();
               if (index === movement.path.length - 1) {
                 this.animateLanding(tileIndex, trailColor);
+                // Beim Landen rücken alle Figuren auf dem Zielfeld in ihre Aufstellung.
+                this.arrangeTokens(true);
                 this.reactToken(movement.playerId, "land");
               } else step(index + 1);
             }
@@ -973,7 +934,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const token = this.tokens.get(playerId);
     if (!visual || !token) return;
     this.tweens.killTweensOf(visual);
-    visual.setPosition(0, 0).setAngle(0);
+    visual.setPosition(0, 0).setAngle(0).setScale(visual.getData("seatScale") ?? visual.scale);
     const { fast, base } = CODEX_DURATIONS;
     if (kind === "land") {
       this.tweens.add({ targets: visual, y: -9, duration: fast, ease: "Quad.Out", yoyo: true });
@@ -994,23 +955,9 @@ export class ValenorBoardScene extends Phaser.Scene {
     return this.state.propertyOwnerships.some(ownership=>ownership.tileIndex===tileIndex && ownership.buildingLevel>0);
   }
 
-  private getTokenOffset(tileIndex: number, count: number, index: number) {
-    return getTokenSlotOffset(tileIndex,count,index,this.hasBuilding(tileIndex));
-  }
-
   private getDragonPosition(tileIndex: number, scale: number) {
     const field=getTilePlacement(tileIndex),unit=Math.min(field.width,field.height),anchor=getDragonAnchor(tileIndex,scale);
     const blockers=REALM_LABEL_SAFE_ZONES.map(zone=>new Phaser.Geom.Rectangle(zone.x,zone.y,zone.width,zone.height));
-    this.state.propertyOwnerships.filter(ownership=>ownership.buildingLevel>0).forEach(ownership=>{
-      const tile=getTilePlacement(ownership.tileIndex),offset=getTileInnerAnchor(ownership.tileIndex,"building"),size=Math.min(tile.width,tile.height);
-      blockers.push(new Phaser.Geom.Rectangle(tile.x+offset.x-size*.4,tile.y+offset.y-size*.78,size*.8,size*1.05));
-    });
-    this.state.players.forEach(player=>{
-      const occupants=this.state.players.filter(candidate=>candidate.position===player.position);
-      const tile=getTilePlacement(player.position),offset=this.getTokenOffset(player.position,occupants.length,occupants.findIndex(candidate=>candidate.id===player.id));
-      const size=Math.min(tile.width,tile.height);
-      blockers.push(new Phaser.Geom.Rectangle(tile.x+offset.x-size*.48,tile.y+offset.y-size*.87,size*.96,size*1.35));
-    });
     const nx=Math.sign(anchor.x),ny=Math.sign(anchor.y);
     const candidates=[{x:0,y:0},{x:nx*unit*.6,y:ny*unit*.6},{x:nx*unit*1.2,y:ny*unit*1.2},
       {x:ny ? -unit*.7 : nx*unit*.6,y:nx ? -unit*.7 : ny*unit*.6},
@@ -1332,12 +1279,9 @@ export class ValenorBoardScene extends Phaser.Scene {
   private applyBoardVisualScale(boardZoom: number) {
     const scale = getBoardVisualScale(boardZoom, this.scale.width);
     this.ownershipMarkerScale = scale.markerScale;
-    this.tokenVisuals.forEach((visual) => visual.setScale(scale.visualTokenScale));
-    this.state.players.forEach(player=>{const occupants=this.state.players.filter(candidate=>candidate.position===player.position);const pointer=this.tokenPointers.get(player.id);if(pointer)this.drawTokenPointer(pointer,player.position,occupants.length,occupants.findIndex(candidate=>candidate.id===player.id),PLAYER_COLORS[player.color]);});
     this.relicBadgeSize = Math.max(18, Math.min(34, 22 / (boardZoom * scale.visualTokenScale)));
     this.syncTokenRelics(this.state);
     this.ownershipMarkers.forEach((marker) => marker.setScale(scale.markerScale));
-    this.developmentLayer?.setVisualScale(scale.buildingScale);
     this.propertyGroupLayer?.setVisualScale(scale.groupMarkerScale);
     this.game.canvas.dataset.effectiveBoardScale = scale.effectiveBoardScale.toFixed(4);
     this.game.canvas.dataset.visualTokenScale = scale.visualTokenScale.toFixed(4);

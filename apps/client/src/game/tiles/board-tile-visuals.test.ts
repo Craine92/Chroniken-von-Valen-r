@@ -2,15 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BOARD_CORNER_TILE_INDICES, BOARD_TILES } from "@valenor/shared";
 import { getBoardTileVisualLayout } from "./board-tile-layout";
-import { BOARD_HEIGHT, BOARD_WIDTH, getBoardFitZoom, getDragonAnchor, getTileInnerAnchor, getTilePlacement, getTokenFormationOffset, getTokenSlotOffset } from "../board-layout";
+import { ACTIVE_TOKEN_SCALE_BOOST, BOARD_FIELD_DEPTH, BOARD_HEIGHT, BOARD_WIDTH, getBoardFitZoom, getBuildingSeat, getDragonAnchor, getFieldZones, getTileInnerAnchor, getTilePlacement, getTokenSeat, TOKEN_FOOTPRINT } from "../board-layout";
 import { getBoardVisualScale } from "../board-presentation";
-import { getPropertyGroupVisual, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, getTileVariant } from "./board-tile-theme";
-import { getTokenPointerGeometry, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
-
-test("moving-player connections stay subtle and inactive connections remain in the background",()=>{
-  assert.ok(TOKEN_VISUAL_CONFIG.pointer.activeAlpha>=.45 && TOKEN_VISUAL_CONFIG.pointer.activeAlpha<=.6);
-  assert.ok(TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha>=0 && TOKEN_VISUAL_CONFIG.pointer.inactiveAlpha<=.15);
-});
+import { getFieldSymbol, getPropertyGroupVisual, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, getTileVariant } from "./board-tile-theme";
+import { showsTokenName } from "../tokens/token-visuals";
 
 test("all forty fields receive a complete data-driven visual definition", () => {
   assert.equal(BOARD_TILES.length, 40);
@@ -34,8 +29,10 @@ test("corners, horizontal rows and vertical board sides use dedicated layouts", 
   assert.equal(getBoardTileVisualLayout(34).kind, "landscape");
   const portrait = getBoardTileVisualLayout(1);
   const landscape = getBoardTileVisualLayout(14);
-  assert.equal(portrait.width * portrait.height, landscape.width * landscape.height);
-  assert.ok(landscape.title.fontSize >= portrait.title.fontSize - 2);
+  // Alle Randfelder sind gleich tief; die Seitenfelder sind etwas niedriger als die oberen und unteren breit sind.
+  assert.equal(portrait.height, landscape.width);
+  assert.ok(Math.abs(portrait.width - landscape.height) < 8);
+  assert.ok(landscape.title.fontSize >= portrait.title.fontSize - 3);
   assert.equal(portrait.footer.fontSize, landscape.footer.fontSize);
   assert.equal(portrait.price.fontSize, landscape.price.fontSize);
   assert.ok(portrait.title.fontSize > portrait.price.fontSize);
@@ -97,7 +94,7 @@ test("fields without a price use the primary-action area", () => {
 
 test("the widescreen camera fills a 1080p stage without clipping its rectangular frame", () => {
   const zoom = getBoardFitZoom(1_699, 1_080);
-  assert.ok(BOARD_WIDTH / BOARD_HEIGHT > 1.7);
+  assert.ok(BOARD_WIDTH / BOARD_HEIGHT >= 1.7);
   assert.ok(BOARD_WIDTH * zoom / 1_699 > .95);
   assert.ok((BOARD_HEIGHT + 40) * zoom <= 1_080);
 });
@@ -135,98 +132,109 @@ test("field order follows the 14 / 6 / 14 / 6 widescreen route", () => {
   assert.ok(steps.every((distance) => distance < 160));
   const tokenSteps = Array.from({ length: 40 }, (_, index) => {
     const from = getTilePlacement(index);
-    const fromSlot = getTokenSlotOffset(index, 1, 0);
+    const fromSeat = getTokenSeat(index, 1, 0);
     const nextIndex = (index + 1) % 40;
     const to = getTilePlacement(nextIndex);
-    const toSlot = getTokenSlotOffset(nextIndex, 1, 0);
-    return Math.hypot(to.x + toSlot.x - from.x - fromSlot.x, to.y + toSlot.y - from.y - fromSlot.y);
+    const toSeat = getTokenSeat(nextIndex, 1, 0);
+    return Math.hypot(to.x + toSeat.x - from.x - fromSeat.x, to.y + toSeat.y - from.y - fromSeat.y);
   });
-  assert.ok(tokenSteps.every((distance) => distance < 170));
-});
-
-test("two to six player tokens receive distinct bounded positions on one field", () => {
-  for (const count of [2, 3, 4, 5, 6]) {
-    const positions = Array.from({ length: count }, (_, index) => getTokenFormationOffset(count, index));
-    assert.equal(new Set(positions.map(({ x, y }) => `${x}:${y}`)).size, count);
-    assert.ok(positions.every(({ x, y }) => Math.abs(x) <= (count >= 5 ? 46 : 24) && Math.abs(y) <= 20));
-  }
-});
-
-test("fixed token slots rotate toward the inner board edge", () => {
-  const bottom = getTokenSlotOffset(5, 4, 0);
-  const left = getTokenSlotOffset(16, 4, 0);
-  const top = getTokenSlotOffset(25, 4, 0);
-  const right = getTokenSlotOffset(36, 4, 0);
-  assert.ok(bottom.y < -70);
-  assert.ok(left.x > 70);
-  assert.ok(top.y > 70);
-  assert.ok(right.x < -70);
-});
-
-test("token pointers run from the base edge to the actual occupied field edge", () => {
-  for (const tileIndex of Array.from({ length: 40 }, (_, index) => index)) {
-    for (const count of [1, 2, 3, 4, 5, 6]) {
-      for (let index = 0; index < count; index += 1) {
-        const slot = getTokenSlotOffset(tileIndex, count, index);
-        const pointer = getTokenPointerGeometry(tileIndex, count, index);
-        const place = getTilePlacement(tileIndex);
-        const renderedSlot = { x: slot.x, y: slot.y + TOKEN_VISUAL_CONFIG.pointer.settledTokenYOffset };
-        const fieldPoint = { x: renderedSlot.x + pointer.tip.x, y: renderedSlot.y + pointer.tip.y };
-        assert.ok(pointer.tip.x * -slot.x + pointer.tip.y * -slot.y > 0);
-        assert.ok(Math.abs(fieldPoint.x) <= place.width / 2 + .001);
-        assert.ok(Math.abs(fieldPoint.y) <= place.height / 2 + .001);
-        assert.ok(Math.abs(Math.abs(fieldPoint.x) - place.width / 2) < .001 || Math.abs(Math.abs(fieldPoint.y) - place.height / 2) < .001);
-        const baseX = pointer.start.x / (TOKEN_VISUAL_CONFIG.base.outerWidth / 2);
-        const baseY = (pointer.start.y - TOKEN_VISUAL_CONFIG.base.centerY) / (TOKEN_VISUAL_CONFIG.base.outerHeight / 2);
-        assert.ok(Math.abs(baseX ** 2 + baseY ** 2 - 1) < .001);
-      }
-    }
-  }
-});
-
-test("multiple occupants fan out to distinct points on every field edge without changing slots", () => {
-  for (const tileIndex of [0, 5, 13, 16, 20, 25, 33, 36]) {
-    for (const count of [2, 3, 4, 5, 6]) {
-      const fieldPoints = Array.from({ length: count }, (_, index) => {
-        const slot = getTokenSlotOffset(tileIndex, count, index);
-        const pointer = getTokenPointerGeometry(tileIndex, count, index);
-        return {
-          x: slot.x + pointer.tip.x,
-          y: slot.y + TOKEN_VISUAL_CONFIG.pointer.settledTokenYOffset + pointer.tip.y
-        };
-      });
-      assert.equal(new Set(fieldPoints.map(({ x, y }) => `${x.toFixed(3)}:${y.toFixed(3)}`)).size, count);
-    }
-  }
+  assert.ok(tokenSteps.every((distance) => distance < 190));
 });
 
 test("calibrated inner anchors preserve all field bounds and point inward on every side and corner",()=>{
   for(let index=0;index<40;index++){
     const before=getTilePlacement(index);
-    for(const purpose of ["token","dragon","building"] as const){
-      const anchor=getTileInnerAnchor(index,purpose);
-      if(anchor.x)assert.ok(Math.abs(anchor.x)>before.width/2);
-      if(anchor.y)assert.ok(Math.abs(anchor.y)>before.height/2);
-    }
+    const anchor=getTileInnerAnchor(index);
+    if(anchor.x)assert.ok(Math.abs(anchor.x)>before.width/2);
+    if(anchor.y)assert.ok(Math.abs(anchor.y)>before.height/2);
     const echo=getDragonAnchor(index,.5),main=getDragonAnchor(index);
     assert.ok(Math.abs(echo.x)<=Math.abs(main.x)&&Math.abs(echo.y)<=Math.abs(main.y));
     assert.deepEqual(getTilePlacement(index),before);
   }
 });
 
-test("pointer end points remain on the field edge with TV scaling and geometry-derived building clearance",()=>{
-  for(const visualScale of [1.1,1.16,1.23])for(const tileIndex of [0,8,13,16,20,24,33,37])for(const count of [1,2,3,4,5,6])for(let index=0;index<count;index++){
-    const slot=getTokenSlotOffset(tileIndex,count,index,true),pointer=getTokenPointerGeometry(tileIndex,count,index,visualScale,true),field=getTilePlacement(tileIndex);
-    const x=slot.x+pointer.tip.x,y=slot.y+TOKEN_VISUAL_CONFIG.pointer.settledTokenYOffset+pointer.tip.y;
-    assert.ok(Math.abs(x)<=field.width/2+.001&&Math.abs(y)<=field.height/2+.001);
-    assert.ok(Math.abs(Math.abs(x)-field.width/2)<.001||Math.abs(Math.abs(y)-field.height/2)<.001);
+const tokenBox = (seat: { x: number; y: number; scale: number }) => ({
+  left: seat.x - TOKEN_FOOTPRINT.width * seat.scale / 2, right: seat.x + TOKEN_FOOTPRINT.width * seat.scale / 2,
+  top: seat.y - TOKEN_FOOTPRINT.above * seat.scale, bottom: seat.y + TOKEN_FOOTPRINT.below * seat.scale
+});
+
+test("fields are 190 deep and name and price bands cover at most a third of every field", () => {
+  assert.equal(BOARD_FIELD_DEPTH, 190);
+  for (let index = 0; index < 40; index += 1) {
+    const place = getTilePlacement(index), zones = getFieldZones(index);
+    const bands = [zones.nameBand, zones.priceBand].filter(Boolean).reduce((sum, band) => sum + (band!.bottom - band!.top), 0);
+    const depth = zones.kind === "landscape" ? place.height : place.height;
+    assert.ok(bands / depth <= 1 / 3 + .001, `Feld ${index}: Bänder ${bands} von ${depth}`);
+    assert.ok(Math.max(place.width, place.height) >= 190);
   }
 });
 
-test("five and six occupants have unique slots with building clearance on every side and corner",()=>{
-  for(const tileIndex of [0,8,13,16,20,24,33,37])for(const count of [5,6])for(const built of [false,true]){
-    const slots=Array.from({length:count},(_,index)=>getTokenSlotOffset(tileIndex,count,index,built));
-    assert.equal(new Set(slots.map(slot=>`${slot.x}:${slot.y}`)).size,count);
-    for(let i=0;i<count;i++)for(let j=i+1;j<count;j++)assert.ok(Math.hypot(slots[i]!.x-slots[j]!.x,slots[i]!.y-slots[j]!.y)>85);
+test("one to six tokens stand on their own field, below the name band and with distinct places", () => {
+  for (let tileIndex = 0; tileIndex < 40; tileIndex += 1) {
+    const place = getTilePlacement(tileIndex), zones = getFieldZones(tileIndex);
+    for (const built of [false, true]) for (let count = 1; count <= 6; count += 1) for (const activeIndex of [-1, 0, count - 1]) {
+      const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index, { activeIndex, occupiedByBuilding: built }));
+      assert.equal(new Set(seats.map(seat => `${seat.x.toFixed(2)}:${seat.y.toFixed(2)}`)).size, count, `Feld ${tileIndex}, ${count} Figuren`);
+      for (const seat of seats) {
+        const box = tokenBox(seat);
+        assert.ok(box.left >= -place.width / 2 && box.right <= place.width / 2, `Feld ${tileIndex}: Figur ragt seitlich heraus`);
+        assert.ok(box.bottom <= place.height / 2, `Feld ${tileIndex}: Figur ragt unten heraus`);
+        if (zones.kind !== "corner") assert.ok(box.top >= zones.nameBand.bottom - .5, `Feld ${tileIndex}: Kopf im Namensband`);
+        else assert.ok(box.bottom <= zones.nameBand.top, `Ecke ${tileIndex}: Figur steht im Namensband`);
+        if (zones.priceBand) assert.ok(seat.y <= zones.priceBand.top, `Feld ${tileIndex}: Füße im Preisband`);
+      }
+    }
   }
+});
+
+test("the active token stands in front and a little larger; alone it keeps the normal size", () => {
+  for (const tileIndex of [3, 16, 24, 0, 37]) for (let count = 2; count <= 6; count += 1) {
+    const activeIndex = count - 1;
+    const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index, { activeIndex }));
+    const active = seats[activeIndex]!;
+    assert.ok(active.front, `Feld ${tileIndex}: aktive Figur vorne`);
+    assert.ok(seats.every(seat => seat.y <= active.y + .001));
+    assert.ok(seats.every((seat, index) => index === activeIndex || seat.scale < active.scale), `Feld ${tileIndex}: aktive Figur am größten`);
+    assert.ok(active.scale <= seats.find((_, index) => index !== activeIndex)!.scale * ACTIVE_TOKEN_SCALE_BOOST + .001);
+  }
+  const alone = getTokenSeat(3, 1, 0, { activeIndex: 0 });
+  assert.equal(alone.scale, getTokenSeat(3, 1, 0).scale);
+});
+
+test("tokens shrink as a field fills up, and crowded fields show only the active name", () => {
+  for (const tileIndex of [3, 16, 0]) {
+    const scales = [1, 2, 3, 4, 5, 6].map(count => getTokenSeat(tileIndex, count, 0).scale);
+    scales.slice(1).forEach((scale, index) => assert.ok(scale <= scales[index]! + .001));
+  }
+  assert.equal(showsTokenName(1, false), true);
+  assert.equal(showsTokenName(2, false), false);
+  assert.equal(showsTokenName(6, true), true);
+});
+
+test("buildings sit on the inner part of their field and leave room for the tokens", () => {
+  for (let tileIndex = 0; tileIndex < 40; tileIndex += 1) {
+    const zones = getFieldZones(tileIndex);
+    if (!zones.building) continue;
+    const place = getTilePlacement(tileIndex), seat = getBuildingSeat(tileIndex);
+    assert.ok(Math.abs(seat.x) + seat.width / 2 <= place.width / 2 && seat.y <= place.height / 2 && seat.y - seat.height >= zones.nameBand.bottom - .5);
+    if (zones.kind === "landscape") {
+      // Bauplatz an der Innenkante, die Figuren stehen daneben.
+      assert.equal(Math.sign(seat.x), zones.inward.x);
+      for (let count = 1; count <= 6; count += 1) for (let index = 0; index < count; index += 1) {
+        const box = tokenBox(getTokenSeat(tileIndex, count, index, { occupiedByBuilding: true }));
+        assert.ok(zones.inward.x > 0 ? box.right <= zones.building.left + .5 : box.left >= zones.building.right - .5, `Feld ${tileIndex}: Figur auf dem Bauplatz`);
+      }
+    } else {
+      // Oben und unten steht das Gebäude hinter den Figuren; ihre Füße bleiben vor dem Bauplatz.
+      for (let count = 1; count <= 6; count += 1) for (let index = 0; index < count; index += 1) {
+        assert.ok(getTokenSeat(tileIndex, count, index, { occupiedByBuilding: true }).y > zones.building.bottom - 30);
+      }
+    }
+  }
+});
+
+test("every field kind has a small symbol for its band", () => {
+  BOARD_TILES.forEach(tile => assert.ok(getFieldSymbol(tile).length > 0, tile.name));
+  assert.equal(getFieldSymbol(BOARD_TILES.find(tile => tile.type === "harbor")!), "harbor");
+  assert.match(getFieldSymbol(BOARD_TILES.find(tile => tile.type === "property")!), /^group-/);
 });

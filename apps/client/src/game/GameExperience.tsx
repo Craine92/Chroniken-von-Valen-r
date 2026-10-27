@@ -4,7 +4,6 @@ import { GameHud, type ActiveEmotes } from "./GameHud";
 import { ChroniclePanel, useChronicleLines } from "../components/ChroniclePanel";
 import { getGraphicsQuality } from "./visual-config";
 import { getCurrentBoardContext } from "./board-context";
-import { RecentActions } from "../components/RecentActions";
 import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
 import { CardReveal } from "../components/CardReveal";
 import { GameResultPanel } from "../components/GameResultPanel";
@@ -149,7 +148,6 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
       <aside className="game-sidebar" aria-label="Spielstatus">
         <GameHud gameState={gameState} emotes={emotes} />
         <ChroniclePanel lines={chronicleLines} />
-        <RecentActions state={gameState} />
       </aside>
       <section className="board-stage" aria-label="Brettbereich">
         <BoardTopHud state={gameState} />

@@ -85,7 +85,9 @@ test("card presentation ignores resolution updates but distinguishes consecutive
   state.decks={fate:{drawCount:1,discardCount:0},adventure:{drawCount:0,discardCount:0}};
   const key=getCardPresentationKey(state);state.activeCard.status="readyToAcknowledge";assert.equal(getCardPresentationKey(state),key);
   state.decks.fate.drawCount++;assert.notEqual(getCardPresentationKey(state),key);
-  for(const [width,height] of [[1699,1080],[2280,1440],[3444,2160]])assert.ok(getBoardScreenLayout(width!,height!).topSpace>45);
+  // Über der oberen Feldreihe (Rand plus Rahmen) bleibt Platz für die Zuganzeige; Meldungen beginnen erst unter der Reihe.
+  for(const [width,height] of [[1176,768],[1699,1080],[2280,1440],[3444,2160]]){const layout=getBoardScreenLayout(width!,height!);
+    assert.ok(layout.topSpace+20*layout.zoom>44);assert.ok(layout.innerTop>layout.topSpace+200*layout.zoom);}
 });
 
 test("TV context prioritizes decisions and cards and expires transient events without stale turns",()=>{
@@ -309,16 +311,16 @@ test("the TV sidebar contains only game status, four players and ordered global 
   assert.ok(markup.indexOf("AKTIVE CHRONIK") < markup.indexOf("WANDERNDER DRACHE"));
 });
 
-test("the action log renders up to three newest entries in reverse chronological order without changing history", () => {
+test("the TV sidebar has one chronicle that starts with the three newest log lines and changes no history", () => {
   const state = startedGameState(2);
   for (const count of [0,1,2,3,4,7]) {
     state.economyLog = Array.from({length:count}, (_, index) => ({ id:`action-${index}`, kind:"system" as const, message:`Aktion ${index}: Myrra verkauft eine Baustufe auf Sternenlichtung und erhält 38 Gold.`, playerIds:[], createdAt:index }));
     const before=JSON.stringify(state.economyLog);
     const markup = renderToStaticMarkup(<GameExperience gameState={state} />);
-    const log=markup.match(/<aside class="economy-log"[^>]*>(.*?)<\/aside>/)![1]!;
-    const messages=[...log.matchAll(/<p\b[^>]*>.*?<span>(.*?)<\/span><\/p>/g)].map(match=>match[1]);
+    assert.doesNotMatch(markup, /LETZTE AKTIONEN|economy-log/);
+    assert.equal([...markup.matchAll(/class="chronicle-panel"/g)].length, 1);
+    const messages=[...markup.matchAll(/<li class="chronicle-line chronicle-line--fact"[^>]*>(.*?)<\/li>/g)].map(match=>match[1]);
     assert.deepEqual(messages,state.economyLog.slice(-3).reverse().map(entry=>entry.message));
-    assert.equal(messages.length,Math.min(count,3));
     assert.equal(JSON.stringify(state.economyLog),before);
   }
 });

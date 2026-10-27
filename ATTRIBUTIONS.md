@@ -21,6 +21,16 @@ For every future imported asset, record:
 Only locally present, reviewed files may be marked as `ready` in the asset manifest. Runtime hotlinks and paid assets are not allowed for the current project phase.
 <!-- credits:skip-end -->
 
+## Feld-, Gebäude- und Titelbilder
+
+Vom Projektinhaber mit ChatGPT erstellt und für dieses Projekt bereitgestellt. Für die Anzeige verkleinert und nach WebP umgewandelt; Motive unverändert.
+
+| Asset | Files | Creator | Source | License | Modified | Date |
+| --- | --- | --- | --- | --- | --- | --- |
+| Feldbilder (34 Felder sowie je ein gemeinsames Bild für Schicksal und Abenteuer) | `apps/client/public/assets/board/fields/*.webp` (Manifest: `VALENOR_ASSETS.fields`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | auf 512 × 512 px verkleinert, WebP | 2026-10-27 |
+| Gebäude (12 Baustufen: Wurzelhütte, Baumhalle, Sternenzitadelle, Gehöft, Herrenhaus, Königsburg, Raiderlager, Kriegslager, Eisenfestung, Wanderzelt, Große Halle, Himmelsfeste) | `apps/client/public/assets/buildings/{elven,human,orc,steppe}/*.webp` (Manifest: `VALENOR_ASSETS.buildings`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | auf den Umriss zugeschnitten, auf 256 px Breite verkleinert, WebP mit Transparenz | 2026-10-27 |
+| Titelbild der TV-Lobby | `apps/client/public/assets/ui/title/titelbild-valenor.webp` (Manifest: `LOBBY_ASSETS.title`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | WebP in Originalgröße (1536 × 1024 px) | 2026-10-27 |
+
 ## Fonts (design system "Codex")
 
 Bundled locally under `apps/client/public/assets/fonts/`, loaded by `apps/client/src/styles/fonts.css`. No runtime hotlinks. The full license text sits next to each family as `OFL.txt`.

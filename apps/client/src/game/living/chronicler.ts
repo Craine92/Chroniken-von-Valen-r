@@ -1,4 +1,4 @@
-import { BOARD_TILES, RELIC_DEFINITIONS, getPropertyGroup, type GameState, type RegionType } from "@valenor/shared";
+import { BOARD_TILES, RELIC_DEFINITIONS, getPropertyGroup, type EconomyLogEntry, type GameState, type RegionType } from "@valenor/shared";
 import { CHRONICLE_LINES, FLOURISHED_MOMENTS, REALM_FLOURISHES, type ChroniclePool } from "./chronicle-lines";
 import { isHighRent } from "./drama";
 import { deriveGameMoments, type GameMoment, type GameMomentKind } from "./moments";
@@ -7,7 +7,8 @@ export type ChronicleTone = "gain" | "loss" | "magic" | "triumph" | "neutral";
 
 export interface ChronicleLine {
   id: string;
-  kind: GameMomentKind;
+  /** „fact“: schlichte Zeile aus dem Wirtschaftsprotokoll für alles, was der Chronist nicht erzählt. */
+  kind: GameMomentKind | "fact";
   tone: ChronicleTone;
   text: string;
 }
@@ -21,8 +22,23 @@ const TONES: Readonly<Record<GameMomentKind, ChronicleTone>> = {
 
 /** Höchstens so viele Sätze pro Spielstand, damit der Chronist erzählt statt aufzuzählen. */
 export const CHRONICLE_LINES_PER_UPDATE = 2;
-/** So viele Sätze bleiben in der Seitenleiste stehen. */
-export const CHRONICLE_VISIBLE_LINES = 4;
+/** So viele Zeilen bleiben in der Seitenleiste stehen. */
+export const CHRONICLE_VISIBLE_LINES = 5;
+
+/**
+ * Protokolleinträge, die kein erzählter Moment abdeckt; sie erscheinen schlicht in derselben Chronik.
+ * Käufe, Mieten, Abgaben, Runentor, Drache, Taverne, Handel und Bankrott erzählt der Chronist selbst.
+ */
+const FACT_LOG_KINDS: ReadonlySet<EconomyLogEntry["kind"]> = new Set(["mortgage", "relic", "quest", "system"]);
+
+function factLine(entry: EconomyLogEntry): ChronicleLine {
+  return { id: `fact-${entry.id}`, kind: "fact", tone: "neutral", text: entry.message };
+}
+
+/** Beim Einschalten des TVs mitten im Spiel: die letzten Protokollzeilen, damit die Chronik nicht leer beginnt. */
+export function getInitialChronicleLines(state: GameState, count = 3): ChronicleLine[] {
+  return state.economyLog.slice(-count).map(factLine);
+}
 
 /**
  * Wählt eine Variante, die nicht die zuletzt gewählte ist. `random` liefert Werte in [0, 1).
@@ -138,9 +154,17 @@ export class ChronicleTracker {
     const previous = this.previous;
     this.previous = next;
     if (!previous || previous === next) return [];
-    return deriveGameMoments(previous, next)
+    const moments = deriveGameMoments(previous, next);
+    const told = moments
       .slice(0, CHRONICLE_LINES_PER_UPDATE)
       .map(moment => this.chronicler.narrate(moment, next))
       .filter((line): line is ChronicleLine => Boolean(line));
+    const seen = new Set(previous.economyLog.map(entry => entry.id));
+    // Bauen erzählt der Chronist; der Verkauf einer Baustufe steht nur im Protokoll.
+    const soldBuilding = next.lastBuildingAction?.type === "sell" && next.lastBuildingAction.id !== previous.lastBuildingAction?.id;
+    const facts = next.economyLog
+      .filter(entry => !seen.has(entry.id) && (FACT_LOG_KINDS.has(entry.kind) || entry.kind === "building" && soldBuilding))
+      .map(factLine);
+    return [...told, ...facts];
   }
 }

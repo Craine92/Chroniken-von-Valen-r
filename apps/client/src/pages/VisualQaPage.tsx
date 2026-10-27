@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { BOARD_TILES, DUNGEON_TILE_INDEX, getAutoMortgagePlan, getWorldImpulseDefinition, type BuildingLevel, type GamePlayerState, type GameState, type PropertyOwnership } from "@valenor/shared";
+import { BOARD_TILES, DUNGEON_TILE_INDEX, getAutoMortgagePlan, getWorldImpulseDefinition, type BuildingLevel, type GamePlayerState, type GameRoom, type GameState, type Player, type PropertyOwnership } from "@valenor/shared";
 import { BrandMark } from "../components/BrandMark";
 import { PropertyCard } from "../components/PropertyCard";
 import { PropertyGroupOverview } from "../components/PropertyGroupOverview";
@@ -19,6 +19,8 @@ import { PlayerPortrait } from "../components/PlayerPortrait";
 import { Icon } from "../components/icons/Icon";
 import { EmoteBar } from "../components/EmoteBar";
 import { LivingBoardQa, isLivingBoardScene } from "./LivingBoardQa";
+import { BoardFieldsQa, isBoardFieldScene } from "./BoardFieldsQa";
+import { HostLobby } from "./HostLobby";
 
 const PLAYERS: GamePlayerState[] = [
   { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver" as const, connectionState: "connected", gold: 1_725, position: 7, isBankrupt: false, dungeon: { inDungeon: false, failedAttempts: 0 } },
@@ -485,6 +487,20 @@ function MovementShowcase({ kind }: { kind: "corner" | "multi" | "wrap" }) {
   return <GameExperience gameState={state} />;
 }
 
+/** TV-Lobby mit Titelbild und Beispielgefährten, ohne Verbindung zum Spielserver. */
+function LobbyQa({ empty = false }: { empty?: boolean }) {
+  const players: Player[] = empty ? [] : [
+    { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver", ready: true, connectionState: "connected", joinedAt: 1 },
+    { id: "p2", name: "Justine", type: "human", color: "green", characterId: "humanKnight", ready: false, connectionState: "connected", joinedAt: 2 },
+    { id: "c1", name: "Ragna", type: "computer", color: "red", characterId: "orcWarlord", ready: true, connectionState: "connected", joinedAt: 3 },
+    { id: "c2", name: "Eldric", type: "computer", color: "blue", characterId: "steppeScoutShaman", ready: true, connectionState: "connected", joinedAt: 4 }
+  ];
+  const room: GameRoom = { code: "VAL-7Q2K", players, phase: "lobby", config: { mode: "chronicles" }, createdAt: 1 };
+  const noop = () => undefined;
+  return <HostLobby room={room} controllerUrl="http://192.168.178.24:5173/controller?room=VAL-7Q2K" connected busy={false} error="" creditsOpen={false}
+    onAddComputer={noop} onRemovePlayer={noop} onConfigChange={noop} onStart={noop} onOpenCredits={noop} onCloseCredits={noop} />;
+}
+
 export function VisualQaPage() {
   const search = new URLSearchParams(window.location.search);
   const scenario = search.get("scene") ?? "four";
@@ -526,6 +542,9 @@ export function VisualQaPage() {
   if (scenario === "victory-pose-shared") return <GameExperience gameState={createResultState(true)} boardPresentationMode={boardPresentationMode} />;
   if (scenario === "controller-emotes") return <MobileEmotesQa />;
   if (scenario === "controller-emotes-cooldown") return <MobileEmotesQa cooldown />;
+  if (isBoardFieldScene(scenario)) return <BoardFieldsQa scene={scenario} />;
+  if (scenario === "lobby") return <LobbyQa />;
+  if (scenario === "lobby-empty") return <LobbyQa empty />;
   if (isLivingBoardScene(scenario)) return <LivingBoardQa scene={scenario} createBase={() => createShowcaseState("buildings")} />;
   if (scenario === "one") {
     const state = createShowcaseState("four");

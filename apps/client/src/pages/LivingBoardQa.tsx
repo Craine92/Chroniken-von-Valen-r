@@ -93,11 +93,11 @@ export function LivingBoardQa({ scene, createBase }: { scene: LivingBoardScene; 
     return state;
   });
   const { steps, emotes } = SCENES[scene];
-  // Im Spiel verschwindet eine Blase nach EMOTE_DISPLAY_MS; hier kommen die Reaktionen alle drei Sekunden neu.
+  // Im Spiel verschwindet eine Blase nach EMOTE_DISPLAY_MS; hier kommen die Reaktionen neu, bevor sie verblassen.
   const [round, setRound] = useState(0);
   useEffect(() => {
     if (!emotes) return;
-    const timer = window.setInterval(() => setRound(current => current + 1), 3_000);
+    const timer = window.setInterval(() => setRound(current => current + 1), 2_500);
     return () => window.clearInterval(timer);
   }, [emotes]);
   const cycled = emotes && Object.fromEntries(Object.entries(emotes).map(([playerId, signal]) => [playerId, { ...signal, id: `${signal.id}-${round}` }]));

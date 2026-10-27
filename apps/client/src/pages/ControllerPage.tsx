@@ -17,6 +17,7 @@ import {
   type TavernChoice,
   type TavernState,
   type CreateTradeOfferRequest,
+  type QuickTradeRequest,
   type JoinRoomRequest,
   type Player,
   type PropertyGroupId
@@ -28,7 +29,7 @@ import { ConnectionBadge } from "../components/ConnectionBadge";
 import { PropertyCard } from "../components/PropertyCard";
 import { ControllerPossessions } from "../components/ControllerPossessions";
 import { ControllerJournal } from "../components/ControllerJournal";
-import { TradePanel, type TradeDraftIntent } from "../components/TradePanel";
+import { TradeTab, type QuickTradeIntent } from "../components/TradeTab";
 import { CardReveal } from "../components/CardReveal";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 import { GameResultPanel } from "../components/GameResultPanel";
@@ -206,7 +207,7 @@ export function ControllerPage() {
   const [colorPending, setColorPending] = useState(false);
   const [selectedPropertyGroupId, setSelectedPropertyGroupId] = useState<PropertyGroupId>();
   const [controllerTab, setControllerTab] = useState("action");
-  const [tradeDraftIntent, setTradeDraftIntent] = useState<TradeDraftIntent>();
+  const [quickTradeIntent, setQuickTradeIntent] = useState<QuickTradeIntent>();
   const tradeDraftSequence = useRef(0);
   useEffect(() => {
     if (gameState?.turnPhase === "tavernDecision" && gameState.tavern?.playerId === player?.id) setControllerTab("action");
@@ -424,7 +425,7 @@ export function ControllerPage() {
     const recipient = gameState?.players.find(entry => entry.id === recipientId && entry.id !== player?.id && !entry.isBankrupt);
     const ownership = gameState?.propertyOwnerships.find(entry => entry.tileIndex === requestedTileIndex && entry.ownerId === recipientId);
     if (!recipient || !ownership) { setError("Für dieses Grundstück kann kein Handel gestartet werden."); return; }
-    setTradeDraftIntent({ id: ++tradeDraftSequence.current, recipientId, requestedPropertyTileIndices: [requestedTileIndex] });
+    setQuickTradeIntent({ id: ++tradeDraftSequence.current, tileIndex: requestedTileIndex });
     setControllerTab("trade"); window.location.hash = "#controller-trade"; window.scrollTo({ top: 0, behavior: "auto" });
   };
 
@@ -495,6 +496,14 @@ export function ControllerPage() {
   const createTrade = (request: CreateTradeOfferRequest) => {
     setError("");
     socket.emit(SOCKET_EVENTS.tradeCreate, request, (result) => {
+      if (!result.ok || !result.gameState) setError(result.message ?? "Das Angebot konnte nicht gesendet werden.");
+      else applyAuthoritativeGameState(result.gameState);
+    });
+  };
+
+  const createQuickTrade = (request: QuickTradeRequest) => {
+    setError("");
+    socket.emit(SOCKET_EVENTS.tradeQuick, request, (result) => {
       if (!result.ok || !result.gameState) setError(result.message ?? "Das Angebot konnte nicht gesendet werden.");
       else applyAuthoritativeGameState(result.gameState);
     });
@@ -728,7 +737,7 @@ export function ControllerPage() {
           {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} autoMortgagePlan={autoMortgagePlan} onAutoMortgage={() => manageFinance(SOCKET_EVENTS.financeAutoMortgageForPayment)} onDeclareBankruptcy={declareBankruptcy} showActions={false} />}
           </div>
           <div hidden={controllerTab !== "property"}><ControllerPossessions state={gameState} playerId={player.id} connected={connected} selectedGroupId={selectedPropertyGroupId} onSelectGroup={selectPropertyGroup} onBuild={manageBuilding} onMortgage={manageMortgage} onRedeemAllMortgages={() => manageFinance(SOCKET_EVENTS.financeRedeemAllMortgages)} onOfferTrade={offerPropertyTrade} /></div>
-          <div id="controller-trade" hidden={controllerTab !== "trade"}><TradePanel state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onDecision={decideTrade} draftIntent={tradeDraftIntent} onDraftIntentHandled={() => setTradeDraftIntent(undefined)} /></div>
+          <div id="controller-trade" hidden={controllerTab !== "trade"}><TradeTab state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onQuickCreate={createQuickTrade} onDecision={decideTrade} quickIntent={quickTradeIntent} onQuickIntentHandled={() => setQuickTradeIntent(undefined)} /></div>
           <div hidden={controllerTab !== "journal"}><ControllerJournal state={gameState} playerId={player.id} /></div>
           <nav className="controller-nav" aria-label="Controller-Bereiche">
             <a href="#controller-action" aria-current={controllerTab === "action" ? "page" : undefined}><span>✦</span>Aktion</a>

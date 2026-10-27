@@ -9,7 +9,12 @@ import {
   canMortgageProperty,
   canRedeemMortgage,
   getPropertyGroupTiles,
+  getQuickTradeEligibility,
+  getQuickTradeSuggestion,
+  getQuickTradeTerms,
+  isQuickTrade,
   PROPERTY_GROUPS,
+  QUICK_TRADE_MIN_PRICE,
   type CreateTradeOfferRequest,
   type PropertyOwnership,
   type TradeAssets,
@@ -34,6 +39,10 @@ export const AI_ECONOMY_CONFIG = AI_ECONOMY_PROFILES.hard;
 export const getAiEconomyProfile = (state: Pick<GameState, "config">): AiEconomyProfile => AI_ECONOMY_PROFILES[state.config.aiDifficulty ?? "normal"];
 
 export const AI_DUNGEON_CARD_TRADE_VALUE = 110;
+/** Unterhalb von Handelsreserve plus diesem Polster bietet ein Computer gelegentlich Einzelbesitz zum Verkauf an. */
+export const AI_QUICK_SELL_GOLD_CUSHION = 200;
+const floorToTen = (value: number) => Math.floor(value / 10) * 10;
+const ceilToTen = (value: number) => Math.ceil(value / 10) * 10;
 export type TradeDecision = { type: "accept" | "reject" } | { type: "counter"; request: CreateTradeOfferRequest };
 export interface TradeEvaluation { receivedValue: number; givenValue: number; goldAfterTrade: number; breaksCompleteGroup: boolean }
 
@@ -88,8 +97,30 @@ export class EconomicAi {
     if (value.breaksCompleteGroup || value.goldAfterTrade < profile.tradeGoldReserve) return { type: "reject" };
     if (value.receivedValue >= value.givenValue * profile.tradeAcceptRatio) return { type: "accept" };
     if (value.receivedValue < value.givenValue * profile.tradeCounterFloor || trade.counterToTradeId) return { type: "reject" };
-    const request = this.createCounterOffer(state, playerId, trade);
+    const request = isQuickTrade(trade) ? this.createQuickCounterOffer(state, playerId, trade) : this.createCounterOffer(state, playerId, trade);
     return request ? { type: "counter", request } : { type: "reject" };
+  }
+
+  /** Gegenangebot im Schnellhandel: gleiches Grundstück, gleiche Rollen, nur ein neuer Preis. */
+  createQuickCounterOffer(state: GameState, playerId: string, trade: TradeOffer): CreateTradeOfferRequest | undefined {
+    const profile = getAiEconomyProfile(state);
+    const terms = getQuickTradeTerms(trade);
+    const player = state.players.find(entry => entry.id === playerId);
+    if (!terms || !player || trade.counterToTradeId || trade.recipientId !== playerId || !this.tradeValidator.isValid(state, trade)
+      || state.trades.some(entry => entry.proposerId === playerId && entry.status === "pending")) return undefined;
+    const value = this.evaluateTrade(state, playerId, trade);
+    const selling = terms.sellerId === playerId;
+    // Als Verkäufer verlangt der Computer mindestens seinen eigenen Wert, als Käufer bietet er höchstens ihn.
+    const gold = selling ? ceilToTen(value.givenValue) : Math.min(floorToTen(value.receivedValue), floorToTen(player.gold - profile.tradeGoldReserve));
+    if (gold < QUICK_TRADE_MIN_PRICE || gold === terms.gold) return undefined;
+    const property = { gold: 0, propertyTileIndices: [terms.tileIndex] };
+    const payment = { gold, propertyTileIndices: [] };
+    const request: CreateTradeOfferRequest = { recipientId: trade.proposerId, counterToTradeId: trade.id, mode: "quick",
+      offer: selling ? property : payment, request: selling ? payment : property };
+    const candidate: TradeOffer = { ...request, id: "ai-quick-counter-preview", proposerId: playerId, status: "pending", createdAt: 0 };
+    if (!this.tradeValidator.isValid(state, candidate)) return undefined;
+    const counterValue = this.evaluateTrade(state, playerId, candidate);
+    return counterValue.goldAfterTrade >= profile.tradeGoldReserve && counterValue.receivedValue >= counterValue.givenValue * profile.tradeAcceptRatio ? request : undefined;
   }
 
   createCounterOffer(state: GameState, playerId: string, trade: TradeOffer): CreateTradeOfferRequest | undefined {
@@ -123,14 +154,42 @@ export class EconomicAi {
       const ownership = state.propertyOwnerships.find(entry => entry.tileIndex === tile.index);
       const human = state.players.find(entry => entry.id === ownership?.ownerId);
       if (human?.type !== "human" || human.isBankrupt || human.connectionState !== "connected") return [];
-      const normalValue = Math.max(0, tile.economy!.purchasePrice - (ownership?.mortgaged ? getEffectiveMortgageRedemptionCost(state, tile) : 0));
-      const gold = Math.round(normalValue * 1.1 / 10) * 10;
+      const gold = getQuickTradeSuggestion(state, tile.index, playerId)?.fairPrice ?? 0;
       if (gold <= 0 || player.gold - gold < profile.tradeGoldReserve) return [];
-      const request: CreateTradeOfferRequest = { recipientId: human.id, offer: { gold, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [tile.index] } };
+      const request: CreateTradeOfferRequest = { recipientId: human.id, mode: "quick", offer: { gold, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [tile.index] } };
       const candidate: TradeOffer = { ...request, id: "ai-proposal-preview", proposerId: playerId, status: "pending", createdAt: 0 };
       return this.tradeValidator.isValid(state, candidate) ? [{ request, potential: tiles.reduce((sum, field) => sum + field.economy!.purchasePrice, 0) }] : [];
     });
-    return candidates.sort((a, b) => b.potential - a.potential)[0]?.request;
+    return candidates.sort((a, b) => b.potential - a.potential)[0]?.request
+      ?? (player.gold < profile.tradeGoldReserve + AI_QUICK_SELL_GOLD_CUSHION ? this.findQuickSaleProposal(state, playerId) : undefined);
+  }
+
+  /**
+   * Knappe Kasse: Der Computer bietet ein Grundstück an, das ihm keinen Gruppenwert bringt,
+   * einem Menschen, der in derselben Region schon Besitz hat, ohne ihm damit die Region zu schenken.
+   */
+  findQuickSaleProposal(state: GameState, playerId: string): CreateTradeOfferRequest | undefined {
+    const seller = state.players.find(entry => entry.id === playerId);
+    if (!seller) return undefined;
+    const ownedBy = (ownerId: string, index: number) => state.propertyOwnerships.some(entry => entry.tileIndex === index && entry.ownerId === ownerId);
+    const candidates = state.propertyOwnerships.filter(entry => entry.ownerId === playerId).flatMap(entry => {
+      const tile = BOARD_TILES[entry.tileIndex]!;
+      if (tile.type !== "property" || !tile.propertyGroup) return [];
+      const others = getPropertyGroupTiles(tile.propertyGroup).filter(member => member.index !== tile.index);
+      if (others.some(member => ownedBy(playerId, member.index))) return [];
+      return state.players
+        .filter(human => human.type === "human" && others.some(member => ownedBy(human.id, member.index)) && !others.every(member => ownedBy(human.id, member.index)))
+        .filter(human => getQuickTradeEligibility(state, playerId, human.id, tile.index).allowed)
+        .flatMap(human => {
+          const gold = getQuickTradeSuggestion(state, tile.index, human.id)?.fairPrice ?? 0;
+          // Die Annahme prüft die feste Computer-Reserve auch nach einem Verkauf.
+          if (gold < QUICK_TRADE_MIN_PRICE || human.gold < gold || seller.gold + gold < NPC_TRADE_GOLD_RESERVE) return [];
+          const request: CreateTradeOfferRequest = { recipientId: human.id, mode: "quick", offer: { gold: 0, propertyTileIndices: [tile.index] }, request: { gold, propertyTileIndices: [] } };
+          const candidate: TradeOffer = { ...request, id: "ai-sale-preview", proposerId: playerId, status: "pending", createdAt: 0 };
+          return this.tradeValidator.isValid(state, candidate) ? [{ request, gold }] : [];
+        });
+    });
+    return candidates.sort((a, b) => b.gold - a.gold || a.request.offer.propertyTileIndices[0]! - b.request.offer.propertyTileIndices[0]!)[0]?.request;
   }
 
   shouldBuy(state: GameState, playerId: string): boolean {

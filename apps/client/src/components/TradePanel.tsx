@@ -7,13 +7,13 @@ export function getCounterOfferTemplate(trade: TradeOffer): CreateTradeOfferRequ
   return { counterToTradeId: trade.id, recipientId: trade.proposerId, offer: copy(trade.request), request: copy(trade.offer) };
 }
 
-function propertyIdentity(index: number) {
+export function propertyIdentity(index: number) {
   const tile = BOARD_TILES[index]!;
   const group = getPropertyGroup(tile.propertyGroupId);
   return { tile, label: group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung"), accent: group?.accent ?? (tile.type === "harbor" ? "#76c8d6" : "#d6bd78"), sigil: group?.sigil ?? (tile.type === "harbor" ? "⚓" : "⚙"), size: group?.size ?? BOARD_TILES.filter(field => field.type === tile.type).length };
 }
 
-function PropertyLabel({ state, index }: { state: GameState; index: number }) {
+export function PropertyLabel({ state, index }: { state: GameState; index: number }) {
   const { tile, label, sigil, size } = propertyIdentity(index);
   const ownership = state.propertyOwnerships.find(entry => entry.tileIndex === index);
   const owner = state.players.find(player => player.id === ownership?.ownerId);
@@ -103,12 +103,12 @@ export function TradePanel({ state, playerId, connected, onCreate, onDecision, d
   const recipientProperties = state.propertyOwnerships.filter(entry => entry.ownerId === recipientId);
   const ownCards = state.players.find(player => player.id === playerId)?.heldCards ?? [];
   const recipientCards = recipient?.heldCards ?? [];
-  const received = state.trades.filter(trade => trade.recipientId === playerId && trade.status === "pending");
-  const sent = state.trades.filter(trade => trade.proposerId === playerId && trade.status === "pending");
+  const received = state.trades.filter(trade => trade.recipientId === playerId && trade.status === "pending" && trade.mode !== "quick");
+  const sent = state.trades.filter(trade => trade.proposerId === playerId && trade.status === "pending" && trade.mode !== "quick");
   const history = state.trades.filter(trade => (trade.proposerId === playerId || trade.recipientId === playerId) && trade.status !== "pending").slice(-3).reverse();
   const safe = ["waitingForRoll", "waitingForEndTurn"].includes(state.turnPhase) && !state.auction && !state.pendingPayment;
   const toggle = <T extends number | string,>(values: T[], value: T, update: (next: T[]) => void) => update(values.includes(value) ? values.filter(entry => entry !== value) : [...values, value]);
-  const statusLabel = useMemo(() => ({ accepted: "Angenommen", rejected: "Abgelehnt", cancelled: "Ungültig", countered: "Durch Gegenangebot ersetzt" }) as const, []);
+  const statusLabel = useMemo(() => ({ accepted: "Angenommen", rejected: "Abgelehnt", cancelled: "Ungültig", countered: "Durch Gegenangebot ersetzt", expired: "Verfallen" }) as const, []);
   const normalizeGold = (value: string) => { if (value === "") return ""; const amount = Number(value); return Number.isFinite(amount) ? String(Math.max(0, Math.trunc(amount))) : ""; };
   const offer = { gold: Number(offerGold) || 0, propertyTileIndices: offered, cardIds: offeredCards, relicIds: [] };
   const request = { gold: Number(requestGold) || 0, propertyTileIndices: requested, cardIds: requestedCards, relicIds: [] };

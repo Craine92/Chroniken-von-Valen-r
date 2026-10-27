@@ -260,10 +260,22 @@ export interface GameResult {
   durationPlayedMs?: number;
 }
 
-export type TradeOfferStatus = "pending" | "accepted" | "rejected" | "cancelled" | "countered";
+export type TradeOfferStatus = "pending" | "accepted" | "rejected" | "cancelled" | "countered" | "expired";
+/** "quick": ein Grundstück gegen Gold, Gegenangebote nur über den Preis. Ohne Angabe: erweiterter Handel. */
+export type TradeMode = "quick" | "advanced";
+
+/** Zustand beim Erstellen eines Schnellangebots; weicht der Spielstand davon ab, verfällt das Angebot. */
+export interface QuickTradeSnapshot {
+  round: number;
+  mortgaged: boolean;
+}
 
 export interface TradeOffer {
   counterToTradeId?: string;
+  mode?: TradeMode;
+  quickSnapshot?: QuickTradeSnapshot;
+  /** Warum ein Angebot verfallen ist, z. B. „Eichenhain wurde verpfändet.“ */
+  closedReason?: string;
   id: string;
   proposerId: string;
   recipientId: string;
@@ -275,7 +287,8 @@ export interface TradeOffer {
 
 export interface TradeAction {
   id: string;
-  type: "created" | "accepted";
+  tradeId?: string;
+  type: "created" | "accepted" | "rejected" | "cancelled" | "expired";
   proposerId: string;
   recipientId: string;
   createdAt: number;

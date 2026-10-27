@@ -4,6 +4,8 @@ import { BrandMark } from "../components/BrandMark";
 import { PropertyCard } from "../components/PropertyCard";
 import { PropertyGroupOverview } from "../components/PropertyGroupOverview";
 import { TradePanel } from "../components/TradePanel";
+import { TradeTab } from "../components/TradeTab";
+import { QuickTradePriceScreen, createQuickTradeDraft, type QuickTradeDraft } from "../components/QuickTradePanel";
 import { GameExperience } from "../game/GameExperience";
 import type { BoardPresentationMode } from "../game/board-presentation";
 import { MobileTradeNotice, MobileTurnNotice, PaymentManagement, RuneStoneDecisionPanel } from "./ControllerPage";
@@ -348,6 +350,28 @@ function MobileTradeQa({ mode }: { mode: "partner" | "composer" | "assets" | "re
   return <MobileQaShell active="trade"><TradePanel state={state} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} {...(draftIntent ? { draftIntent } : {})} /></MobileQaShell>;
 }
 
+function MobileQuickTradeQa({ mode }: { mode: "overview" | "buy" | "sell" | "incoming" | "counter" | "own" }) {
+  const state = createShowcaseState("four");
+  state.propertyOwnerships = [ownership(1, "p1"), ownership(3, "p2"), ownership(10, "p2"), ownership(12, "p2"), ownership(26, "p3"), ownership(27, "p3", 1), ownership(29, "p3")];
+  const lena = state.players[1]!;
+  if (mode === "incoming" || mode === "counter") state.trades = [{ id: "qa-quick", mode: "quick", proposerId: lena.id, recipientId: "p1", offer: { gold: 180, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [1] }, status: "pending", createdAt: Date.now(), quickSnapshot: { round: state.currentRound, mortgaged: false } }];
+  if (mode === "own") state.trades = [{ id: "qa-own", mode: "quick", proposerId: "p1", recipientId: lena.id, offer: { gold: 70, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [3] }, status: "pending", createdAt: Date.now(), quickSnapshot: { round: state.currentRound, mortgaged: false } }];
+  const initial: QuickTradeDraft | undefined = mode === "buy" ? createQuickTradeDraft(state, "p1", 3) : mode === "sell" ? createQuickTradeDraft(state, "p1", 1) : mode === "counter" ? { tileIndex: 1, counterToTradeId: "qa-quick", gold: 180 } : undefined;
+  const [draft, setDraft] = useState(initial);
+  return <MobileQaShell active="trade">{draft
+    ? <QuickTradePriceScreen state={state} playerId="p1" draft={draft} onChange={setDraft} onBack={() => setDraft(undefined)} onSend={() => undefined} />
+    : <TradeTab state={state} playerId="p1" connected onCreate={() => undefined} onQuickCreate={() => undefined} onDecision={() => undefined} />}</MobileQaShell>;
+}
+
+function QuickTradeTvQa({ sealed = false }: { sealed?: boolean }) {
+  const state = createShowcaseState("four");
+  state.propertyOwnerships = [...state.propertyOwnerships.filter(entry => entry.tileIndex !== 10), ownership(10, "p2")];
+  const trade = { id: "qa-tv", mode: "quick" as const, proposerId: "p1", recipientId: "p2", offer: { gold: 180, propertyTileIndices: [] }, request: { gold: 0, propertyTileIndices: [10] }, status: sealed ? "accepted" as const : "pending" as const, createdAt: Date.now() };
+  state.trades = [trade];
+  state.lastTradeAction = { id: `qa-tv-${sealed ? "sealed" : "open"}`, tradeId: trade.id, type: sealed ? "accepted" : "created", proposerId: "p1", recipientId: "p2", createdAt: Date.now() };
+  return <GameExperience gameState={state} suppressIntro />;
+}
+
 function MobileJournalQa() {
   const state = createShowcaseState("impulse");
   state.economyLog = [
@@ -471,6 +495,14 @@ export function VisualQaPage() {
   if (scenario === "mobile-trade-review") return <MobileTradeQa mode="review" />;
   if (scenario === "mobile-trade-counter") return <MobileTradeQa mode="incoming" />;
   if (scenario === "mobile-journal") return <MobileJournalQa />;
+  if (scenario === "mobile-quick-trade") return <MobileQuickTradeQa mode="overview" />;
+  if (scenario === "mobile-quick-trade-buy") return <MobileQuickTradeQa mode="buy" />;
+  if (scenario === "mobile-quick-trade-sell") return <MobileQuickTradeQa mode="sell" />;
+  if (scenario === "mobile-quick-trade-incoming") return <MobileQuickTradeQa mode="incoming" />;
+  if (scenario === "mobile-quick-trade-counter") return <MobileQuickTradeQa mode="counter" />;
+  if (scenario === "mobile-quick-trade-own") return <MobileQuickTradeQa mode="own" />;
+  if (scenario === "quick-trade") return <QuickTradeTvQa />;
+  if (scenario === "quick-trade-sealed") return <QuickTradeTvQa sealed />;
   if (scenario === "controller-turn") return <ControllerTurnShowcase />;
   if (scenario === "controller-feedback") return <ControllerFeedbackShowcase />;
   if (scenario === "controller-impulse") return <ControllerImpulseShowcase />;

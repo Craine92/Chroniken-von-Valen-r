@@ -543,3 +543,64 @@ body:has(.controller-page) .audio-settings__toggles { grid-template-columns: 1fr
   .controller-finance-section { padding: .7rem; }
   .difficulty-picker button { font-size: .76rem; padding-inline: .35rem; }
 }
+
+/* Schnellhandel: ein Grundstück, ein Preis, große Tasten. */
+.controller-page .quick-trade-panel { display: grid; }
+.controller-page .quick-trade-lead { margin: 0; color: #c9bcbf; font-size: .85rem; line-height: 1.45; }
+.controller-page .quick-trade-back { width: 100%; min-height: 44px; margin-top: .75rem; color: #e7d5ad; background: transparent; border: 1px solid rgba(216,185,104,.35); font-size: .85rem; font-weight: 700; cursor: pointer; }
+.controller-page .quick-trade-direction { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #8b7146; }
+.controller-page .quick-trade-direction button { min-height: 48px; color: #c9bcbf; background: #141116; border: 0; font-size: .95rem; font-weight: 800; letter-spacing: .04em; cursor: pointer; }
+.controller-page .quick-trade-direction button[aria-selected="true"] { color: #19120d; background: linear-gradient(140deg, #d6b768, #f0d899); }
+.controller-page .quick-trade-owner { display: grid; gap: .5rem; min-width: 0; }
+.controller-page .quick-trade-owner h3 { margin: .25rem 0 0; color: #ecd6a3; font-size: .8rem; letter-spacing: .08em; }
+.controller-page .quick-trade-tile { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .6rem; min-height: 60px; padding: .6rem .75rem; color: #f4e5ce; text-align: left; background: color-mix(in srgb, var(--property-group-accent) 8%, #101016); border: 1px solid color-mix(in srgb, var(--property-group-accent) 45%, transparent); border-left: 4px solid var(--property-group-accent); cursor: pointer; }
+.controller-page .quick-trade-tile > span:first-child { color: var(--property-group-accent); font-size: 1.25rem; text-align: center; }
+.controller-page .quick-trade-tile > span:nth-child(2) { display: grid; gap: .15rem; min-width: 0; }
+.controller-page .quick-trade-tile strong { font-size: 1rem; overflow-wrap: anywhere; }
+.controller-page .quick-trade-tile small { color: var(--property-group-accent); font-size: .75rem; }
+.controller-page .quick-trade-tile small.quick-trade-tile__blocked { color: #c7b9b8; }
+.controller-page .quick-trade-tile b { color: #f0d899; font-size: .9rem; white-space: nowrap; }
+.controller-page .quick-trade-tile:disabled { opacity: .55; cursor: not-allowed; }
+.controller-page .quick-trade-advanced-link { display: grid; gap: .2rem; width: 100%; min-height: 56px; padding: .65rem .8rem; color: #e7d5ad; text-align: left; background: transparent; border: 1px dashed rgba(216,185,104,.45); cursor: pointer; }
+.controller-page .quick-trade-advanced-link small { color: #b9adb2; font-size: .75rem; }
+.controller-page .quick-trade-advanced-notice { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .6rem; padding: .6rem .75rem; color: #eadbbc; background: #1d1714; border: 1px solid #8b7146; font-size: .85rem; }
+.controller-page .quick-trade-advanced-notice button { min-height: 44px; padding: 0 1rem; color: #19120d; background: linear-gradient(140deg, #d6b768, #f0d899); border: 0; font-weight: 800; cursor: pointer; }
+
+.controller-page .quick-trade-offer { display: grid; gap: .7rem; padding: .9rem; background: linear-gradient(140deg, color-mix(in srgb, var(--property-group-accent) 12%, #1b1418), #0c0b10); border: 1px solid color-mix(in srgb, var(--property-group-accent) 55%, #8b7146); border-top: 3px solid var(--property-group-accent); }
+.controller-page .quick-trade-offer--incoming { box-shadow: 0 0 0 1px rgba(240,216,153,.25), 0 10px 26px rgba(0,0,0,.45); }
+.controller-page .quick-trade-offer > small { color: #d8b968; font-size: .72rem; font-weight: 800; letter-spacing: .14em; }
+.controller-page .quick-trade-offer h3 { margin: 0; color: #fff0cc; font: 700 1.25rem/1.3 Georgia, serif; letter-spacing: 0; text-transform: none; overflow-wrap: anywhere; }
+.controller-page .quick-trade-offer--own h3 { font-size: 1.05rem; }
+.controller-page .quick-trade-offer__waiting { margin: 0; color: #c9bcbf; font-size: .85rem; font-style: italic; }
+.controller-page .quick-trade-offer__actions { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+.controller-page .quick-trade-offer__actions button { min-height: 52px; padding: .5rem; color: #e7d5ad; background: #1a1518; border: 1px solid #8b7146; font-size: .95rem; font-weight: 800; cursor: pointer; }
+.controller-page .quick-trade-offer__actions button:only-child,
+.controller-page .quick-trade-offer__actions .controller-primary-action { grid-column: 1 / -1; min-height: 56px; font-size: 1.05rem; }
+.controller-page .quick-trade-offer__actions .controller-primary-action { color: #19120d; background: linear-gradient(140deg, #d6b768, #f0d899); border-color: #f1db9d; }
+.controller-page .quick-trade-offer__actions .trade-counter-action { border-color: #bea36b; background: #33291d; color: #ffe3ab; }
+.controller-page .quick-trade-offer__actions button:disabled { opacity: .5; cursor: not-allowed; }
+
+.controller-page .quick-trade-rating { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem .75rem; margin: 0; color: #c9bcbf; font-size: .8rem; }
+.controller-page .quick-trade-rating strong { padding: .05rem .45rem; border-radius: 999px; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; }
+.controller-page .quick-trade-rating--cheap strong { color: #0f2216; background: #83d6a0; }
+.controller-page .quick-trade-rating--fair strong { color: #19120d; background: #f0d899; }
+.controller-page .quick-trade-rating--high strong { color: #2a0d10; background: #e8908f; }
+
+.controller-page .quick-trade-buyers { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .5rem; min-width: 0; margin: 0; padding: 0; border: 0; }
+.controller-page .quick-trade-buyers legend { margin-bottom: .45rem; padding: 0; color: #ecd6a3; font-size: .8rem; font-weight: 800; letter-spacing: .08em; }
+.controller-page .quick-trade-buyers button { display: grid; gap: .1rem; min-height: 52px; padding: .45rem .6rem; color: #e7d5ad; text-align: left; background: #141116; border: 1px solid #8b7146; font-size: .95rem; font-weight: 700; overflow-wrap: anywhere; cursor: pointer; }
+.controller-page .quick-trade-buyers button small { color: #b9adb2; font-size: .75rem; font-weight: 400; }
+.controller-page .quick-trade-buyers button[aria-pressed="true"] { color: #19120d; background: linear-gradient(140deg, #d6b768, #f0d899); border-color: #f1db9d; }
+.controller-page .quick-trade-buyers button[aria-pressed="true"] small { color: #3b2d18; }
+
+.controller-page .quick-trade-price { display: grid; gap: .65rem; padding: .85rem; background: #0d0c11; border: 1px solid rgba(216,185,104,.35); }
+.controller-page .quick-trade-price__value { display: block; color: #f0d899; text-align: center; font: 800 1rem Arial, sans-serif; letter-spacing: .12em; }
+.controller-page .quick-trade-price__value b { display: block; color: #fff0cc; font: 700 3rem/1.05 Georgia, serif; letter-spacing: 0; }
+.controller-page .quick-trade-price__steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; }
+.controller-page .quick-trade-price__steps button { min-height: 60px; color: #fff0cc; background: #241c17; border: 1px solid #bea36b; font: 800 1.2rem Arial, sans-serif; cursor: pointer; touch-action: manipulation; }
+.controller-page .quick-trade-price__steps button:active:not(:disabled) { background: #3a2d1f; }
+.controller-page .quick-trade-price__steps button:disabled { opacity: .4; cursor: not-allowed; }
+.controller-page .quick-trade-reset { justify-self: center; min-height: 40px; padding: 0 .8rem; color: #e7d5ad; background: transparent; border: 0; font-size: .85rem; text-decoration: underline; cursor: pointer; }
+.controller-page .quick-trade-factors { display: grid; gap: .25rem; margin: 0; padding: .55rem .75rem; list-style: none; border-left: 2px solid rgba(216,185,104,.45); background: rgba(0,0,0,.22); }
+.controller-page .quick-trade-factors li { display: flex; justify-content: space-between; gap: .75rem; color: #c9bcbf; font-size: .8rem; }
+.controller-page .quick-trade-factors b { color: #f0d899; white-space: nowrap; }

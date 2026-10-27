@@ -1,4 +1,4 @@
-import type { GameState } from "@valenor/shared";
+import { formatQuickTradeHeadline, type GameState } from "@valenor/shared";
 import { ControllerQuestLog } from "./ControllerQuestLog";
 
 export function ControllerJournal({ state, playerId }: { state: GameState; playerId: string }) {
@@ -19,8 +19,9 @@ export function ControllerJournal({ state, playerId }: { state: GameState; playe
       {completedTrades.slice().reverse().map(trade => {
         const partnerId = trade.proposerId === playerId ? trade.recipientId : trade.proposerId;
         const partner = state.players.find(entry => entry.id === partnerId)?.name ?? "Unbekannt";
-        const labels = { accepted: "Angenommen", rejected: "Abgelehnt", cancelled: "Zurückgezogen", countered: "Gegenangebot" } as const;
-        return <article key={trade.id}><strong>{labels[trade.status as keyof typeof labels]} · {partner}</strong><span>{trade.offer.gold} Gold + {trade.offer.propertyTileIndices.length} Besitz gegen {trade.request.gold} Gold + {trade.request.propertyTileIndices.length} Besitz</span></article>;
+        const labels = { accepted: "Angenommen", rejected: "Abgelehnt", cancelled: "Zurückgezogen", countered: "Gegenangebot", expired: "Verfallen" } as const;
+        const headline = trade.mode === "quick" ? formatQuickTradeHeadline(state, trade) : undefined;
+        return <article key={trade.id}><strong>{labels[trade.status as keyof typeof labels]} · {partner}</strong><span>{headline ?? `${trade.offer.gold} Gold + ${trade.offer.propertyTileIndices.length} Besitz gegen ${trade.request.gold} Gold + ${trade.request.propertyTileIndices.length} Besitz`}{trade.closedReason ? ` ${trade.closedReason}` : ""}</span></article>;
       })}
     </details>
   </section>;

@@ -1,4 +1,4 @@
-import { BOARD_TILES, RELIC_DEFINITIONS, QUEST_DEFINITIONS, getActiveChronicleEvent, getChronicleRegionLabel, getPropertyGroup, type GameState } from "@valenor/shared";
+import { BOARD_TILES, RELIC_DEFINITIONS, QUEST_DEFINITIONS, formatQuickTradeHeadline, getActiveChronicleEvent, getChronicleRegionLabel, getPropertyGroup, type GameState } from "@valenor/shared";
 import { openControllerTrade, type MobileFeedback } from "./mobile-feedback";
 
 // Reads server-confirmed records only. No actions, balances or game rules are changed.
@@ -36,7 +36,7 @@ export class MobileFeedbackEventTracker {
       if (trade.recipientId !== playerId && trade.proposerId !== playerId) continue;
       if (trade.status === "pending" && trade.recipientId === playerId) {
         add({ id: `trade:${trade.id}:pending`, type: "tradeOffer", title: "HANDELSANGEBOT",
-          message: `${name(trade.proposerId) ?? "Ein Gefährte"} möchte mit dir handeln.`,
+          message: (trade.mode === "quick" ? formatQuickTradeHeadline(state, trade) : undefined) ?? `${name(trade.proposerId) ?? "Ein Gefährte"} möchte mit dir handeln.`,
           hapticPattern: [80, 60, 80], icon: "◇",
           actionLabel: "HANDEL ANSEHEN", action: openControllerTrade }, true);
       } else if (trade.status === "accepted" || trade.status === "rejected") {
@@ -45,6 +45,9 @@ export class MobileFeedbackEventTracker {
           title: accepted ? "HANDEL ANGENOMMEN" : "HANDEL ABGELEHNT",
           message: accepted ? "Der Handel wurde abgeschlossen." : "Das Angebot wurde abgelehnt.",
           hapticPattern: accepted ? 60 : undefined, icon: "◇" });
+      } else if (trade.status === "expired") {
+        add({ id: `trade:${trade.id}:expired`, type: "tradeRejected", title: "ANGEBOT VERFALLEN",
+          message: trade.closedReason ?? "Das Angebot gilt nicht mehr.", icon: "◇" });
       }
     }
     const turn = state.lastTurnAction;

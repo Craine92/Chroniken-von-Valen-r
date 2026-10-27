@@ -19,6 +19,7 @@ import {
 } from "@valenor/shared";
 import type { TavernChoice } from "@valenor/shared";
 import type { WorldImpulseChoice } from "@valenor/shared";
+import type { QuickTradeRequest } from "@valenor/shared";
 import { DiceService } from "./game/dice-service";
 import { EconomyService } from "./game/economy-service";
 import { BuildingService } from "./game/building-service";
@@ -545,6 +546,12 @@ export class RoomManager {
     return this.cloneGameState(state);
   }
 
+  createQuickTrade(roomCode: string, playerId: string, request: QuickTradeRequest): GameState {
+    const state = this.requireGameState(roomCode);
+    this.trades.createQuick(state, playerId, request);
+    return this.cloneGameState(state);
+  }
+
   acceptTrade(roomCode: string, playerId: string, tradeId: string): GameState {
     const state = this.requireGameState(roomCode);
     this.trades.accept(state, playerId, tradeId);
@@ -771,6 +778,7 @@ export class RoomManager {
   private cloneGameState(gameState: GameState): GameState {
     this.quickClock.sync(gameState);
     this.finishGameIfReady(gameState);
+    this.trades.expireStaleQuickTrades(gameState);
     return {
       ...gameState,
       weltenwegPot: gameState.weltenwegPot ?? 0,
@@ -806,6 +814,7 @@ export class RoomManager {
         ...(gameState.activeChronicleEvent.affectedTileTypes ? { affectedTileTypes: [...gameState.activeChronicleEvent.affectedTileTypes] } : {}) } } : {}),
       trades: gameState.trades.map((trade) => ({
         ...trade,
+        ...(trade.quickSnapshot ? { quickSnapshot: { ...trade.quickSnapshot } } : {}),
         offer: { ...trade.offer, propertyTileIndices: [...trade.offer.propertyTileIndices], cardIds: [...(trade.offer.cardIds ?? [])], relicIds: [...(trade.offer.relicIds ?? [])] },
         request: { ...trade.request, propertyTileIndices: [...trade.request.propertyTileIndices], cardIds: [...(trade.request.cardIds ?? [])], relicIds: [...(trade.request.relicIds ?? [])] }
       })),

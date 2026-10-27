@@ -1,5 +1,6 @@
 import type { AuctionBidIncrement } from "./economy";
-import type { GameConfig, GameRoom, GameState, MagicSignal, Player, PlayerColor, PlayerCharacterId, TradeAssets, TavernChoice } from "./game";
+import type { GameConfig, GameRoom, GameState, MagicSignal, Player, PlayerColor, PlayerCharacterId, TradeAssets, TavernChoice, TradeMode } from "./game";
+import type { QuickTradeRequest } from "./quick-trade";
 import type { WorldImpulseChoice } from "./world-impulses";
 import type { PropertyGroupId } from "./property-groups";
 
@@ -45,6 +46,7 @@ export const SOCKET_EVENTS = {
   financeAutoMortgageForPayment: "finance:autoMortgageForPayment",
   financeRedeemAllMortgages: "finance:redeemAllMortgages",
   tradeCreate: "trade:create",
+  tradeQuick: "trade:quick",
   tradeAccept: "trade:accept",
   tradeReject: "trade:reject",
   tradeCancel: "trade:cancel",
@@ -99,6 +101,7 @@ export interface GameActionResult extends EventResult {
 
 export interface CreateTradeOfferRequest {
   counterToTradeId?: string;
+  mode?: TradeMode;
   recipientId: string;
   offer: TradeAssets;
   request: TradeAssets;
@@ -149,6 +152,7 @@ export interface ClientToServerEvents {
   "finance:autoMortgageForPayment": (callback: (result: GameActionResult) => void) => void;
   "finance:redeemAllMortgages": (callback: (result: GameActionResult) => void) => void;
   "trade:create": (request: CreateTradeOfferRequest, callback: (result: GameActionResult) => void) => void;
+  "trade:quick": (request: QuickTradeRequest, callback: (result: GameActionResult) => void) => void;
   "trade:accept": (tradeId: string, callback: (result: GameActionResult) => void) => void;
   "trade:reject": (tradeId: string, callback: (result: GameActionResult) => void) => void;
   "trade:cancel": (tradeId: string, callback: (result: GameActionResult) => void) => void;

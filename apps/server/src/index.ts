@@ -923,6 +923,17 @@ io.on("connection", (socket) => {
     } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Handelsangebot konnte nicht erstellt werden." }); }
   });
 
+  socket.on(SOCKET_EVENTS.tradeQuick, (request, callback) => {
+    try {
+      const { roomCode, playerId, role } = socket.data;
+      if (!roomCode || !playerId || role !== "player") throw new Error("Du bist mit keiner Partie verbunden.");
+      const state = rooms.createQuickTrade(roomCode, playerId, request);
+      publishGameState(roomCode, state);
+      orchestrateGame(roomCode, state);
+      callback({ ok: true, gameState: state });
+    } catch (error) { callback({ ok: false, message: error instanceof Error ? error.message : "Schnellhandel konnte nicht gesendet werden." }); }
+  });
+
   const handleTradeDecision = (action: "accept" | "reject" | "cancel", tradeId: string, callback: Parameters<ClientToServerEvents["trade:accept"]>[1]) => {
     try {
       const { roomCode, playerId, role } = socket.data;

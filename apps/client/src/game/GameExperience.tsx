@@ -10,6 +10,7 @@ import { DEFAULT_BOARD_PRESENTATION_MODE, getCardPresentationKey, type BoardPres
 import { audioManager } from "../audio/AudioManager";
 import { GameAudioEventTracker } from "../audio/game-audio-events";
 import { MomentumCelebrationBanner, WorldImpulseBanner } from "../components/WorldImpulseUi";
+import { TvQuickTradeBanner, isQuickTradeAction } from "./TvQuickTrade";
 
 const GameCanvas = lazy(() =>
   import("./GameCanvas").then((module) => ({ default: module.GameCanvas }))
@@ -110,7 +111,8 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
   const buildingAction = buildingNoticeId === gameState.lastBuildingAction?.id ? gameState.lastBuildingAction : undefined;
   const buildingPlayer = buildingAction ? gameState.players.find((player) => player.id === buildingAction.playerId) : undefined;
   const buildingTile = buildingAction ? BOARD_TILES[buildingAction.tileIndex] : undefined;
-  const tradeAction = tradeNoticeId === gameState.lastTradeAction?.id ? gameState.lastTradeAction : undefined;
+  // Schnellhandel hat ein eigenes, länger sichtbares Banner; der kurze Hinweis bleibt dem erweiterten Handel.
+  const tradeAction = tradeNoticeId === gameState.lastTradeAction?.id && !isQuickTradeAction(gameState, gameState.lastTradeAction) ? gameState.lastTradeAction : undefined;
   const chronicleNotice = chronicleKey === chronicleNoticeKey ? chronicle : undefined;
   const tavernNotice = tavern && (tavern.status !== "resolved" || tavern.id === tavernNoticeId) ? tavern : undefined;
   const tavernWinner = tavernNotice ? gameState.players.find((player) => player.id === tavernNotice.playerId) : undefined;
@@ -191,6 +193,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
               <span>{buildingAction.type === "build" ? "−" : "+"}{buildingAction.amount} Gold</span>
             </aside>
           )}
+          {gameState.status === "playing" && <TvQuickTradeBanner state={gameState} />}
           {tradeAction && (
             <aside className="building-notice">
               <small>{tradeAction.type === "created" ? `${gameState.players.find((player) => player.id === tradeAction.proposerId)?.name} unterbreitet ein Handelsangebot.` : "Ein Bündnis wird besiegelt."}</small>

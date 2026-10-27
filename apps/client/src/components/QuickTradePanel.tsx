@@ -5,6 +5,7 @@ import {
   QUICK_TRADE_PRICE_STEPS,
   formatQuickTradeHeadline,
   getOpenQuickTrade,
+  getPropertyGroupTiles,
   getQuickTradeEligibility,
   getQuickTradeSuggestion,
   getQuickTradePriceVerdict,
@@ -33,6 +34,26 @@ const SAFE_PHASES = ["waitingForRoll", "waitingForEndTurn"];
 const clampPrice = (gold: number, maxPrice: number) => Math.max(QUICK_TRADE_MIN_PRICE, Math.min(maxPrice, gold));
 const playerName = (state: GameState, id: string | undefined) => state.players.find(player => player.id === id)?.name ?? "Ein Gefährte";
 const playerLabel = (state: GameState, id: string) => { const player = state.players.find(entry => entry.id === id); return `${player?.name ?? ""}${player?.type === "computer" ? " · NPC" : ""}`; };
+
+export interface BlockedTileGroup { key: string; label: string; reason: string; tileIndices: number[] }
+
+/**
+ * Fasst gesperrte Grundstücke zusammen: Bauwerke pro Region, alle anderen Gründe (Bankrott, Verbindung, Gold) je Grund.
+ * So steht statt mehrerer ausgegrauter Karten eine Zeile wie „3 Grundstücke gesperrt – Bauwerke in Eisenöde“.
+ */
+export function groupBlockedTiles(state: GameState, blocked: readonly { tileIndex: number; reason: string }[]): BlockedTileGroup[] {
+  const groups = new Map<string, BlockedTileGroup>();
+  for (const { tileIndex, reason } of blocked) {
+    const region = BOARD_TILES[tileIndex]?.propertyGroup;
+    const built = region !== undefined && getPropertyGroupTiles(region).some(member => (state.propertyOwnerships.find(entry => entry.tileIndex === member.index)?.buildingLevel ?? 0) > 0);
+    const key = built ? `built:${region}` : `reason:${reason}`;
+    const group = groups.get(key) ?? { key, label: built ? `Bauwerke in ${region}` : reason.replace(/\.$/, ""), reason, tileIndices: [] };
+    group.tileIndices.push(tileIndex);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+const blockedSummary = (group: BlockedTileGroup) => `${group.tileIndices.length} ${group.tileIndices.length === 1 ? "Grundstück" : "Grundstücke"} gesperrt – ${group.label}`;
 
 /** Startpreis für einen neuen Entwurf: der Vorschlag des Spiels, begrenzt auf das Gold des Käufers. */
 export function createQuickTradeDraft(state: GameState, playerId: string, tileIndex: number, buyerId?: string): QuickTradeDraft | undefined {
@@ -174,17 +195,29 @@ export function QuickTradePanel({ state, playerId, connected, onQuickCreate, onD
   if (draft) return <QuickTradePriceScreen state={state} playerId={playerId} draft={draft} disabledReason={disabledReason} onChange={setDraft} onBack={() => setDraft(undefined)} onSend={onQuickCreate} />;
 
   const others = state.players.filter(player => player.id !== playerId && !player.isBankrupt);
-  const tileButton = (tileIndex: number, sellerId: string) => {
+  const eligibilityFor = (tileIndex: number, sellerId: string) => direction === "buy" ? getQuickTradeEligibility(state, sellerId, playerId, tileIndex)
+    : others.some(player => getQuickTradeEligibility(state, playerId, player.id, tileIndex).allowed) ? { allowed: true } : getQuickTradeEligibility(state, playerId, others[0]?.id ?? "", tileIndex);
+  const tileButton = (tileIndex: number) => {
     const identity = propertyIdentity(tileIndex);
-    const eligibility = direction === "buy" ? getQuickTradeEligibility(state, sellerId, playerId, tileIndex)
-      : others.some(player => getQuickTradeEligibility(state, playerId, player.id, tileIndex).allowed) ? { allowed: true } : getQuickTradeEligibility(state, playerId, others[0]?.id ?? "", tileIndex);
     const fairPrice = direction === "buy" ? getQuickTradeSuggestion(state, tileIndex, playerId)?.fairPrice : undefined;
-    return <button type="button" className="quick-trade-tile" key={tileIndex} disabled={!eligibility.allowed} style={{ "--property-group-accent": identity.accent } as CSSProperties}
+    return <button type="button" className="quick-trade-tile" key={tileIndex} style={{ "--property-group-accent": identity.accent } as CSSProperties}
       onClick={() => { const next = createQuickTradeDraft(state, playerId, tileIndex); if (next) setDraft(next); }}>
       <span aria-hidden="true"><Icon name={identity.icon} /></span>
-      <span><strong>{BOARD_TILES[tileIndex]?.name}</strong><small>{identity.label}{state.propertyOwnerships.find(entry => entry.tileIndex === tileIndex)?.mortgaged ? " · verpfändet" : ""}</small>{!eligibility.allowed && <small className="quick-trade-tile__blocked">{eligibility.reason}</small>}</span>
-      {fairPrice !== undefined && eligibility.allowed && <b>≈ {fairPrice}</b>}
+      <span><strong>{BOARD_TILES[tileIndex]?.name}</strong><small>{identity.label}{state.propertyOwnerships.find(entry => entry.tileIndex === tileIndex)?.mortgaged ? " · verpfändet" : ""}</small></span>
+      {fairPrice !== undefined && <b>≈ {fairPrice}</b>}
     </button>;
+  };
+  const tileList = (tiles: number[], sellerId: string) => {
+    const checked = tiles.map(tileIndex => ({ tileIndex, eligibility: eligibilityFor(tileIndex, sellerId) }));
+    const blocked = groupBlockedTiles(state, checked.filter(entry => !entry.eligibility.allowed).map(entry => ({ tileIndex: entry.tileIndex, reason: entry.eligibility.reason ?? "Nicht handelbar." })));
+    return <>
+      {checked.filter(entry => entry.eligibility.allowed).map(entry => tileButton(entry.tileIndex))}
+      {blocked.map(group => <details className="quick-trade-blocked" key={group.key}>
+        <summary><span>{blockedSummary(group)}</span><Icon name="chevron-right" className="quick-trade-blocked__chevron" /></summary>
+        <p>{group.reason}</p>
+        <ul>{group.tileIndices.map(index => <li key={index}><Icon name={propertyIdentity(index).icon} /> {BOARD_TILES[index]?.name}</li>)}</ul>
+      </details>)}
+    </>;
   };
   const owned = (ownerId: string) => state.propertyOwnerships.filter(entry => entry.ownerId === ownerId).map(entry => entry.tileIndex).sort((a, b) => a - b);
 
@@ -201,8 +234,8 @@ export function QuickTradePanel({ state, playerId, connected, onQuickCreate, onD
     <p className="quick-trade-lead">{direction === "buy" ? "Tippe auf ein Grundstück eines Gefährten und nenne deinen Preis." : "Tippe auf einen deiner Besitze und biete ihn feil."}</p>
     {openQuick && <p className="controller-disabled-reason">{OPEN_QUICK_TRADE_REASON}</p>}
     {direction === "buy"
-      ? others.map(owner => owned(owner.id).length > 0 && <section className="quick-trade-owner" key={owner.id}><h3>{playerLabel(state, owner.id).toUpperCase()}</h3>{owned(owner.id).map(index => tileButton(index, owner.id))}</section>)
-      : <section className="quick-trade-owner">{owned(playerId).map(index => tileButton(index, playerId))}</section>}
+      ? others.map(owner => owned(owner.id).length > 0 && <section className="quick-trade-owner" key={owner.id}><h3>{playerLabel(state, owner.id).toUpperCase()}</h3>{tileList(owned(owner.id), owner.id)}</section>)
+      : <section className="quick-trade-owner">{tileList(owned(playerId), playerId)}</section>}
     {(direction === "buy" ? others.every(owner => owned(owner.id).length === 0) : owned(playerId).length === 0) && <p className="trade-empty">{direction === "buy" ? "Noch besitzt kein Gefährte ein Grundstück." : "Du besitzt noch kein Grundstück."}</p>}
     <button type="button" className="quick-trade-advanced-link" onClick={onOpenAdvanced}><strong>Erweiterter Handel</strong><small>Mehrere Grundstücke, Gold und Karten auf beiden Seiten</small></button>
   </section>;

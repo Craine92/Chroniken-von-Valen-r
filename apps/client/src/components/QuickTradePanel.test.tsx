@@ -3,7 +3,7 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { GameState, TradeOffer } from "@valenor/shared";
-import { QuickTradeOfferCard, QuickTradePanel, QuickTradePriceScreen, QuickTradePriceStepper, createQuickTradeDraft } from "./QuickTradePanel";
+import { QuickTradeOfferCard, QuickTradePanel, QuickTradePriceScreen, QuickTradePriceStepper, createQuickTradeDraft, groupBlockedTiles } from "./QuickTradePanel";
 import { TradeTab } from "./TradeTab";
 import { TradePanel } from "./TradePanel";
 
@@ -125,10 +125,31 @@ test("unsafe phases disable every quick trade action with a reason", () => {
   for (const label of ["Annehmen", "Ablehnen", "Preis ändern"]) assert.match(markup, new RegExp(`<button[^>]*disabled=""[^>]*>${label}</button>`));
 });
 
-test("built regions are listed but blocked with the existing rule as reason", () => {
+test("blocked properties collapse into one expandable row per region with the existing rule as reason", () => {
   const game = state(); game.propertyOwnerships.push({ tileIndex: 12, ownerId: "p2", mortgaged: false, buildingLevel: 0 }, { tileIndex: 14, ownerId: "p2", mortgaged: false, buildingLevel: 1 });
   const markup = renderToStaticMarkup(<QuickTradePanel state={game} playerId="p1" connected onQuickCreate={noop} onDecision={noop} onOpenAdvanced={noop} />);
-  assert.match(markup, /<button type="button" class="quick-trade-tile" disabled=""[^>]*>.*?Mühlenweg.*?Zuerst müssen alle Bauwerke dieser Region verkauft werden\./);
+  assert.match(markup, /<details class="quick-trade-blocked"><summary><span>3 Grundstücke gesperrt – Bauwerke in Silberbach<\/span><svg class="icon icon--chevron-right quick-trade-blocked__chevron"[^>]*>.*?<\/svg><\/summary><p>Zuerst müssen alle Bauwerke dieser Region verkauft werden\.<\/p>/);
+  assert.equal((markup.match(/<details class="quick-trade-blocked">/g) ?? []).length, 1, "one row instead of three greyed cards");
+  for (const name of ["Mühlenweg", "Königsfurt", "Rosenhain"]) assert.match(markup, new RegExp(`<li>[^<]*<svg[^>]*>.*?</svg> ${name}</li>`));
+  assert.doesNotMatch(markup, /quick-trade-tile" disabled/);
+  assert.match(markup, /<button type="button" class="quick-trade-tile"[^>]*>.*?Geistertal/, "tradable properties stay as cards");
+});
+
+test("blocked groups split by region for buildings and by reason otherwise", () => {
+  const game = state();
+  game.propertyOwnerships.push({ tileIndex: 26, ownerId: "p3", mortgaged: false, buildingLevel: 2 }, { tileIndex: 27, ownerId: "p3", mortgaged: false, buildingLevel: 0 }, { tileIndex: 12, ownerId: "p2", mortgaged: false, buildingLevel: 1 });
+  const groups = groupBlockedTiles(game, [
+    { tileIndex: 26, reason: "Zuerst müssen alle Bauwerke dieser Region verkauft werden." },
+    { tileIndex: 27, reason: "Zuerst müssen alle Bauwerke dieser Region verkauft werden." },
+    { tileIndex: 12, reason: "Zuerst müssen alle Bauwerke dieser Region verkauft werden." },
+    { tileIndex: 5, reason: "Der Gefährte ist gerade nicht verbunden." },
+    { tileIndex: 15, reason: "Der Gefährte ist gerade nicht verbunden." }
+  ]);
+  assert.deepEqual(groups.map(group => [group.label, group.tileIndices]), [
+    ["Bauwerke in Eisenöde", [26, 27]],
+    ["Bauwerke in Silberbach", [12]],
+    ["Der Gefährte ist gerade nicht verbunden", [5, 15]]
+  ]);
 });
 
 test("advanced offers are announced in quick mode and open the advanced editor", () => {

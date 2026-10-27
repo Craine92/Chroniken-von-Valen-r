@@ -558,9 +558,7 @@ body:has(.controller-page) .audio-settings__toggles { grid-template-columns: 1fr
 .controller-page .quick-trade-tile > span:nth-child(2) { display: grid; gap: var(--space-0-5); min-width: 0; }
 .controller-page .quick-trade-tile strong { font-size:var(--fs-md); overflow-wrap: anywhere; }
 .controller-page .quick-trade-tile small { color: var(--property-group-accent); font-size:var(--fs-xs); }
-.controller-page .quick-trade-tile small.quick-trade-tile__blocked { color: var(--c-parchment-400); }
 .controller-page .quick-trade-tile b { color: var(--c-gold-300); font-size:var(--fs-sm); white-space: nowrap; }
-.controller-page .quick-trade-tile:disabled { opacity: .55; cursor: not-allowed; }
 .controller-page .quick-trade-advanced-link { display: grid; gap: var(--space-1); width: 100%; min-height: 56px; padding: var(--space-3) var(--space-3); color: var(--c-parchment-200); text-align: left; background: transparent; border: 1px dashed rgb(var(--c-gold-400-rgb) / .45); cursor: pointer; }
 .controller-page .quick-trade-advanced-link small { color: var(--c-parchment-400); font-size:var(--fs-xs); }
 .controller-page .quick-trade-advanced-notice { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); color: var(--c-parchment-100); background: var(--c-ink-800); border: 1px solid var(--c-gold-700); font-size:var(--fs-sm); }
@@ -692,3 +690,15 @@ body:has(.controller-page) .audio-settings__toggles { grid-template-columns: 1fr
 .difficulty-picker button.is-selected,
 .controller-page .difficulty-picker button.is-selected { color: var(--text-on-accent); background: linear-gradient(180deg, var(--c-gold-300), var(--c-gold-500)); border-color: var(--c-gold-300); }
 .difficulty-picker button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Gesperrte Grundstücke im Schnellhandel: eine einklappbare Zeile je Grund statt vieler grauer Karten. */
+.controller-page .quick-trade-blocked { border: 1px dashed var(--line); border-radius: var(--radius-sm); background: var(--surface-sunken); color: var(--text-muted); }
+.controller-page .quick-trade-blocked > summary { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); font: 600 var(--fs-sm)/1.35 var(--font-text); cursor: pointer; }
+.controller-page .quick-trade-blocked[open] > summary { color: var(--text); }
+.controller-page .quick-trade-blocked > summary { justify-content: space-between; list-style: none; }
+.controller-page .quick-trade-blocked > summary::-webkit-details-marker { display: none; }
+.controller-page .quick-trade-blocked__chevron { flex: none; color: var(--text-faint); transition: rotate var(--dur-base) var(--ease-out); }
+.controller-page .quick-trade-blocked[open] .quick-trade-blocked__chevron { rotate: 90deg; }
+.controller-page .quick-trade-blocked > p { margin: 0; padding: 0 var(--space-3); font-size: var(--fs-sm); }
+.controller-page .quick-trade-blocked > ul { display: grid; gap: var(--space-1); margin: 0; padding: var(--space-2) var(--space-3) var(--space-3); list-style: none; font-size: var(--fs-md); }
+.controller-page .quick-trade-blocked li .icon { color: var(--text-faint); }

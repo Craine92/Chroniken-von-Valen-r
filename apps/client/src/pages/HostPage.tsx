@@ -17,6 +17,7 @@ import { ConnectionBadge } from "../components/ConnectionBadge";
 import { GameModeSelector } from "../components/GameModeSelector";
 import { PlayerSlot } from "../components/PlayerSlot";
 import { createValenorSocket } from "../lib/socket";
+import { CODEX_COLORS } from "../game/design-tokens";
 import { shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { audioManager } from "../audio/AudioManager";
 
@@ -224,8 +225,8 @@ export function HostPage() {
                 value={controllerUrl}
                 size={166}
                 level="M"
-                bgColor="#f4eddc"
-                fgColor="#11121b"
+                bgColor={CODEX_COLORS.parchment50}
+                fgColor={CODEX_COLORS.ink900}
                 marginSize={2}
                 title={`Beitritt zum Spielraum ${room?.code ?? "Valenør"}`}
               />

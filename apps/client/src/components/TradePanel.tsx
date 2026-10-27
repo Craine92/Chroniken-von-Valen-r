@@ -10,7 +10,7 @@ export function getCounterOfferTemplate(trade: TradeOffer): CreateTradeOfferRequ
 export function propertyIdentity(index: number) {
   const tile = BOARD_TILES[index]!;
   const group = getPropertyGroup(tile.propertyGroupId);
-  return { tile, label: group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung"), accent: group?.accent ?? (tile.type === "harbor" ? "#76c8d6" : "#d6bd78"), sigil: group?.sigil ?? (tile.type === "harbor" ? "⚓" : "⚙"), size: group?.size ?? BOARD_TILES.filter(field => field.type === tile.type).length };
+  return { tile, label: group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung"), accent: group?.accent ?? (tile.type === "harbor" ? "var(--c-tide-300)" : "var(--accent-strong)"), sigil: group?.sigil ?? (tile.type === "harbor" ? "⚓" : "⚙"), size: group?.size ?? BOARD_TILES.filter(field => field.type === tile.type).length };
 }
 
 export function PropertyLabel({ state, index }: { state: GameState; index: number }) {

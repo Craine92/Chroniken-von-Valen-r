@@ -50,7 +50,7 @@ export function MobileFeedbackToast({ snapshot, onDismiss, onHeightChange }: {
   if (!feedback) return null;
   return (
     <aside ref={ref} className={`mobile-feedback-toast ${snapshot.exiting ? "is-exiting" : ""}`}
-      style={{ "--feedback-accent": feedback.accent ?? "#d8b968" } as CSSProperties}
+      style={{ "--feedback-accent": feedback.accent ?? "var(--accent)" } as CSSProperties}
       role="status" aria-live={feedback.type === "tradeOffer" ? "assertive" : "polite"} aria-atomic="true">
       <span className="mobile-feedback-toast__icon" aria-hidden="true">{feedback.icon ?? "✦"}</span>
       <div className="mobile-feedback-toast__content">

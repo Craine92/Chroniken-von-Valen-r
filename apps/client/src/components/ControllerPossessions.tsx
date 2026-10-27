@@ -63,7 +63,7 @@ export function ControllerPropertyDetails({ state, playerId, connected, tile, on
   const canDevelop = tile.type === "property" && tile.region && schedule;
   const buildAction = own && canDevelop && build.allowed ? { label: `Bauen · ${getEffectiveBuildCost(state, tile)} Gold`, onClick: () => onBuild(SOCKET_EVENTS.propertyBuild, tile.index), disabled: !connected } : undefined;
   const sellAction = own && canDevelop && sell.allowed ? { label: `Verkaufen · +${getEffectiveBuildingSaleValue(state, tile)} Gold`, onClick: () => onBuild(SOCKET_EVENTS.propertySellBuilding, tile.index), disabled: !connected, tone: "secondary" as const } : undefined;
-  return <div className="controller-property-detail has-context-action-bar" style={{ "--property-group-accent": group?.accent ?? "#d6bd78" } as CSSProperties}>
+  return <div className="controller-property-detail has-context-action-bar" style={{ "--property-group-accent": group?.accent ?? "var(--accent-strong)" } as CSSProperties}>
     <article className="property-card controller-detail-card">
       <header><span className="controller-detail-sigil" aria-hidden="true">{group?.sigil ?? (tile.type === "harbor" ? "⚓" : "⚙")}</span><div><h3>{tile.name}</h3><p>{group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung")} · Feld {tile.index}</p></div></header>
       <div className="controller-status-chips"><span>{own ? "Dein Besitz" : owner ? `Besitz: ${owner.name}` : "Frei"}</span>{ownership?.mortgaged && <span className="mortgage-status" title="Belehnt"><b aria-hidden="true">×</b> BELEHNT</span>}{complete && <span>{active ? "SETBONUS AKTIV" : "SETBONUS RUHT"}</span>}</div>

@@ -1,0 +1,213 @@
+/*
+ * Valenør Design-System „Codex“.
+ * Primitive Farben (--c-*) beschreiben die Palette; semantische Tokens (--surface-*, --text-*, --accent-*)
+ * benennen ihre Rolle. Komponenten verwenden bevorzugt die semantischen Tokens.
+ * Farben mit Transparenz: rgb(var(--c-gold-500-rgb) / .35).
+ * Phaser liest dieselben Werte aus src/game/design-tokens.ts; beide Dateien gemeinsam ändern.
+ */
+
+:root {
+  /* Tinte – Flächen */
+  --c-ink-950: #080609;
+  --c-ink-950-rgb: 8 6 9;
+  --c-ink-900: #100c10;
+  --c-ink-900-rgb: 16 12 16;
+  --c-ink-850: #161115;
+  --c-ink-850-rgb: 22 17 21;
+  --c-ink-800: #1d171b;
+  --c-ink-800-rgb: 29 23 27;
+  --c-ink-750: #251d22;
+  --c-ink-750-rgb: 37 29 34;
+  --c-ink-700: #2e252a;
+  --c-ink-700-rgb: 46 37 42;
+  --c-ink-600: #3d3237;
+  --c-ink-600-rgb: 61 50 55;
+  --c-ink-500: #54474c;
+  --c-ink-500-rgb: 84 71 76;
+
+  /* Leder – warme Flächen und Linien */
+  --c-leather-900: #1c140d;
+  --c-leather-900-rgb: 28 20 13;
+  --c-leather-800: #2a1d13;
+  --c-leather-800-rgb: 42 29 19;
+  --c-leather-700: #3b2a1b;
+  --c-leather-700-rgb: 59 42 27;
+  --c-leather-600: #4f3a26;
+  --c-leather-600-rgb: 79 58 38;
+  --c-leather-500: #6b5236;
+  --c-leather-500-rgb: 107 82 54;
+
+  /* Pergament – Text und helle Flächen */
+  --c-parchment-50: #fbf4e2;
+  --c-parchment-50-rgb: 251 244 226;
+  --c-parchment-100: #f1e5c8;
+  --c-parchment-100-rgb: 241 229 200;
+  --c-parchment-200: #e3d3ae;
+  --c-parchment-200-rgb: 227 211 174;
+  --c-parchment-300: #cdbb94;
+  --c-parchment-300-rgb: 205 187 148;
+  --c-parchment-400: #ad9c7d;
+  --c-parchment-400-rgb: 173 156 125;
+  --c-parchment-500: #8d806a;
+  --c-parchment-500-rgb: 141 128 106;
+  --c-parchment-600: #6b6152;
+  --c-parchment-600-rgb: 107 97 82;
+
+  /* Blattgold – der einzige Akzent */
+  --c-gold-200: #fbe6b0;
+  --c-gold-200-rgb: 251 230 176;
+  --c-gold-300: #f2d796;
+  --c-gold-300-rgb: 242 215 150;
+  --c-gold-400: #e3c27a;
+  --c-gold-400-rgb: 227 194 122;
+  --c-gold-500: #c9a14f;
+  --c-gold-500-rgb: 201 161 79;
+  --c-gold-600: #a8823c;
+  --c-gold-600-rgb: 168 130 60;
+  --c-gold-700: #7d5f2b;
+  --c-gold-700-rgb: 125 95 43;
+  --c-gold-800: #4f3c1c;
+  --c-gold-800-rgb: 79 60 28;
+
+  /* Bedeutung – Erfolg, Gefahr, Magie, Wasser */
+  --c-verdigris-300: #9fd8bd;
+  --c-verdigris-300-rgb: 159 216 189;
+  --c-verdigris-500: #5e9b84;
+  --c-verdigris-500-rgb: 94 155 132;
+  --c-verdigris-800: #1e3a30;
+  --c-verdigris-800-rgb: 30 58 48;
+  --c-oxblood-300: #f0a59a;
+  --c-oxblood-300-rgb: 240 165 154;
+  --c-oxblood-400: #d9675c;
+  --c-oxblood-400-rgb: 217 103 92;
+  --c-oxblood-500: #9c3d35;
+  --c-oxblood-500-rgb: 156 61 53;
+  --c-oxblood-800: #3f1a18;
+  --c-oxblood-800-rgb: 63 26 24;
+  --c-arcane-300: #c8b2f0;
+  --c-arcane-300-rgb: 200 178 240;
+  --c-arcane-500: #8a63c9;
+  --c-arcane-500-rgb: 138 99 201;
+  --c-arcane-800: #2e2142;
+  --c-arcane-800-rgb: 46 33 66;
+  --c-tide-300: #9fc7ef;
+  --c-tide-300-rgb: 159 199 239;
+  --c-tide-500: #4f86c2;
+  --c-tide-500-rgb: 79 134 194;
+  --c-tide-800: #1a2c40;
+  --c-tide-800-rgb: 26 44 64;
+
+  /* Spielerfarben (identisch mit PLAYER_COLOR_VALUES) */
+  --c-player-violet: #a16deb;
+  --c-player-violet-rgb: 161 109 235;
+  --c-player-green: #5ec58a;
+  --c-player-green-rgb: 94 197 138;
+  --c-player-red: #dc5f67;
+  --c-player-red-rgb: 220 95 103;
+  --c-player-blue: #5f9ddd;
+  --c-player-blue-rgb: 95 157 221;
+  --c-player-orange: #ed8a3c;
+  --c-player-orange-rgb: 237 138 60;
+  --c-player-cyan: #41d9d2;
+  --c-player-cyan-rgb: 65 217 210;
+
+  /* Rein */
+  --c-white: #ffffff;
+  --c-white-rgb: 255 255 255;
+  --c-black: #000000;
+  --c-black-rgb: 0 0 0;
+
+  /* Semantik: Flächen */
+  --surface-page: var(--c-ink-950);
+  --surface-sunken: var(--c-ink-900);
+  --surface-1: var(--c-ink-850);
+  --surface-2: var(--c-ink-800);
+  --surface-3: var(--c-ink-750);
+  --surface-overlay: rgb(var(--c-ink-900-rgb) / .94);
+  --surface-scrim: rgb(var(--c-black-rgb) / .62);
+
+  /* Semantik: Text */
+  --text-strong: var(--c-parchment-50);
+  --text: var(--c-parchment-100);
+  --text-muted: var(--c-parchment-400);
+  --text-faint: var(--c-parchment-500);
+  --text-on-accent: var(--c-leather-900);
+
+  /* Semantik: Akzent, Linien, Zustände */
+  --accent: var(--c-gold-500);
+  --accent-strong: var(--c-gold-400);
+  --accent-soft: var(--c-gold-300);
+  --accent-deep: var(--c-gold-700);
+  --line: rgb(var(--c-gold-500-rgb) / .22);
+  --line-strong: rgb(var(--c-gold-500-rgb) / .5);
+  --line-quiet: rgb(var(--c-parchment-100-rgb) / .1);
+  --success: var(--c-verdigris-500);
+  --success-text: var(--c-verdigris-300);
+  --danger: var(--c-oxblood-500);
+  --danger-text: var(--c-oxblood-300);
+  --danger-surface: var(--c-oxblood-800);
+  --arcane: var(--c-arcane-500);
+  --focus-ring: var(--c-gold-300);
+
+  /* Typografie */
+  --font-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --font-text: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --fs-2xs: .6875rem;  /* 11 px – nur Mikro-Etiketten auf dem Handy */
+  --fs-xs: .75rem;     /* 12 px */
+  --fs-sm: .875rem;    /* 14 px */
+  --fs-md: 1rem;       /* 16 px – Fließtext Handy */
+  --fs-lg: 1.125rem;   /* 18 px */
+  --fs-xl: 1.375rem;   /* 22 px – Mindestgröße für TV-Text */
+  --fs-2xl: 1.75rem;   /* 28 px */
+  --fs-3xl: 2.25rem;   /* 36 px */
+  --fs-4xl: 3rem;      /* 48 px */
+  --fs-5xl: 4rem;      /* 64 px */
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
+  --lh-body: 1.5;
+  --tracking-caps: .12em;
+  --tracking-display: .04em;
+
+  /* Abstände: 4-px-Raster */
+  --space-0-5: .125rem;
+  --space-1: .25rem;
+  --space-1-5: .375rem;
+  --space-2: .5rem;
+  --space-3: .75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --touch-target: 2.75rem; /* 44 px */
+
+  /* Radien: Codex bleibt kantig */
+  --radius-xs: .125rem;
+  --radius-sm: .25rem;
+  --radius-md: .375rem;
+  --radius-lg: .625rem;
+  --radius-pill: 999px;
+
+  /* Schatten */
+  --shadow-sm: 0 2px 6px rgb(var(--c-black-rgb) / .35);
+  --shadow-md: 0 10px 28px rgb(var(--c-black-rgb) / .45);
+  --shadow-lg: 0 24px 70px rgb(var(--c-black-rgb) / .58);
+  --shadow-inset-gold: inset 0 0 0 1px rgb(var(--c-gold-300-rgb) / .09);
+  --shadow-glow-gold: 0 0 24px rgb(var(--c-gold-500-rgb) / .28);
+  --shadow-button: inset 0 -2px 0 rgb(var(--c-black-rgb) / .25), 0 6px 18px rgb(var(--c-gold-500-rgb) / .22);
+
+  /* Bewegung: gemessen und schwer */
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 420ms;
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --ease-seal: cubic-bezier(.3, 1.4, .5, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-instant: 1ms; --dur-fast: 1ms; --dur-base: 1ms; --dur-slow: 1ms; }
+}

@@ -3,6 +3,7 @@ import { validateBoardTiles, type GameState } from "@valenor/shared";
 import { ValenorBoardScene } from "./scenes/ValenorBoardScene";
 import { ValenorPreloadScene, type PreloadCallbacks } from "./scenes/ValenorPreloadScene";
 import { DEFAULT_BOARD_PRESENTATION_MODE, type BoardPresentationMode } from "./board-presentation";
+import { CODEX_COLORS } from "./design-tokens";
 
 export function createGame(parent: HTMLElement, gameState: GameState, preloadCallbacks: PreloadCallbacks = {}, presentationMode: BoardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE) {
   validateBoardTiles();
@@ -13,7 +14,7 @@ export function createGame(parent: HTMLElement, gameState: GameState, preloadCal
     parent,
     width: parent.clientWidth,
     height: parent.clientHeight,
-    backgroundColor: "#05060c",
+    backgroundColor: CODEX_COLORS.ink950,
     transparent: true,
     scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [preloadScene, scene],

@@ -664,7 +664,7 @@ export function ControllerPage() {
           <header className={`controller-player-bar controller-player-bar--${player.color}`}>
             <PlayerPortrait characterId={activePlayer.characterId} />
             <div><strong>{activePlayer.name}</strong><small>RUNDE {gameState.currentRound} · {activePlayer.dungeon.inDungeon ? "IM KERKER" : gameState.currentPlayerId === player.id ? "AM ZUG" : "BEREIT"}</small></div>
-            <b><i className="valenor-coin" aria-hidden="true">V</i>{activePlayer.gold.toLocaleString("de-DE")}<i className={`controller-connection-dot${connected ? " is-connected" : ""}`} aria-label={connected ? "Verbunden" : "Verbindung getrennt"} /></b>
+            <b><Icon name="gold" className="controller-gold-icon" />{activePlayer.gold.toLocaleString("de-DE")}<i className={`controller-connection-dot${connected ? " is-connected" : ""}`} aria-label={connected ? "Verbunden" : "Verbindung getrennt"} /></b>
           </header>
           {!connected && <p className="controller-reconnecting" role="status">VERBINDUNG WIRD WIEDERHERGESTELLT</p>}
           <QuickGameClockDisplay clock={gameState.quickGameClock} compact />

@@ -168,7 +168,7 @@ function ControllerPropertyShowcase() {
       <section className="controller-card controller-card--started">
         <BrandMark compact />
         <div className="controller-player-bar controller-player-bar--violet">
-          <span aria-hidden="true"><Icon name="figure" /></span><div><small>DEIN GEFÄHRTE</small><strong>{player.name}</strong></div><b><i className="valenor-coin">V</i>{player.gold}</b>
+          <span aria-hidden="true"><Icon name="figure" /></span><div><small>DEIN GEFÄHRTE</small><strong>{player.name}</strong></div><b><Icon name="gold" className="controller-gold-icon" />{player.gold}</b>
         </div>
         <div className="controller-card__intro"><p className="eyebrow">Dein Besitz</p><h1>Reich des Mondhains</h1><p>Verwalte deine Ländereien und ihre Bauwerke.</p></div>
         <section className="ownership-list" id="controller-property">
@@ -196,7 +196,7 @@ function ControllerTurnShowcase() {
       <section className="controller-card controller-card--started">
         <BrandMark compact />
         <div className="controller-player-bar controller-player-bar--violet">
-          <span aria-hidden="true"><Icon name="figure" /></span><div><small>RUNDE 7 · AM ZUG</small><strong>{player.name}</strong></div><b><i className="valenor-coin">V</i>{player.gold} Gold</b>
+          <span aria-hidden="true"><Icon name="figure" /></span><div><small>RUNDE 7 · AM ZUG</small><strong>{player.name}</strong></div><b><Icon name="gold" className="controller-gold-icon" />{player.gold} Gold</b>
         </div>
         <div className="controller-card__intro"><p className="eyebrow">Dein Zug</p><h1>Das Schicksal wartet.</h1><p>Wirf die Runenwürfel und beginne deine Reise.</p></div>
         <div className="controller-gold"><span>DEIN VERMÖGEN</span><strong>1.725</strong><small>Goldstücke</small></div>
@@ -229,7 +229,7 @@ function ControllerFeedbackShowcase({ foreign = false }: { foreign?: boolean }) 
     <main className="controller-page controller-page--active player-theme--violet visual-qa-controller">
       <section className="controller-card controller-card--started">
         <BrandMark compact />
-        <div className="controller-player-bar controller-player-bar--violet"><span aria-hidden="true"><Icon name="figure" /></span><div><small>RUNDE 7 · AM ZUG</small><strong>Philipp</strong></div><b><i className="valenor-coin">V</i>1.725</b></div>
+        <div className="controller-player-bar controller-player-bar--violet"><span aria-hidden="true"><Icon name="figure" /></span><div><small>RUNDE 7 · AM ZUG</small><strong>Philipp</strong></div><b><Icon name="gold" className="controller-gold-icon" />1.725</b></div>
         <MobileTurnNotice currentName={foreign ? "Justine" : "Philipp"} own={!foreign} />
         <MobileTradeNotice proposerName="Justine" />
         <div id="controller-trade"><TradePanel state={state} playerId="p1" connected onCreate={() => undefined} onDecision={() => undefined} /></div>
@@ -259,7 +259,7 @@ function MobileQaShell({ children, active = "action", primary, secondary }: {
       <header className="controller-player-bar controller-player-bar--violet">
         <PlayerPortrait characterId={player.characterId} />
         <div><strong>{player.name}</strong><small>RUNDE 21 · AM ZUG</small></div>
-        <b><i className="valenor-coin">V</i>1.948<i className="controller-connection-dot is-connected" /></b>
+        <b><Icon name="gold" className="controller-gold-icon" />1.948<i className="controller-connection-dot is-connected" /></b>
       </header>
       {children}
       <ControllerQaNav active={active} />
@@ -299,7 +299,7 @@ function MobileFinanceQa() {
   state.pendingPayment = { payerId: "p1", payeeId: "p2", creditorType: "player", reasonType: "rent", amount: 150, reason: "Miete für die Eisenfeste" };
   const callbacks = { onSelectGroup: () => undefined, onBuild: () => undefined, onMortgage: () => undefined, onRedeemAllMortgages: () => undefined };
   return <MobileQaShell active="property" primary={{ label: "Sofort beleihen", onClick: () => undefined }}>
-    <PaymentManagement payment={state.pendingPayment} playerGold={state.players[0]!.gold} hasLegalPaymentAction connected onSettle={() => undefined} autoMortgagePlan={getAutoMortgagePlan(state, "p1")} onAutoMortgage={() => undefined} onDeclareBankruptcy={() => undefined} />
+    <PaymentManagement payment={state.pendingPayment} playerGold={state.players[0]!.gold} hasLegalPaymentAction connected onSettle={() => undefined} autoMortgagePlan={getAutoMortgagePlan(state, "p1")} onAutoMortgage={() => undefined} onDeclareBankruptcy={() => undefined} showActions={false} />
     <ControllerPossessions state={state} playerId="p1" connected {...callbacks} />
   </MobileQaShell>;
 }
@@ -313,7 +313,7 @@ function MobileDungeonPaymentQa() {
   state.propertyOwnerships = [ownership(1, "p1"), ownership(3, "p1")];
   return <MobileQaShell primary={{ label: "SOFORT BELEIHEN", onClick: () => undefined }}>
     <PaymentManagement payment={state.pendingPayment} playerGold={20} hasLegalPaymentAction connected onSettle={() => undefined}
-      autoMortgagePlan={getAutoMortgagePlan(state, "p1")} onAutoMortgage={() => undefined} onDeclareBankruptcy={() => undefined} />
+      autoMortgagePlan={getAutoMortgagePlan(state, "p1")} onAutoMortgage={() => undefined} onDeclareBankruptcy={() => undefined} showActions={false} />
   </MobileQaShell>;
 }
 
@@ -398,7 +398,7 @@ function ControllerImpulseShowcase({ variant = "golden" }: { variant?: "golden" 
   return <main className="controller-page controller-page--active player-theme--violet visual-qa-controller">
     <MobileWorldImpulseToast impulse={state.activeWorldImpulse} />
     <section className="controller-card controller-card--started"><BrandMark compact />
-      <div className="controller-player-bar controller-player-bar--violet"><span aria-hidden="true"><Icon name="figure" /></span><div><small>RUNDE 7</small><strong>Philipp</strong></div><b><i className="valenor-coin">V</i>1.725</b></div>
+      <div className="controller-player-bar controller-player-bar--violet"><span aria-hidden="true"><Icon name="figure" /></span><div><small>RUNDE 7</small><strong>Philipp</strong></div><b><Icon name="gold" className="controller-gold-icon" />1.725</b></div>
       {variant === "live"
         ? <MobileLiveEvents state={state} playerId="p2" />
         : <WorldImpulseDecisionPanel state={state} playerId="p1" connected onChoose={() => undefined} />}

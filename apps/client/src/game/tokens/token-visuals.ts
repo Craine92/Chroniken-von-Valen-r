@@ -1,4 +1,4 @@
-import { BOARD_CELL_SIZE } from "../board-layout";
+import { BOARD_CELL_SIZE, CREST_FIELD_THRESHOLD } from "../board-layout";
 
 export const TOKEN_VISUAL_CONFIG = {
   miniatureScale: 1,
@@ -17,4 +17,19 @@ export const TOKEN_VISUAL_CONFIG = {
 /** Teilen sich Figuren ein Feld, trägt nur die aktive ihr Namensschild; sonst überdecken sich die Schilder. */
 export function showsTokenName(occupants: number, active: boolean): boolean {
   return occupants <= 1 || active;
+}
+
+/**
+ * Wer auf einem Feld vorne steht: die aktive Figur. Ist sie nicht dort und ist das Feld voll (Wappen),
+ * steht die Figur, die als Nächste am Zug ist. Liefert -1, wenn auf einem nicht vollen Feld niemand aktiv ist.
+ */
+export function pickLeadIndex(occupantIds: readonly string[], currentPlayerId: string | undefined, turnOrder: readonly string[]): number {
+  const active = occupantIds.indexOf(currentPlayerId ?? "");
+  if (active >= 0 || occupantIds.length < CREST_FIELD_THRESHOLD) return active;
+  const start = turnOrder.indexOf(currentPlayerId ?? "");
+  for (let step = 1; step <= turnOrder.length; step += 1) {
+    const index = occupantIds.indexOf(turnOrder[(start + step + turnOrder.length) % turnOrder.length]!);
+    if (index >= 0) return index;
+  }
+  return 0;
 }

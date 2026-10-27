@@ -1,6 +1,6 @@
 import Phaser from "phaser";
-import { BOARD_TILES, getPropertyGroupTiles, DUNGEON_TILE_INDEX, MAX_RELICS, RELIC_DEFINITIONS, isRelicArmed, type GameState, type PropertyGroupId, type RegionType } from "@valenor/shared";
-import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, getFieldZones, getTilePlacement, getTileWorldPosition, getTokenSeat, TOKEN_FOOTPRINT, type TokenSeat } from "../board-layout";
+import { BOARD_TILES, getPropertyGroupTiles, DUNGEON_TILE_INDEX, MAX_RELICS, RELIC_DEFINITIONS, isRelicArmed, type GameState, type PlayerCharacterId, type PropertyGroupId, type RegionType } from "@valenor/shared";
+import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, CREST_SIZE, getFieldZones, getTilePlacement, getTileWorldPosition, getTokenSeat, TOKEN_FOOTPRINT, type TokenSeat } from "../board-layout";
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { MortgageOverlayLayer } from "../layers/MortgageOverlayLayer";
 import { PropertyGroupLayer } from "../layers/PropertyGroupLayer";
@@ -16,7 +16,7 @@ import { selectDramaticMoments } from "../living/drama";
 import { BoardTileRenderer } from "../tiles/BoardTileRenderer";
 import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
 import { CARD_DRAW_DURATION_MS, DEFAULT_BOARD_PRESENTATION_MODE, getBoardVisualScale, getCardPresentationKey, getBoardScreenLayout, type BoardPresentationMode } from "../board-presentation";
-import { showsTokenName, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
+import { pickLeadIndex, showsTokenName, TOKEN_VISUAL_CONFIG } from "../tokens/token-visuals";
 import { audioManager } from "../../audio/AudioManager";
 import { deriveMovementStepAudioEvents } from "../../audio/game-audio-events";
 
@@ -43,6 +43,8 @@ export class ValenorBoardScene extends Phaser.Scene {
   private readonly tokenVisuals = new Map<string, Phaser.GameObjects.Container>();
   private readonly tokenNameLabels = new Map<string, Phaser.GameObjects.Container>();
   private readonly tokenRelics = new Map<string, Phaser.GameObjects.Container>();
+  /** Wappen mit Porträt, das auf vollen Feldern statt der Figur steht. */
+  private readonly tokenCrests = new Map<string, Phaser.GameObjects.Container>();
   private relicSignature = "";
   private relicBadgeSize = 24;
   private readonly dungeonMarkers = new Map<string, Phaser.GameObjects.Container>();
@@ -635,6 +637,9 @@ export class ValenorBoardScene extends Phaser.Scene {
       tokenVisual.add(relicBadges);
       this.tokenRelics.set(player.id, relicBadges);
       token.add(tokenVisual);
+      const crest = this.createTokenCrest(player.characterId, color);
+      token.add(crest);
+      this.tokenCrests.set(player.id, crest);
       this.tokens.set(player.id, token);
       this.tokenVisuals.set(player.id, tokenVisual);
       this.tokenNameLabels.set(player.id, nameLabel);
@@ -818,18 +823,62 @@ export class ValenorBoardScene extends Phaser.Scene {
   private getTokenSeatFor(playerId: string, tileIndex: number) {
     const occupants = this.state.players.filter(candidate => candidate.position === tileIndex);
     const index = Math.max(0, occupants.findIndex(candidate => candidate.id === playerId));
-    const activeIndex = occupants.findIndex(candidate => candidate.id === this.state.currentPlayerId);
-    return { seat: getTokenSeat(tileIndex, occupants.length, index, { activeIndex, occupiedByBuilding: this.hasBuilding(tileIndex) }), occupants: occupants.length };
+    return { seat: getTokenSeat(tileIndex, occupants.length, index, { activeIndex: this.getLeadIndex(occupants), occupiedByBuilding: this.hasBuilding(tileIndex) }), occupants: occupants.length };
+  }
+
+  private getLeadIndex(occupants: readonly { id: string }[]): number {
+    return pickLeadIndex(occupants.map(candidate => candidate.id), this.state.currentPlayerId, this.state.turnOrder);
+  }
+
+  /** Rundes Porträt aus dem Figurenbild, einmal je Figur als Textur erzeugt; ohne Bild bleibt nur der farbige Ring. */
+  private getCrestPortraitKey(characterId: PlayerCharacterId): string | undefined {
+    const key = `crest-portrait-${characterId}`;
+    if (this.textures.exists(key)) return key;
+    const asset = getCharacterAsset(characterId);
+    if (!this.textures.exists(asset.key)) return undefined;
+    const source = this.textures.get(asset.key).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    const size = 96, canvas = this.textures.createCanvas(key, size, size);
+    if (!canvas) return undefined;
+    const context = canvas.getContext();
+    context.save();
+    context.beginPath(); context.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2); context.clip();
+    context.fillStyle = "#120f14"; context.fillRect(0, 0, size, size);
+    // Enger Kopfausschnitt aus dem oberen Bildviertel, mittig; die Figuren stehen alle gleich im Bild.
+    const side = source.width * .5;
+    context.drawImage(source, source.width * .25, source.height * .02, side, side, 0, 0, size, size);
+    context.restore();
+    canvas.refresh();
+    return key;
+  }
+
+  private createTokenCrest(characterId: PlayerCharacterId, color: number): Phaser.GameObjects.Container {
+    const radius = CREST_SIZE / 2;
+    const crest = this.add.container(0, 0).setName("token-crest").setVisible(false);
+    crest.add([
+      this.add.circle(1.5, 2.5, radius + 2, 0x000000, .55),
+      this.add.circle(0, 0, radius + 1.5, color, 1),
+      this.add.circle(0, 0, radius - .5, 0x0b0911, 1)
+    ]);
+    const portrait = this.getCrestPortraitKey(characterId);
+    if (portrait) crest.add(this.add.image(0, 0, portrait).setDisplaySize(radius * 2 - 3, radius * 2 - 3));
+    else crest.add(addIconImage(this, 0, 0, "companion", radius * 1.3, color));
+    crest.add(this.add.circle(0, 0, radius + .5, 0x000000, 0).setStrokeStyle(1, 0xf3dc9a, .85));
+    return crest;
   }
 
   /** Weltposition des Figuren-Containers: Die Füße (Sockelmitte) stehen genau auf dem Platz. */
   private getTokenWorldPosition(tileIndex: number, seat: TokenSeat) {
     const field = getTileWorldPosition(tileIndex);
+    if (seat.crest) return { x: field.x + seat.x, y: field.y + seat.y };
     return { x: field.x + seat.x, y: field.y + seat.y - TOKEN_VISUAL_CONFIG.base.centerY * TOKEN_FOOTPRINT.nominalVisualScale * seat.scale };
   }
 
   /** Größe der Figur für ihren Platz; Namensschild und Relikte behalten dabei ihre lesbare Größe. */
   private styleTokenForSeat(playerId: string, seat: TokenSeat, occupants: number): number {
+    // Auf vollen Feldern zeigt der Platz nur das Wappen; die Figur selbst ist dann ausgeblendet.
+    this.tokenCrests.get(playerId)?.setVisible(Boolean(seat.crest)).setScale(seat.crest ? seat.scale / CREST_SIZE : 1);
+    this.tokenVisuals.get(playerId)?.setVisible(!seat.crest);
+    if (seat.crest) return this.tokenVisuals.get(playerId)?.getData("seatScale") ?? 1;
     const scale = TOKEN_FOOTPRINT.nominalVisualScale * seat.scale;
     this.tokenVisuals.get(playerId)?.setData("seatScale", scale);
     const showName = showsTokenName(occupants, playerId === this.state.currentPlayerId);

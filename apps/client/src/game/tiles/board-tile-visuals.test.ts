@@ -68,16 +68,17 @@ test("property groups retain their data but show only the compact group name on 
 
 test("long names use one central two-line wrapping rule", () => {
   assert.equal(getTileTitle("Alter Brunnen"), "ALTER\nBRUNNEN");
-  assert.equal(getTileTitle("Schwarzgrat"), "SCHWARZ\nGRAT");
-  assert.equal(getTileTitle("Sternenlichtung"), "STERNEN\nLICHTUNG");
-  assert.equal(getTileTitle("Knochenpass"), "KNOCHEN\nPASS");
-  assert.equal(getTileTitle("Amethystkrone"), "AMETHYST\nKRONE");
-  assert.equal(getTileTitle("Königsfurt"), "KÖNIGS\nFURT");
-  assert.equal(getTileTitle("Mühlenweg"), "MÜHLEN\nWEG");
+  // Komposita werden mit Trennstrich umbrochen, Mehrwortnamen an der Leerstelle.
+  assert.equal(getTileTitle("Schwarzgrat"), "SCHWARZ-\nGRAT");
+  assert.equal(getTileTitle("Sternenlichtung"), "STERNEN-\nLICHTUNG");
+  assert.equal(getTileTitle("Knochenpass"), "KNOCHEN-\nPASS");
+  assert.equal(getTileTitle("Amethystkrone"), "AMETHYST-\nKRONE");
+  assert.equal(getTileTitle("Königsfurt"), "KÖNIGS-\nFURT");
+  assert.equal(getTileTitle("Mühlenweg"), "MÜHLEN-\nWEG");
   assert.equal(getTileTitle("Abenteuer"), "ABENTEUER");
   assert.equal(getTileTitle("Schicksal"), "SCHICKSAL");
-  assert.equal(getTileTitle("Mondpfad", 7), "MOND\nPFAD");
-  assert.equal(getTileTitle("Windgras", 7), "WIND\nGRAS");
+  assert.equal(getTileTitle("Mondpfad", 7), "MOND-\nPFAD");
+  assert.equal(getTileTitle("Windgras", 7), "WIND-\nGRAS");
   BOARD_TILES.forEach((tile) => assert.ok(getTileTitle(tile.name).split("\n").length <= 2));
 });
 

@@ -3,6 +3,7 @@ import type { GameState } from "@valenor/shared";
 import { WorldStatus } from "../components/WorldStatus";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 import { PlayerPortrait } from "../components/PlayerPortrait";
+import { Icon } from "../components/icons/Icon";
 
 function GoldAmount({ gold }: { gold: number }) {
   const previous = useRef(gold);
@@ -15,13 +16,10 @@ function GoldAmount({ gold }: { gold: number }) {
     const timer = window.setTimeout(() => setDelta(0), 1_800);
     return () => window.clearTimeout(timer);
   }, [gold]);
-  return <b><i className="valenor-coin" aria-hidden="true">V</i>{gold.toLocaleString("de-DE")} <small>Gold</small>{delta !== 0 && <span className={`gold-delta ${delta > 0 ? "is-positive" : "is-negative"}`}>{delta > 0 ? "+" : ""}{delta}</span>}</b>;
+  return <b><Icon name="gold" className="hud-gold-icon" />{gold.toLocaleString("de-DE")} <small>Gold</small>{delta !== 0 && <span className={`gold-delta ${delta > 0 ? "is-positive" : "is-negative"}`}>{delta > 0 ? "+" : ""}{delta}</span>}</b>;
 }
 
 export function GameHud({ gameState }: { gameState: GameState }) {
-  const modeLabel = gameState.config.mode === "quick"
-    ? `Schnelles Abenteuer · ${gameState.config.quickGameDurationMinutes} Min`
-    : "Chroniken-Modus";
   const displayedPlayers = gameState.turnOrder.length
     ? gameState.turnOrder.map((id) => gameState.players.find((player) => player.id === id)!).filter(Boolean)
     : gameState.players;
@@ -29,8 +27,7 @@ export function GameHud({ gameState }: { gameState: GameState }) {
   return (
     <div className={`game-hud${displayedPlayers.length >= 5 ? " game-hud--compact" : ""}`}>
       <div className="game-hud__status">
-        <div><span>RUNDE</span><b>{gameState.currentRound}</b><span>ZUG</span><b>{gameState.turnNumber || "–"}</b></div>
-        <small>{modeLabel}</small>
+        <div><span>RUNDE</span><b>{gameState.currentRound}</b></div>
       </div>
       <QuickGameClockDisplay clock={gameState.quickGameClock} />
       <div className="game-hud__players">
@@ -40,7 +37,8 @@ export function GameHud({ gameState }: { gameState: GameState }) {
             <PlayerPortrait characterId={player.characterId} />
             <div>
               <strong>{player.name}</strong>
-              <span>{player.isBankrupt ? "Zuschauer" : player.dungeon.inDungeon ? `Im Kerker · ${player.dungeon.failedAttempts}/3` : player.type === "computer" ? "NPC" : "Mensch"} · {gameState.propertyOwnerships.filter((entry) => entry.ownerId === player.id).length} Besitz</span>
+              {/* Auf dem TV nur Ausnahmen zeigen; Besitz und Spielertyp stehen auf dem Handy. */}
+              {(player.isBankrupt || player.dungeon.inDungeon) && <span>{player.isBankrupt ? "Zuschauer" : `Im Kerker · ${player.dungeon.failedAttempts}/3`}</span>}
             </div>
             <GoldAmount gold={player.gold} />
           </article>

@@ -89,6 +89,7 @@ export function TurnStatus({ state }: { state: GameState }) {
   const landedRent = landed?.type === "property" && ownership && owner
     ? getEffectiveRent(state, landed, owner.id)
     : undefined;
+  const landedSubtitle = landed ? (landed.type === "property" && landed.propertyGroup ? `${landed.propertyGroup} · ${TYPE_LABELS[landed.type]}` : TYPE_LABELS[landed.type] ?? "") : "";
   return (
     <section className="turn-overlay">
       {state.turnPhase === "dungeonDecision" && (
@@ -107,7 +108,8 @@ export function TurnStatus({ state }: { state: GameState }) {
         <div className="landed-card">
           <small>GELANDET AUF FELD {landed.index}</small>
           <strong>{landed.name}</strong>
-          <span>{landed.type === "property" && landed.propertyGroup ? `${landed.propertyGroup} · ${TYPE_LABELS[landed.type]}` : TYPE_LABELS[landed.type]}</span>
+          {/* Keine Unterzeile, die nur den Titel wiederholt (z. B. „Abenteuer“ auf dem Feld „Abenteuer“). */}
+          {landedSubtitle.toLocaleLowerCase("de") !== landed.name.toLocaleLowerCase("de") && <span>{landedSubtitle}</span>}
           {landed.economy && <b>{getEffectivePurchasePrice(state, landed)} GOLD</b>}
           {landed.type === "property" && landed.region && ownership && ownership.buildingLevel > 0 && (
             <><b>{getBuildingName(landed.region, ownership.buildingLevel)}</b><em>Miete: {landedRent} Gold</em></>

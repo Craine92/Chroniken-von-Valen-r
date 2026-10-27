@@ -76,8 +76,6 @@
 .hud-player { position: relative; }
 .hud-emote {
   position: absolute;
-  text-transform: none;
-  letter-spacing: normal;
   z-index: 3;
   top: 50%;
   left: 3.4rem;
@@ -112,7 +110,8 @@
 .hud-emote--laugh .icon { color: var(--c-verdigris-500); }
 .hud-emote--awe .icon { color: var(--c-arcane-500); }
 /* Der Ausruf darf zweizeilig werden; die Blase ist schmal, weil die Leiste nichts über ihren Rand lässt. */
-.hud-emote em { min-width: 0; color: var(--c-leather-900); font: italic 800 var(--fs-sm)/1.05 var(--font-text); overflow-wrap: anywhere; }
+/* Eigene Schreibung am em: `.hud-player span` vererbt sonst Großbuchstaben und Sperrung. */
+.hud-emote em { min-width: 0; color: var(--c-leather-900); font: italic 800 var(--fs-sm)/1.05 var(--font-text); text-transform: none; letter-spacing: normal; overflow-wrap: anywhere; }
 @media (min-width: 1367px) { .hud-emote em { font-size: var(--fs-md); } .hud-emote .icon { font-size: 2rem; } }
 @keyframes emote-pop {
   0% { opacity: 0; scale: .6; }

@@ -8,7 +8,7 @@ import { BoardArtLayer } from "../layers/BoardArtLayer";
 import { getCharacterAsset, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
 import { fitImage } from "../assets/asset-runtime";
 import { BOARD_DEPTHS } from "../layers/board-depths";
-import { DEFAULT_GRAPHICS_QUALITY, VISUAL_QUALITY, prefersReducedMotion } from "../visual-config";
+import { VISUAL_QUALITY, getGraphicsQuality, prefersReducedMotion } from "../visual-config";
 import { BoardTileRenderer } from "../tiles/BoardTileRenderer";
 import { getBoardTileVisualLayout } from "../tiles/board-tile-layout";
 import { CARD_DRAW_DURATION_MS, DEFAULT_BOARD_PRESENTATION_MODE, LANDING_CONNECTION_DURATION_MS, getBoardVisualScale, getCardPresentationKey, getBoardScreenLayout, type BoardPresentationMode } from "../board-presentation";
@@ -82,7 +82,8 @@ export class ValenorBoardScene extends Phaser.Scene {
   private readonly worldImpulseMarkers: Phaser.GameObjects.Graphics[] = [];
   private lastCelebrationId = "";
   private readonly reducedMotion = prefersReducedMotion();
-  private readonly visualQuality = VISUAL_QUALITY[DEFAULT_GRAPHICS_QUALITY];
+  private readonly graphicsQuality = getGraphicsQuality();
+  private readonly visualQuality = VISUAL_QUALITY[this.graphicsQuality];
   private lastDiagnosticAt = 0;
   private readonly handleResize = () => { this.fitCamera(); this.syncRealmNames(); };
 
@@ -113,6 +114,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.propertyGroupLayer.setExternalFocus(this.externalPropertyGroupFocus);
     this.artLayer.renderRealmDecorations();
     this.artLayer.renderRealmAtmosphere(this.reducedMotion, this.visualQuality.animateAmbient);
+    this.game.canvas.dataset.graphicsQuality = this.graphicsQuality;
     this.drawRealmMiniatures(renderedRealmBackgrounds);
     this.artLayer.renderBoardEffects();
     this.drawCenterTitle();

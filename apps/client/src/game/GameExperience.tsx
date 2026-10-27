@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { BOARD_TILES, RELIC_DEFINITIONS, canBuildOnProperty, getActiveChronicleEvent, getPropertyGroup, getPropertyGroupTiles, type GameState, type PropertyGroupId } from "@valenor/shared";
 import { GameHud } from "./GameHud";
+import { getGraphicsQuality } from "./visual-config";
 import { getCurrentBoardContext } from "./board-context";
 import { RecentActions } from "../components/RecentActions";
 import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
@@ -22,6 +23,7 @@ export const CHRONICLE_NOTICE_DURATION_MS = 3_000;
 export const TAVERN_NOTICE_DURATION_MS = 4_000;
 
 export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE, suppressIntro = false }: { gameState: GameState; onNewChronicle?: () => void; onReturnToLobby?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined; suppressIntro?: boolean | undefined }) {
+  const [graphicsQuality] = useState(getGraphicsQuality);
   const [introVisible, setIntroVisible] = useState(!suppressIntro);
   const [buildingNoticeId, setBuildingNoticeId] = useState<string>();
   const [tradeNoticeId, setTradeNoticeId] = useState<string>();
@@ -141,7 +143,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
     || Boolean(dragonNotice);
 
   return (
-    <main className={`board-page board-page--${boardPresentationMode} ${hasContextEvent ? "has-context-event" : "is-context-idle"}`} data-testid="valenor-game-view" data-context-state={hasContextEvent ? "active" : "idle"}>
+    <main className={`board-page board-page--${boardPresentationMode} ${hasContextEvent ? "has-context-event" : "is-context-idle"}`} data-testid="valenor-game-view" data-context-state={hasContextEvent ? "active" : "idle"} data-quality={graphicsQuality}>
       <aside className="game-sidebar" aria-label="Spielstatus">
         <GameHud gameState={gameState} />
         <RecentActions state={gameState} />

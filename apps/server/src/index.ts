@@ -13,7 +13,7 @@ import {
   type ServerToClientEvents,
   type SocketData
 } from "@valenor/shared";
-import { createControllerUrl, findLocalAddress } from "./network";
+import { createControllerUrl, describeAddressChoice, resolvePublicHost } from "./network";
 import { RoomManager } from "./room-manager";
 import { EconomicAi, getAiEconomyProfile } from "./ai/economic-ai";
 import { chooseNpcTavernAction } from "./game/economy-service";
@@ -464,7 +464,7 @@ app.use(cors());
 app.use(express.json());
 app.get("/api/health", (_request, response) => response.json({ ok: true }));
 app.get("/api/network", (_request, response) =>
-  response.json({ localAddress: findLocalAddress(), clientPort: process.env.PUBLIC_CLIENT_PORT ?? "5173" })
+  response.json({ localAddress: resolvePublicHost(), clientPort: process.env.PUBLIC_CLIENT_PORT ?? "5173" })
 );
 if (process.env.NODE_ENV !== "production") {
   app.post("/api/dev/rooms/:roomCode/expire-quick-clock", (request, response) => {
@@ -1061,7 +1061,8 @@ if (process.env.NODE_ENV === "production") {
 }
 
 httpServer.listen(PORT, "0.0.0.0", () => {
-  const localAddress = findLocalAddress();
+  const localAddress = resolvePublicHost();
   console.log(`Valenør-Server läuft auf http://localhost:${PORT}`);
   console.log(`Im WLAN erreichbar unter http://${localAddress}:${PORT}`);
+  describeAddressChoice().forEach(line => console.log(line));
 });

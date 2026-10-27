@@ -13,4 +13,12 @@ Ausgewählte Ansichten aus `/visual-qa` vor und nach der Umstellung auf das Desi
 | Am Zug (Handy) | ![](controller-turn-390-vorher.jpg) | ![](controller-turn-390-nachher.jpg) |
 | Zahlung (Handy) | ![](mobile-finance-390-vorher.jpg) | ![](mobile-finance-390-nachher.jpg) |
 
+## Nachbesserungen
+
+| Ansicht | Bild |
+| --- | --- |
+| Schnellhandel: Preisbewertung aus Sicht des Betrachters (hier Verkäufer, grün) | ![](mobile-quick-trade-incoming-390-nachher.jpg) |
+| Gesperrte Grundstücke als einklappbare Zeile je Region | ![](quick-trade-blocked-390.jpg) |
+| „Mitwirkende“ in der Lobby (Produktions-Build) | ![](credits-1920.jpg) |
+
 Neu erzeugen: Dev-Server starten (`npm run dev`) und die Szenen unter `http://localhost:5173/visual-qa?scene=<name>` in beiden Breiten aufnehmen.

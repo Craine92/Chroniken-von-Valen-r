@@ -16,6 +16,7 @@ import {
 } from "@valenor/shared";
 import { ControllerActionBar } from "./ControllerActionBar";
 import { PropertyLabel, propertyIdentity } from "./TradePanel";
+import { Icon } from "./icons/Icon";
 
 /** Der Preisbildschirm: ein Grundstück, ein Partner, ein Preis. */
 export interface QuickTradeDraft {
@@ -175,7 +176,7 @@ export function QuickTradePanel({ state, playerId, connected, onQuickCreate, onD
     const fairPrice = direction === "buy" ? getQuickTradeSuggestion(state, tileIndex, playerId)?.fairPrice : undefined;
     return <button type="button" className="quick-trade-tile" key={tileIndex} disabled={!eligibility.allowed} style={{ "--property-group-accent": identity.accent } as CSSProperties}
       onClick={() => { const next = createQuickTradeDraft(state, playerId, tileIndex); if (next) setDraft(next); }}>
-      <span aria-hidden="true">{identity.sigil}</span>
+      <span aria-hidden="true"><Icon name={identity.icon} /></span>
       <span><strong>{BOARD_TILES[tileIndex]?.name}</strong><small>{identity.label}{state.propertyOwnerships.find(entry => entry.tileIndex === tileIndex)?.mortgaged ? " · verpfändet" : ""}</small>{!eligibility.allowed && <small className="quick-trade-tile__blocked">{eligibility.reason}</small>}</span>
       {fairPrice !== undefined && eligibility.allowed && <b>≈ {fairPrice}</b>}
     </button>;

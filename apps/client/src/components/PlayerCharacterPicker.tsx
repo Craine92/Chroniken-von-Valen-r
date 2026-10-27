@@ -1,5 +1,6 @@
 import { PLAYER_CHARACTERS, type Player, type PlayerCharacterId } from "@valenor/shared";
 import { getCharacterAsset } from "../game/assets/asset-manifest";
+import { Icon } from "./icons/Icon";
 
 export function PlayerCharacterPicker({ players, playerId, connected, pending, onSelect }: {
   players: Player[]; playerId: string; connected: boolean; pending: boolean; onSelect: (characterId: PlayerCharacterId) => void;
@@ -14,7 +15,7 @@ export function PlayerCharacterPicker({ players, playerId, connected, pending, o
       return <button key={character.id} type="button" aria-pressed={selected} className="character-choice"
         disabled={!connected || pending || Boolean(occupant)} onClick={() => onSelect(character.id)}>
         <img src={getCharacterAsset(character.id).path} alt="" />
-        <strong>{character.name}</strong><small>{occupant ? `Belegt von ${occupant.name}` : selected ? "✓ Deine Figur" : "Wählen"}</small>
+        <strong>{character.name}</strong><small>{occupant ? `Belegt von ${occupant.name}` : selected ? <><Icon name="check" /> Deine Figur</> : "Wählen"}</small>
       </button>;
     })}</div>
   </section>;

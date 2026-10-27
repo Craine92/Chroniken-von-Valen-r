@@ -1,4 +1,5 @@
 import { getBuildingName, getEffectivePurchasePrice, getEffectiveBuildCost, getEffectiveMortgageRedemptionCost, getMortgageRedemptionCost, getMortgageValue, type BoardTile, type GamePlayerState, type GameState, type PropertyOwnership } from "@valenor/shared";
+import { Icon, tileIcon } from "./icons/Icon";
 
 const TYPE_LABEL = { property: "Land", harbor: "Hafen", utility: "Versorgung" } as const;
 
@@ -14,7 +15,7 @@ export function PropertyCard({ tile, ownership, owner, state, compact = false, c
   if (!tile.economy) return null;
   return (
     <article className={`property-card property-card--${tile.region ?? "neutral"} ${compact ? "property-card--compact" : ""}`}>
-      <div className="property-card__seal" aria-hidden="true"><span>{tile.type === "harbor" ? "⚓" : tile.type === "utility" ? "⚙" : "♜"}</span></div>
+      <div className="property-card__seal" aria-hidden="true"><span><Icon name={tileIcon(tile)} /></span></div>
       <small>{TYPE_LABEL[tile.type as keyof typeof TYPE_LABEL] ?? "Besitz"} · Feld {tile.index}</small>
       <strong>{tile.name}</strong>
       {tile.propertyGroup && <span>{tile.propertyGroup}</span>}
@@ -31,8 +32,8 @@ export function PropertyCard({ tile, ownership, owner, state, compact = false, c
         )}
       </dl>
       <em>{ownership && owner ? `Im Besitz von ${owner.name}` : "Noch unbeansprucht"}</em>
-      {ownership?.mortgaged && <b className="property-card__mortgaged">⛓ Verpfändet</b>}
-      {completeGroup && <b className="property-card__complete">✓ Vollständige Region</b>}
+      {ownership?.mortgaged && <b className="property-card__mortgaged"><Icon name="mortgage" /> Verpfändet</b>}
+      {completeGroup && <b className="property-card__complete"><Icon name="check" /> Vollständige Region</b>}
       {completeGroup && !groupEconomicallyActive && <p className="property-card__warning">Regionsbonus ruht aufgrund einer Hypothek.</p>}
       {ownership && tile.type === "property" && tile.region && tile.economy.rentSchedule && (
         <div className="property-card__rents" aria-label="Mietstaffel">

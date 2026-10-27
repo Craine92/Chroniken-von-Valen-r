@@ -1,4 +1,5 @@
 import { audioManager, type AudioSettings } from "../audio/AudioManager";
+import { type IconName } from "../components/icons/Icon";
 
 export type MobileFeedbackType = "turn" | "tradeOffer" | "tradeAccepted" | "tradeRejected" | "purchase" | "build" | "coin" | "adventure" | "fate" | "double" | "chronicle";
 export interface MobileFeedback {
@@ -9,7 +10,7 @@ export interface MobileFeedback {
   hapticPattern?: number | number[] | undefined;
   duration?: number;
   accent?: string | undefined;
-  icon?: string;
+  icon?: IconName;
   actionLabel?: string;
   action?: () => void;
 }

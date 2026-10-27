@@ -1,4 +1,5 @@
 import { BOARD_TILES, type GameState } from "@valenor/shared";
+import { Icon } from "./icons/Icon";
 
 export function MobileLiveEvents({ state, playerId }: { state: GameState; playerId: string }) {
   const current = state.players.find(player => player.id === state.currentPlayerId);
@@ -10,7 +11,7 @@ export function MobileLiveEvents({ state, playerId }: { state: GameState; player
     <h2>LIVE</h2>
     <div className={`mobile-live__turn player-theme--${current.color}`}>
       <strong>{current.name} ist am Zug</strong>
-      {(roll || landing) && <p>🎲 {roll ? `${roll.die1} + ${roll.die2} = ${roll.total}` : "–"}{landing && <> → <b>{landing.name}</b></>}</p>}
+      {(roll || landing) && <p><Icon name="dice" /> {roll ? `${roll.die1} + ${roll.die2} = ${roll.total}` : "–"}{landing && <> <Icon name="arrow-right" /> <b>{landing.name}</b></>}</p>}
     </div>
     <dl className="mobile-live__facts">
       <div><dt>Weltimpuls</dt><dd>{state.activeWorldImpulse?.title ?? "–"}</dd></div>

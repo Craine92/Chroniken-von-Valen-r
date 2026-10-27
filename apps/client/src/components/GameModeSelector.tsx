@@ -1,4 +1,5 @@
 import type { AiDifficulty, GameConfig, GameMode, QuickGameDuration } from "@valenor/shared";
+import { Icon } from "./icons/Icon";
 
 const DURATIONS: QuickGameDuration[] = [60, 75, 90];
 
@@ -27,7 +28,7 @@ export function GameModeSelector({ config, onChange, disabled }: GameModeSelecto
           disabled={disabled}
           aria-pressed={config.mode === "chronicles"}
         >
-          <span className="mode-card__icon" aria-hidden="true">♜</span>
+          <span className="mode-card__icon" aria-hidden="true"><Icon name="chronicle" /></span>
           <strong>Chroniken-Modus</strong>
           <span>Das vollständige Abenteuer. Erobert Reiche, errichtet Festungen und treibt eure Rivalen in den Ruin.</span>
           <small>OHNE ZEITLIMIT</small>
@@ -39,7 +40,7 @@ export function GameModeSelector({ config, onChange, disabled }: GameModeSelecto
           disabled={disabled}
           aria-pressed={config.mode === "quick"}
         >
-          <span className="mode-card__icon" aria-hidden="true">◷</span>
+          <span className="mode-card__icon" aria-hidden="true"><Icon name="hourglass" /></span>
           <strong>Schnelles Abenteuer</strong>
           <span>Eine kompaktere Chronik für einen Spieleabend. Mehr Tempo, mehr Entscheidungen und ein festes Ende.</span>
           <small>FESTE SPIELDAUER</small>

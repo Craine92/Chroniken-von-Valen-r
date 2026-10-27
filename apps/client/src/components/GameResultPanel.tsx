@@ -1,4 +1,5 @@
 import type { GameState } from "@valenor/shared";
+import { Icon } from "./icons/Icon";
 
 export function GameResultPanel({ gameState, viewerId, onNewChronicle }: {
   gameState: GameState;
@@ -17,7 +18,7 @@ export function GameResultPanel({ gameState, viewerId, onNewChronicle }: {
   return (
     <div className="game-result-panel">
       <p className="eyebrow">{result?.finishReason === "quickGameTimeExpired" ? "Das schnelle Abenteuer endet" : "Die Chronik ist entschieden"}</p>
-      <div className="result-miniature" aria-hidden="true"><i>♞</i><span>✦</span></div>
+      <div className="result-miniature" aria-hidden="true"><i><Icon name="figure" /></i><span><Icon name="magic" /></span></div>
       <h1>{shared ? "Geteilter Sieg" : winners[0]?.name ?? "Valenør"}</h1>
       <strong>{shared ? winners.map((winner) => winner!.name).join(" · ") : "Herrscher von Valenør"}</strong>
       {scores.length > 0 && (

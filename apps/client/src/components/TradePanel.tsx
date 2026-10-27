@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { BOARD_TILES, getCardDefinition, getPropertyGroup, getBuildingName, type CreateTradeOfferRequest, type GameState, type TradeOffer, type PropertyOwnership } from "@valenor/shared";
 import { ControllerActionBar } from "./ControllerActionBar";
+import { Icon, tileIcon } from "./icons/Icon";
 
 export function getCounterOfferTemplate(trade: TradeOffer): CreateTradeOfferRequest {
   const copy = (assets: TradeOffer["offer"]) => ({ ...assets, propertyTileIndices: [...assets.propertyTileIndices], cardIds: [...(assets.cardIds ?? [])], relicIds: [] });
@@ -10,14 +11,14 @@ export function getCounterOfferTemplate(trade: TradeOffer): CreateTradeOfferRequ
 export function propertyIdentity(index: number) {
   const tile = BOARD_TILES[index]!;
   const group = getPropertyGroup(tile.propertyGroupId);
-  return { tile, label: group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung"), accent: group?.accent ?? (tile.type === "harbor" ? "var(--c-tide-300)" : "var(--accent-strong)"), sigil: group?.sigil ?? (tile.type === "harbor" ? "⚓" : "⚙"), size: group?.size ?? BOARD_TILES.filter(field => field.type === tile.type).length };
+  return { tile, label: group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung"), accent: group?.accent ?? (tile.type === "harbor" ? "var(--c-tide-300)" : "var(--accent-strong)"), icon: tileIcon(tile), size: group?.size ?? BOARD_TILES.filter(field => field.type === tile.type).length };
 }
 
 export function PropertyLabel({ state, index }: { state: GameState; index: number }) {
-  const { tile, label, sigil, size } = propertyIdentity(index);
+  const { tile, label, icon, size } = propertyIdentity(index);
   const ownership = state.propertyOwnerships.find(entry => entry.tileIndex === index);
   const owner = state.players.find(player => player.id === ownership?.ownerId);
-  return <><span className="trade-property__sigil" aria-hidden="true">{sigil}</span><span className="trade-property__identity"><strong>{tile.name}</strong><small>{label} · {size}er-Gruppe</small><span>Besitz: {owner?.name ?? "Frei"}</span><span>{ownership?.buildingLevel && tile.region ? `Baustufe ${ownership.buildingLevel} · ${getBuildingName(tile.region, ownership.buildingLevel)}` : "Unbebaut"}{ownership?.mortgaged ? " · Belehnt / verpfändet" : ""}</span></span></>;
+  return <><span className="trade-property__sigil" aria-hidden="true"><Icon name={icon} /></span><span className="trade-property__identity"><strong>{tile.name}</strong><small>{label} · {size}er-Gruppe</small><span>Besitz: {owner?.name ?? "Frei"}</span><span>{ownership?.buildingLevel && tile.region ? `Baustufe ${ownership.buildingLevel} · ${getBuildingName(tile.region, ownership.buildingLevel)}` : "Unbebaut"}{ownership?.mortgaged ? " · Belehnt / verpfändet" : ""}</span></span></>;
 }
 
 function Assets({ state, assets, onRemoveProperty, onRemoveCard }: {
@@ -26,9 +27,9 @@ function Assets({ state, assets, onRemoveProperty, onRemoveCard }: {
   onRemoveCard?: (id: string) => void;
 }) {
   return <div className="trade-assets">
-    {assets.gold > 0 && <span className="trade-gold">✦ {assets.gold} Gold</span>}
+    {assets.gold > 0 && <span className="trade-gold"><Icon name="gold" /> {assets.gold} Gold</span>}
     {assets.propertyTileIndices.map(index => onRemoveProperty ? <button type="button" className="trade-property trade-selected-remove" key={index} style={{ "--property-group-accent": propertyIdentity(index).accent } as CSSProperties} onClick={() => onRemoveProperty(index)}><PropertyLabel state={state} index={index} /><b aria-hidden="true">×</b></button> : <div className="trade-property" key={index} style={{ "--property-group-accent": propertyIdentity(index).accent } as CSSProperties}><PropertyLabel state={state} index={index} /></div>)}
-    {(assets.cardIds ?? []).map(cardId => onRemoveCard ? <button type="button" className="trade-held-card trade-selected-remove" key={cardId} onClick={() => onRemoveCard(cardId)}>▤ {getCardDefinition(cardId).title}<b aria-hidden="true">×</b></button> : <span className="trade-held-card" key={cardId}>▤ {getCardDefinition(cardId).title}</span>)}
+    {(assets.cardIds ?? []).map(cardId => onRemoveCard ? <button type="button" className="trade-held-card trade-selected-remove" key={cardId} onClick={() => onRemoveCard(cardId)}><Icon name="card" /> {getCardDefinition(cardId).title}<b aria-hidden="true">×</b></button> : <span className="trade-held-card" key={cardId}><Icon name="card" /> {getCardDefinition(cardId).title}</span>)}
     {assets.gold === 0 && assets.propertyTileIndices.length === 0 && !assets.cardIds?.length && <span className="trade-empty">Keine Objekte ausgewählt</span>}
   </div>;
 }
@@ -38,7 +39,7 @@ function PropertyOptions({ state, properties, selected, onToggle }: { state: Gam
   return <div className="trade-property-options">{groups.map(label => {
     const members = properties.filter(entry => propertyIdentity(entry.tileIndex).label === label);
     const visual = propertyIdentity(members[0]!.tileIndex);
-    return <details className="trade-region" key={label} style={{ "--property-group-accent": visual.accent } as CSSProperties}><summary><span aria-hidden="true">{visual.sigil}</span> {label} ({members.length})</summary>{members.map(entry => <label className={`trade-property${selected.includes(entry.tileIndex) ? " is-selected" : ""}`} key={entry.tileIndex}><input type="checkbox" checked={selected.includes(entry.tileIndex)} onChange={() => onToggle(entry.tileIndex)} /><PropertyLabel state={state} index={entry.tileIndex} /><span className="trade-property__check" aria-hidden="true">{selected.includes(entry.tileIndex) ? "✓" : "+"}</span></label>)}</details>;
+    return <details className="trade-region" key={label} style={{ "--property-group-accent": visual.accent } as CSSProperties}><summary><span aria-hidden="true"><Icon name={visual.icon} /></span> {label} ({members.length})</summary>{members.map(entry => <label className={`trade-property${selected.includes(entry.tileIndex) ? " is-selected" : ""}`} key={entry.tileIndex}><input type="checkbox" checked={selected.includes(entry.tileIndex)} onChange={() => onToggle(entry.tileIndex)} /><PropertyLabel state={state} index={entry.tileIndex} /><span className="trade-property__check" aria-hidden="true"><Icon name={selected.includes(entry.tileIndex) ? "check" : "plus"} /></span></label>)}</details>;
   })}{properties.length === 0 && <p className="trade-empty">Keine Grundstücke vorhanden.</p>}</div>;
 }
 
@@ -138,7 +139,7 @@ export function TradePanel({ state, playerId, connected, onCreate, onDecision, d
       <div className="trade-asset-tabs" role="tablist">{tabs.map(tab => <button type="button" role="tab" aria-selected={currentTab === tab} key={tab} onClick={() => setAssetTab(tab)}>{({ gold: "Gold", properties: "Grundstücke", cards: "Karten" })[tab]}</button>)}</div>
       {currentTab === "gold" && <label>Gold<input type="number" aria-label={giving ? "Du gibst Gold" : "Du erhältst Gold"} inputMode="numeric" min="0" step="1" placeholder="0" value={giving ? offerGold : requestGold} onChange={event => giving ? setOfferGold(normalizeGold(event.target.value)) : setRequestGold(normalizeGold(event.target.value))} /></label>}
       {currentTab === "properties" && <PropertyOptions state={state} properties={properties} selected={selectedProperties} onToggle={index => giving ? toggle(offered, index, setOffered) : toggle(requested, index, setRequested)} />}
-      {currentTab === "cards" && <div className="trade-card-options">{cards.map(held => <label className="trade-held-option" key={held.cardId}><input type="checkbox" checked={selectedCards.includes(held.cardId)} onChange={() => giving ? toggle(offeredCards, held.cardId, setOfferedCards) : toggle(requestedCards, held.cardId, setRequestedCards)} />▤ {getCardDefinition(held.cardId).title}</label>)}</div>}
+      {currentTab === "cards" && <div className="trade-card-options">{cards.map(held => <label className="trade-held-option" key={held.cardId}><input type="checkbox" checked={selectedCards.includes(held.cardId)} onChange={() => giving ? toggle(offeredCards, held.cardId, setOfferedCards) : toggle(requestedCards, held.cardId, setRequestedCards)} /><Icon name="card" /> {getCardDefinition(held.cardId).title}</label>)}</div>}
     </section>;
   };
   const openPicker = (side: "offer" | "request") => {

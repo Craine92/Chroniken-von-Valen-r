@@ -42,6 +42,7 @@ import { PlayerCharacterPicker } from "../components/PlayerCharacterPicker";
 import { PlayerPortrait } from "../components/PlayerPortrait";
 import { MobileWorldImpulseToast, WorldImpulseDecisionPanel } from "../components/WorldImpulseUi";
 import { ControllerActionBar, type ControllerAction } from "../components/ControllerActionBar";
+import { Icon, dieIcon } from "../components/icons/Icon";
 
 export { resolveRoomGameState } from "../lib/authoritative-game-state";
 
@@ -59,10 +60,10 @@ export function TavernDecisionPanel({ tavern, connected, onChoose, showActions =
     <small>TAVERNE AM WELTENWEG</small>
     {tavern.status === "decision" ? <><h2>Der Weltenweg-Pott</h2><p>Im Pott liegen</p><strong>{tavern.pot} GOLD</strong><p>Sicher mitnehmen oder alles aufs Spiel setzen?</p>
       {showActions && <><button type="button" className="controller-primary-action" disabled={!connected} onClick={() => onChoose("take")}>{tavern.pot} GOLD NEHMEN</button>
-      <button type="button" className="controller-tavern__risk" disabled={!connected} onClick={() => onChoose("gamble")}>🎲 DOPPELT ODER NIX</button></>}
+      <button type="button" className="controller-tavern__risk" disabled={!connected} onClick={() => onChoose("gamble")}><Icon name="dice" /> DOPPELT ODER NIX</button></>}
       <p className="controller-tavern__odds">1–3: kein Gewinn · 4–6: doppelter Pott</p></>
-      : tavern.status === "rolling" ? <><h2>Doppelt oder Nix!</h2><span className="tavern-die tavern-die--rolling" aria-label="Tavernenwürfel rollt">⚄</span><p>{tavern.pot} Gold stehen auf dem Spiel.</p></>
-        : <><h2>{tavern.choice === "take" ? "Pott gesichert!" : tavern.payout ? "DOPPELT!" : "VERZOCKT!"}</h2>{tavern.die && <span className="tavern-die" aria-label={`Tavernenwürfel ${tavern.die}`}>{["","⚀","⚁","⚂","⚃","⚄","⚅"][tavern.die]}</span>}
+      : tavern.status === "rolling" ? <><h2>Doppelt oder Nix!</h2><span className="tavern-die tavern-die--rolling" aria-label="Tavernenwürfel rollt"><Icon name="dice" /></span><p>{tavern.pot} Gold stehen auf dem Spiel.</p></>
+        : <><h2>{tavern.choice === "take" ? "Pott gesichert!" : tavern.payout ? "DOPPELT!" : "VERZOCKT!"}</h2>{tavern.die && <span className="tavern-die" aria-label={`Tavernenwürfel ${tavern.die}`}><Icon name={dieIcon(tavern.die)} /></span>}
           <strong>{tavern.payout ? `+${tavern.payout} GOLD` : `${tavern.pot} GOLD`}</strong>{!tavern.payout && <p>Der Pott bleibt bei {tavern.pot} Gold.</p>}</>}
   </section>;
 }
@@ -671,7 +672,7 @@ export function ControllerPage() {
           <div id="controller-action" hidden={controllerTab !== "action"}>
           {!isCurrent && !ownWorldImpulseDecision && <MobileLiveEvents state={gameState} playerId={player.id} />}
           {ownWorldImpulseDecision && <WorldImpulseDecisionPanel state={gameState} playerId={player.id} connected={connected} onChoose={chooseWorldImpulse} showActions={false} />}
-          <div className="controller-divider"><span>✦</span></div>
+          <div className="controller-divider"><span><Icon name="magic" /></span></div>
           {isCurrent && gameState.turnPhase === "dungeonDecision" ? (
             <DungeonDecisionPanel
               failedAttempts={activePlayer.dungeon.failedAttempts}
@@ -710,8 +711,8 @@ export function ControllerPage() {
               {isCurrent && gameState.turnPhase === "dungeonRolling" && <p className="dungeon-fate-copy">Die Würfel entscheiden über deine Freiheit …</p>}
               {isCurrent && gameState.lastDiceRoll && !canRoll && (
                 <div className="personal-turn-result" aria-label="Letztes Würfelergebnis">
-                  <span>🎲 {gameState.lastDiceRoll.die1} + {gameState.lastDiceRoll.die2} = <strong>{gameState.lastDiceRoll.total}</strong></span>
-                  {landed && <span>→ <strong>{landed.name}</strong></span>}
+                  <span><Icon name="dice" /> {gameState.lastDiceRoll.die1} + {gameState.lastDiceRoll.die2} = <strong>{gameState.lastDiceRoll.total}</strong></span>
+                  {landed && <span><Icon name="arrow-right" /> <strong>{landed.name}</strong></span>}
                   {landed?.type === "dungeon" && !activePlayer.dungeon.inDungeon && <span>Nur zu Besuch · Du bist frei.</span>}
                 </div>
               )}
@@ -740,10 +741,10 @@ export function ControllerPage() {
           <div id="controller-trade" hidden={controllerTab !== "trade"}><TradeTab state={gameState} playerId={player.id} connected={connected && ["waitingForRoll", "waitingForEndTurn"].includes(gameState.turnPhase)} onCreate={createTrade} onQuickCreate={createQuickTrade} onDecision={decideTrade} quickIntent={quickTradeIntent} onQuickIntentHandled={() => setQuickTradeIntent(undefined)} /></div>
           <div hidden={controllerTab !== "journal"}><ControllerJournal state={gameState} playerId={player.id} /></div>
           <nav className="controller-nav" aria-label="Controller-Bereiche">
-            <a href="#controller-action" aria-current={controllerTab === "action" ? "page" : undefined}><span>✦</span>Aktion</a>
-            <a href="#controller-property" aria-current={controllerTab === "property" ? "page" : undefined}><span>♜</span>Besitz</a>
-            <a href="#controller-trade" aria-current={controllerTab === "trade" ? "page" : undefined}><span>◇</span>Handel{incomingTradeCount > 0 && <b className="controller-trade-badge" aria-label={`${incomingTradeCount} offene Handelsangebote`}>{incomingTradeCount}</b>}</a>
-            <a href="#controller-journal" aria-current={controllerTab === "journal" ? "page" : undefined}><span>☷</span>Journal</a>
+            <a href="#controller-action" aria-current={controllerTab === "action" ? "page" : undefined}><span><Icon name="dice" /></span>Aktion</a>
+            <a href="#controller-property" aria-current={controllerTab === "property" ? "page" : undefined}><span><Icon name="property" /></span>Besitz</a>
+            <a href="#controller-trade" aria-current={controllerTab === "trade" ? "page" : undefined}><span><Icon name="trade" /></span>Handel{incomingTradeCount > 0 && <b className="controller-trade-badge" aria-label={`${incomingTradeCount} offene Handelsangebote`}>{incomingTradeCount}</b>}</a>
+            <a href="#controller-journal" aria-current={controllerTab === "journal" ? "page" : undefined}><span><Icon name="journal" /></span>Journal</a>
           </nav>
           {controllerTab === "action" && <ControllerActionBar primary={primaryAction} secondary={secondaryAction} />}
           {error && <p className="form-error" role="alert">{error}</p>}
@@ -769,15 +770,15 @@ export function ControllerPage() {
 
         {room?.phase === "lobby" && <PlayerColorPicker players={room.players} playerId={player.id} connected={connected} pending={colorPending} onSelect={chooseColor} />}
         {room?.phase === "lobby" && <><PlayerCharacterPicker players={room.players} playerId={player.id} connected={connected} pending={colorPending} onSelect={chooseCharacter} />
-          <button className="lobby-ready" type="button" disabled={!connected || colorPending} aria-pressed={player.ready} onClick={toggleReady}>{player.ready ? "✓ BEREIT" : "BEREIT"}</button></>}
-        <div className="controller-divider"><span>✦</span></div>
+          <button className="lobby-ready" type="button" disabled={!connected || colorPending} aria-pressed={player.ready} onClick={toggleReady}>{player.ready ? <><Icon name="check" /> BEREIT</> : "BEREIT"}</button></>}
+        <div className="controller-divider"><span><Icon name="magic" /></span></div>
         <button
           className={`magic-button magic-button--${player.color} ${signalSent ? "is-casting" : ""}`}
           type="button"
           onClick={sendMagicSignal}
           disabled={!connected}
         >
-          <span className="magic-button__icon" aria-hidden="true">✦</span>
+          <span className="magic-button__icon" aria-hidden="true"><Icon name="magic" /></span>
           <span>{signalSent ? "Signal gesendet" : "Magisches Signal senden"}</span>
         </button>
         <p className="controller-hint">Dein Signal erscheint auf dem gemeinsamen Bildschirm.</p>

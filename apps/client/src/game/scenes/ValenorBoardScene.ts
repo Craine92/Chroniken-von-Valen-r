@@ -22,7 +22,9 @@ function getMovementSignature(state: GameState): string {
 }
 
 import { PLAYER_COLOR_VALUES as PLAYER_COLORS, PLAYER_CHARACTERS } from "@valenor/shared";
-import { CODEX_FONTS } from "../design-tokens";
+import { CODEX_FONTS, codexColor } from "../design-tokens";
+import { addIconImage, type BoardIconName } from "../icon-textures";
+import { RELIC_ICONS } from "../../components/icons/Icon";
 
 const REGION_TRAIL: Record<RegionType, number> = {
   elves: 0xbd8cff,
@@ -487,7 +489,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   }
 
   private drawCardDecks() {
-    const createDeck = (x: number, label: string, kind: "adventure" | "fate", glyph: string) => {
+    const createDeck = (x: number, label: string, kind: "adventure" | "fate", glyph: BoardIconName) => {
       const asset = kind === "adventure" ? VALENOR_ASSETS.cards.adventureFrame : VALENOR_ASSETS.cards.fateFrame;
       const deck = this.add.container(x, 78).setName(`deck-${kind}`).setDepth(BOARD_DEPTHS.decorations + 4).setRotation(x < 0 ? -.035 : .035);
       deck.add(this.add.ellipse(7, 13, 138, 165, 0x000000, .16));
@@ -505,14 +507,14 @@ export class ValenorBoardScene extends Phaser.Scene {
         if(!offset)card.setY(-1.5);
         deck.add(card);
       }
-      const symbol = this.add.text(0, -4, glyph, { color: "#62471f", fontFamily: CODEX_FONTS.display, fontSize: "32px" }).setOrigin(.5);
+      const symbol = addIconImage(this, 0, -4, glyph, 36, codexColor("leather600"));
       const title = this.add.text(0, 27, label, { color: "#352315", fontFamily: CODEX_FONTS.display, fontSize: "12px", fontStyle: "bold" }).setOrigin(.5).setResolution(2);
       deck.add([symbol, title]);
       this.cardDecks.set(kind,deck);
       return deck;
     };
-    createDeck(-390, "ABENTEUER", "adventure", "✦");
-    createDeck(390, "SCHICKSAL", "fate", "☾");
+    createDeck(-390, "ABENTEUER", "adventure", "adventure");
+    createDeck(390, "SCHICKSAL", "fate", "fate");
   }
 
   private resetCardDecks() {
@@ -560,7 +562,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const baseLower = this.add.ellipse(0, 13, 44, 12, 0x050507, .92);
       const baseOuter = this.add.ellipse(0, 10, TOKEN_VISUAL_CONFIG.base.outerWidth, TOKEN_VISUAL_CONFIG.base.outerHeight, 0x15151a, 1).setStrokeStyle(4, color, 1);
       const baseInner = this.add.ellipse(0, 7, TOKEN_VISUAL_CONFIG.base.innerWidth, TOKEN_VISUAL_CONFIG.base.innerHeight, color, .94).setStrokeStyle(2, 0xffedbd, .9);
-      const baseRune = this.add.text(0, 5, "ᚱ", { color: "#fff1c7", fontSize: "9px", fontFamily: CODEX_FONTS.display }).setOrigin(.5);
+      const baseRune = addIconImage(this, 0, 5, "rune", 11, codexColor("parchment50"));
       const miniatureAsset = getCharacterAsset(player.characterId);
       const miniatureVisual = this.add.container(0, 0).setName("token-character");
       if (miniatureAsset && this.artLayer?.hasAsset(miniatureAsset)) {
@@ -610,7 +612,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       bars.lineStyle(2, 0xc56464, 0.95);
       bars.strokeRoundedRect(-14, -20, 28, 32, 4);
       [-7, 0, 7].forEach((x) => bars.lineBetween(x, -18, x, 10));
-      const chain = this.add.text(0, -28, "⛓", { color: "#d88b85", fontSize: "12px" }).setOrigin(0.5);
+      const chain = addIconImage(this, 0, -28, "dungeon", 15, codexColor("oxblood300"));
       dungeonMarker.add([bars, chain]);
       const tokenVisual = this.add.container(0, 0).setName("token-visual");
       tokenVisual.add([pointer, shadowSoft, shadowCore, glow, baseLower, baseOuter, baseInner, baseRune, miniatureVisual, dungeonMarker, activeRing, nameLabel]);
@@ -662,7 +664,7 @@ export class ValenorBoardScene extends Phaser.Scene {
         const frame = this.add.circle(0, 0, size / 2 + 1, 0x0b0911, .96).setStrokeStyle(1, 0xd8b968, .85);
         const asset = RELIC_ASSETS[id];
         const icon = this.textures.exists(asset.key) ? fitImage(this.add.image(0, 0, asset.key), size - 3, size - 3, "contain") :
-          this.add.text(0, 0, RELIC_DEFINITIONS[id].symbol, { color: "#f1d99d", fontSize: `${size * .7}px` }).setOrigin(.5);
+          addIconImage(this, 0, 0, RELIC_ICONS[id] as BoardIconName, size * .7, codexColor("gold300"));
         badge.add([shadow, frame, icon]);
         row.add(badge); iconCount++;
       });
@@ -826,20 +828,20 @@ export class ValenorBoardScene extends Phaser.Scene {
       const glow = this.add.circle(badgeX, badgeY, 14, PLAYER_COLORS[owner.color], .28);
       const banner = this.add.rectangle(badgeX, badgeY, 28, 21, 0x09090c, .96)
         .setStrokeStyle(3, PLAYER_COLORS[owner.color], 1);
-      const initials = owner.name.trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "✦";
+      const initials = owner.name.trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "V";
       const rune = this.add.text(badgeX, badgeY, initials, { color: "#fff3cf", fontFamily: CODEX_FONTS.text, fontSize: "10px", fontStyle: "bold", stroke: "#080709", strokeThickness: 2 }).setOrigin(.5);
       if(ownership.mortgaged)marker.add(this.add.rectangle(0,0,place.width-9,place.height-9,0x000000,.28).setName("mortgage-shade"));
       marker.add([ownershipFrame, strip, glow, banner, rune]);
       const group = BOARD_TILES[ownership.tileIndex]?.propertyGroup;
       if(group && getPropertyGroupTiles(group).every(tile=>this.state.propertyOwnerships.some(entry=>entry.tileIndex===tile.index && entry.ownerId===owner.id))) {
         const landscape=place.side === "left" || place.side === "right";
-        marker.add(this.add.text(badgeX+35,landscape?19:26,"♛",{color:"#f1d99d",fontSize:landscape?"10px":"16px",stroke:`#${PLAYER_COLORS[owner.color].toString(16).padStart(6,"0")}`,strokeThickness:2}).setOrigin(.5).setName("complete-group-crown"));
+        marker.add(addIconImage(this,badgeX+35,landscape?19:26,"crown",landscape?13:19,codexColor("gold300")).setName("complete-group-crown"));
       }
       if (ownership.mortgaged) {
         glow.setFillStyle(0x292a31, 0.65);
         banner.setAlpha(.85);
         rune.setAlpha(.9);
-        marker.add(this.add.text(badgeX-3, 24, "⛓", { color: "#eee3cc", fontSize: "14px",stroke:"#080709",strokeThickness:2 }).setOrigin(0.5).setName("mortgage-lock"));
+        marker.add(addIconImage(this, badgeX-3, 24, "mortgage", 16, codexColor("parchment100")).setName("mortgage-lock"));
       }
       this.ownershipMarkers.set(ownership.tileIndex, marker);
     });
@@ -1011,7 +1013,7 @@ export class ValenorBoardScene extends Phaser.Scene {
           visual.add([shadow,glow,outline,sprite]);
           if (!this.reducedMotion) this.tweens.add({ targets: [sprite,outline,glow], y: "-=5", duration: 950, yoyo: true, repeat: -1, ease: "Sine.InOut" });
         } else {
-          visual.add([shadow, glow, this.add.text(0, -16, "🐉", { color: "#f5bd6c", fontSize: "40px" }).setOrigin(.5)]);
+          visual.add([shadow, glow, addIconImage(this, 0, -16, "dragon", 46, codexColor("gold400"))]);
         }
       });
       if (import.meta.env.DEV && this.dragonSprite) {
@@ -1161,7 +1163,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const target = getTileWorldPosition(DUNGEON_TILE_INDEX);
     const sourceRune = this.add.circle(source.x, source.y, 34, 0x8f2530, 0.12).setDepth(BOARD_DEPTHS.effects).setStrokeStyle(3, 0xd15f63, 0.7);
     const targetRune = this.add.circle(target.x, target.y, 38, 0x5b1823, 0.18).setDepth(BOARD_DEPTHS.effects).setStrokeStyle(3, 0xc6535c, 0.8);
-    const chains = this.add.text(source.x, source.y - 34, "⛓", { color: "#d27372", fontSize: "24px" }).setOrigin(0.5).setDepth(BOARD_DEPTHS.effects + 1);
+    const chains = addIconImage(this, source.x, source.y - 34, "dungeon", 30, codexColor("oxblood400")).setDepth(BOARD_DEPTHS.effects + 1);
     this.tweens.add({ targets: [sourceRune, targetRune], alpha: 0.85, scale: 1.35, duration: 480, yoyo: true, repeat: 1 });
     this.tweens.add({
       targets: token,
@@ -1195,7 +1197,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const rollVisual=this.add.container(0,0).setName("dice-roll-presentation").setDepth(BOARD_DEPTHS.ui);
     this.temporaryVisuals.add(rollVisual);
     const cup = this.add.circle(0, 10, 112, 0x120f0c, .76).setDepth(BOARD_DEPTHS.ui).setStrokeStyle(3, die1 === die2 ? 0xf1d89b : 0x8f7548, .72);
-    const rune = this.add.text(0, 10, "ᚠ  ·  ᚱ  ·  ᛟ  ·  ᚷ", { color: die1 === die2 ? "#f5d685" : "#85704b", fontFamily: CODEX_FONTS.display, fontSize: "13px", letterSpacing: 5 }).setOrigin(.5).setDepth(BOARD_DEPTHS.ui + 1);
+    const rune = this.add.text(0, 10, "VALENØR", { color: die1 === die2 ? "#f5d685" : "#85704b", fontFamily: CODEX_FONTS.display, fontSize: "13px", letterSpacing: 5 }).setOrigin(.5).setDepth(BOARD_DEPTHS.ui + 1);
     const first = this.createDie(die1, -62);
     const second = this.createDie(die2, 62);
     rollVisual.add([cup,rune,first,second]);

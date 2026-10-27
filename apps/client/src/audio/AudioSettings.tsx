@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { audioManager, type AudioOutputRole, type AudioSettings as Settings } from "./AudioManager";
+import { Icon } from "../components/icons/Icon";
 
 function VolumeControl({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   const percent = Math.round(value * 100);
@@ -21,7 +22,7 @@ export function AudioSettingsPanel({ role = "board" }: { role?: AudioOutputRole 
   return (
     <div className={`audio-settings ${open ? "is-open" : ""}`}>
       <button className="audio-settings__trigger" type="button" aria-expanded={open} aria-label="Audioeinstellungen" data-audio-cue={open ? "UI_CANCEL" : "UI_CLICK"} onClick={() => setOpen((current) => !current)}>
-        <span aria-hidden="true">{settings.masterMuted ? "♩" : "♫"}</span>
+        <Icon name={settings.masterMuted ? "mute" : "music"} />
       </button>
       {open && (
         <aside className="audio-settings__panel" aria-label="Audio">

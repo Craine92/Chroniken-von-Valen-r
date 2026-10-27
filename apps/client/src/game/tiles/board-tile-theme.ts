@@ -1,4 +1,5 @@
 import { getPropertyGroup, type BoardTile, type BoardTileType, type RegionType } from "@valenor/shared";
+import { GROUP_ICONS, type IconName } from "../../components/icons/Icon";
 
 export type TileVisualVariant = BoardTileType;
 
@@ -18,14 +19,14 @@ export interface TilePalette {
 export interface PropertyGroupVisual {
   accent: number;
   cssAccent: string;
-  sigil: string;
+  icon: IconName;
   size: 2 | 3;
 }
 
 const FALLBACK_GROUP_VISUAL: PropertyGroupVisual = {
   accent: 0xd6bd78,
   cssAccent: "#d6bd78",
-  sigil: "◇",
+  icon: "property",
   size: 3
 };
 
@@ -185,7 +186,7 @@ export function getPropertyGroupVisual(propertyGroup: string | undefined): Prope
   return {
     accent: Number.parseInt(definition.accent.slice(1), 16),
     cssAccent: definition.accent,
-    sigil: definition.sigil,
+    icon: GROUP_ICONS[definition.id],
     size: definition.size
   };
 }

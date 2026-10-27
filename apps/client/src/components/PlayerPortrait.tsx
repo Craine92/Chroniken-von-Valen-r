@@ -1,11 +1,12 @@
 import { useState } from "react";
 import type { PlayerCharacterId } from "@valenor/shared";
 import { getCharacterAsset } from "../game/assets/asset-manifest";
+import { Icon } from "./icons/Icon";
 
 export function PlayerPortrait({ characterId }: { characterId: PlayerCharacterId }) {
   const [failed, setFailed] = useState<string>();
   const asset = getCharacterAsset(characterId);
   return <span className="hud-player__portrait" aria-hidden="true">
-    {failed !== asset.key ? <img src={asset.path} alt="" onError={() => setFailed(asset.key)} /> : "✦"}
+    {failed !== asset.key ? <img src={asset.path} alt="" onError={() => setFailed(asset.key)} /> : <Icon name="companion" />}
   </span>;
 }

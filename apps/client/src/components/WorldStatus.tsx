@@ -5,7 +5,7 @@ export function WorldStatus({ state }: { state: GameState }) {
   const remaining = getChronicleRoundsRemaining(state);
   const impulseEffects = [
     state.worldImpulseEffects?.runeSpark ? "Runenfunke · +75 Gold am Runentor" : undefined,
-    state.worldImpulseEffects?.buildingFervor ? "⚒ Baueifer · nächster Bau −20 %" : undefined,
+    state.worldImpulseEffects?.buildingFervor ? "Baueifer · nächster Bau −20 %" : undefined,
     state.worldImpulseEffects?.merchantLuck ? "Händlerglück · nächster Direktkauf −15 %" : undefined,
     state.worldImpulseEffects?.twistOfFate ? "Schicksalswende · nächster normaler Wurf" : undefined,
     state.worldImpulseEffects?.harborWindUntilRound === state.currentRound ? `Hafenwind · bis Ende Runde ${state.currentRound}` : undefined

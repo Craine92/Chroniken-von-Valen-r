@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { getPreloadAssets } from "../assets/asset-manifest";
 import { CODEX_FONT_FACES } from "../design-tokens";
+import { preloadIconTextures } from "../icon-textures";
 
 /** Lädt die Schriften des Design-Systems, bevor Phaser Text rastert; ohne Schrift-API (Tests) sofort fertig. */
 export function loadCodexFonts(timeoutMs = 2_500): Promise<void> {
@@ -38,6 +39,7 @@ export class ValenorPreloadScene extends Phaser.Scene {
       }
       console.warn(`Valenør asset unavailable; procedural fallback remains active: ${file.key}`);
     });
+    preloadIconTextures(this.load);
     getPreloadAssets().forEach((asset) => {
       if (asset.kind === "image") this.load.image(asset.key, asset.path);
       else this.load.atlas(asset.key, asset.texturePath, asset.atlasPath);

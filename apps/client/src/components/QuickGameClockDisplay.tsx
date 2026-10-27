@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { QuickGameClock } from "@valenor/shared";
+import { Icon } from "./icons/Icon";
 
 export function formatQuickGameTime(milliseconds: number): string {
   const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1_000));
@@ -30,7 +31,7 @@ export function QuickGameClockDisplay({ clock, compact = false }: { clock?: Quic
   const label = clock.expired ? "ZEIT ABGELAUFEN" : clock.pausedAt !== undefined ? "PAUSIERT" : "VERBLEIBENDE ZEIT";
   return (
     <div className={`quick-clock quick-clock--${urgency} ${compact ? "quick-clock--compact" : ""}`} role="timer" aria-live="off">
-      <i className="quick-clock__hourglass" aria-hidden="true">⌛</i>
+      <i className="quick-clock__hourglass" aria-hidden="true"><Icon name="hourglass" /></i>
       <span>{label}</span>
       <strong>{formatQuickGameTime(remaining)}</strong>
     </div>

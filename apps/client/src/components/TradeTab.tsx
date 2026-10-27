@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { CreateTradeOfferRequest, GameState, QuickTradeRequest } from "@valenor/shared";
 import { QuickTradePanel } from "./QuickTradePanel";
 import { TradePanel } from "./TradePanel";
+import { Icon } from "./icons/Icon";
 
 export interface QuickTradeIntent {
   id: number;
@@ -21,7 +22,7 @@ export function TradeTab({ state, playerId, connected, onCreate, onQuickCreate, 
   const [mode, setMode] = useState(initialMode);
   useEffect(() => { if (quickIntent) setMode("quick"); }, [quickIntent?.id]);
   if (mode === "advanced") return <>
-    <button type="button" className="quick-trade-back" onClick={() => setMode("quick")}>← Zurück zum Schnellhandel</button>
+    <button type="button" className="quick-trade-back" onClick={() => setMode("quick")}><Icon name="chevron-left" /> Zurück zum Schnellhandel</button>
     <TradePanel state={state} playerId={playerId} connected={connected} onCreate={onCreate} onDecision={onDecision} />
   </>;
   return <QuickTradePanel state={state} playerId={playerId} connected={connected} onQuickCreate={onQuickCreate} onDecision={onDecision}

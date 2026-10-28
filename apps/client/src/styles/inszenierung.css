@@ -1,0 +1,10 @@
+/* ==========================================================================
+   Inszenierung
+   Würfel, Kamera, Stimmung und Karten. Rein darstellend; unter
+   reduzierter Bewegung und Qualitätsstufe „low“ ruhig bzw. aus.
+   ========================================================================== */
+
+/* --- 3D-Würfel: durchsichtige Ebene über dem Brett ------------------------ */
+/* Nur die Mitte des Bretts: Dort rollen die Würfel; weniger Fläche heißt weniger Arbeit für die Grafik. */
+.dice-stage { position: absolute; inset: 15% 20%; z-index: 3; pointer-events: none; }
+.dice-stage__canvas { display: block; width: 100%; height: 100%; }

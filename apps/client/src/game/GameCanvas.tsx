@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { DiceStage } from "./dice3d/DiceStage";
+import { getGraphicsQuality, prefersReducedMotion } from "./visual-config";
 import type { GameState, LocateSignal, PropertyGroupId } from "@valenor/shared";
 import { createGame } from "./createGame";
 import type { ValenorBoardScene } from "./scenes/ValenorBoardScene";
@@ -19,6 +21,9 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
   const bridgeRef = useRef<GameSceneBridge | null>(null);
   const lastDiceSignatureRef = useRef(getDiceSignature(gameState));
   const [loading, setLoading] = useState(true);
+  // 3D-Würfel nur auf „high“/„medium“ ohne reduzierte Bewegung; sonst bleibt die bisherige Würfelanzeige.
+  const [graphicsQuality] = useState(getGraphicsQuality);
+  const [use3dDice] = useState(() => graphicsQuality !== "low" && !prefersReducedMotion());
   const [loadProgress, setLoadProgress] = useState(0);
   if (!bridgeRef.current) bridgeRef.current = new GameSceneBridge(gameState);
 
@@ -79,6 +84,7 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
   return (
     <div className="game-canvas" data-testid="valenor-game-container" aria-label="Spielbrett von Valenør">
       <div ref={containerRef} className="game-canvas__mount" />
+      {use3dDice && <DiceStage gameState={gameState} quality={graphicsQuality as "high" | "medium"} onAvailability={available => sceneRef.current?.setExternalDice(available)} />}
       {loading && <div className="asset-loading" role="status"><span>Valenør erwacht …</span><progress value={loadProgress} max={1} aria-label="Grafikassets werden geladen" /></div>}
     </div>
   );

@@ -75,6 +75,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   private tileLayer: Phaser.GameObjects.Layer | undefined;
   private propertyGroupLayer: PropertyGroupLayer | undefined;
   private auctionMarker: Phaser.GameObjects.Container | undefined;
+  private externalDice = false;
   private auctionTileIndex: number | undefined;
   private externalPropertyGroupFocus: PropertyGroupId | undefined;
   private currentPlayerId: string | undefined;
@@ -218,7 +219,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       : "";
     if (["rolling", "dungeonRolling", "dungeonTransfer"].includes(next.turnPhase) && diceSignature && diceSignature !== this.lastDiceSignature) {
       this.lastDiceSignature = diceSignature;
-      this.animateDice(next.lastDiceRoll!.die1, next.lastDiceRoll!.die2);
+      // Sind die 3D-Würfel bereit, zeigen sie den Wurf; sonst die bisherige Anzeige.
+      if (!this.externalDice) this.animateDice(next.lastDiceRoll!.die1, next.lastDiceRoll!.die2);
     }
 
     const movementSignature = getMovementSignature(next);
@@ -295,6 +297,12 @@ export class ValenorBoardScene extends Phaser.Scene {
         repeat: Math.max(0, Math.round(LOCATE_PULSE_MS / 1_000) - 1), ease: "Sine.Out" });
     }
     this.time.delayedCall(LOCATE_PULSE_MS + 700, remove);
+  }
+
+  /** Die 3D-Würfel über dem Brett übernehmen (oder geben zurück, wenn WebGL fehlt). */
+  setExternalDice(available: boolean): void {
+    this.externalDice = available;
+    if (this.game?.canvas) this.game.canvas.dataset.dice3d = String(available);
   }
 
   focusPropertyGroup(groupId: PropertyGroupId | undefined): void {

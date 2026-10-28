@@ -14,6 +14,7 @@ export type AudioAudience = AudioOutputRole;
 
 export type AudioEvent =
   | "DICE_ROLL"
+  | "DICE_IMPACT"
   | "TOKEN_MOVE"
   | "GOLD_GAIN"
   | "GOLD_PAY"
@@ -57,6 +58,8 @@ export const MUSIC_TRACK = {
 
 export const AUDIO_CUES: Readonly<Record<AudioEvent, AudioCueConfig>> = {
   DICE_ROLL: { paths: [1, 2, 3, 4, 5].map((number) => sfx("dice", `dice-0${number}.ogg`)), group: "SFX", audience: "board", volume: 0.9, cooldownMs: 250, pitchVariation: 0.03 },
+  // Leiser Klack, wenn ein 3D-Würfel aufschlägt.
+  DICE_IMPACT: { paths: [1, 2, 3, 4, 5].map((number) => sfx("dice", `dice-0${number}.ogg`)), group: "SFX", audience: "board", volume: 0.32, cooldownMs: 70, pitchVariation: 0.08 },
   TOKEN_MOVE: { paths: [1, 2, 3].map((number) => sfx("movement", `token-0${number}.ogg`)), group: "SFX", audience: "board", volume: 0.28, cooldownMs: 0, pitchVariation: 0.025 },
   GOLD_GAIN: { paths: [sfx("economy", "coins-gain-01.ogg"), sfx("economy", "coins-gain-02.ogg")], group: "SFX", audience: "board", volume: 0.72, cooldownMs: 350, pitchVariation: 0.02 },
   GOLD_PAY: { paths: [sfx("economy", "coins-pay-01.ogg"), sfx("economy", "coins-pay-02.ogg")], group: "SFX", audience: "board", volume: 0.7, cooldownMs: 350, pitchVariation: 0.02 },

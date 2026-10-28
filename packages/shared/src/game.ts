@@ -390,6 +390,8 @@ export interface GameState {
   finishReason?: FinishReason;
   finalScores?: QuickGameScore[];
   gameResult?: GameResult;
+  /** Statistik der laufenden Partie (nur im Arbeitsspeicher, nur für die Siegerehrung). */
+  matchStats?: import("./match-stats").MatchStats;
   lastResolvedRollSequence?: number;
   lastResolvedMovementSequence?: number;
   lastRewardedStartMovementSequence?: number;

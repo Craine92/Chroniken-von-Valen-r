@@ -134,3 +134,118 @@
 @media (prefers-reduced-motion: reduce) { .realm-backdrop__image { animation: none; } }
 /* Die Handykarte lässt den Reichs-Hintergrund durchscheinen; Panels darin behalten ihre eigenen Flächen. */
 .controller-page:has(> .realm-backdrop) .controller-card--started { background: linear-gradient(180deg, rgb(var(--c-ink-850-rgb) / .42), rgb(var(--c-ink-950-rgb) / .62)); }
+
+/* --- Sieg, Stufe 1: der Moment gehört dem Brett; oben nur ein schmales Siegesbanner ------------------------- */
+.victory-moment { position: absolute; inset: 0; z-index: 40; pointer-events: none; }
+.victory-moment__banner {
+  position: absolute; top: 7%; left: 50%; translate: -50% 0;
+  display: grid; justify-items: center; gap: 2px;
+  padding: var(--space-3) calc(var(--space-8) + 18px);
+  color: var(--c-parchment-100); text-align: center;
+  border: 2px solid var(--c-gold-400); border-radius: 6px; outline: 1px solid rgb(var(--c-gold-300-rgb) / .45); outline-offset: -8px;
+  background: linear-gradient(90deg, #4a3112, #e9c877 5px, #8f6826 11px, #3b270e 14px, transparent 15px, transparent calc(100% - 15px), #3b270e calc(100% - 14px), #8f6826 calc(100% - 11px), #e9c877 calc(100% - 5px), #4a3112), linear-gradient(180deg, rgb(42 30 19 / .96), rgb(16 11 9 / .96));
+  box-shadow: 0 18px 50px rgb(var(--c-black-rgb) / .7), 0 0 60px rgb(var(--c-gold-400-rgb) / .3);
+  animation: bannerUnroll .7s cubic-bezier(.2, .72, .2, 1) .4s both;
+}
+.victory-moment__banner small { color: var(--c-gold-400); font: 800 var(--fs-2xs) var(--font-text); letter-spacing: .24em; }
+.victory-moment__banner strong { color: var(--c-gold-200); font: 700 clamp(2rem, 3vw, 3.2rem)/1.05 var(--font-display); text-transform: uppercase; text-shadow: 0 0 24px rgb(var(--c-gold-500-rgb) / .6); }
+.victory-moment__banner span { color: var(--c-parchment-200); font: 600 var(--fs-md) var(--font-text); }
+
+/* --- Sieg, Stufe 2: Siegerehrung -------------------------------------------------------------------------- */
+.victory-ceremony {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: var(--space-4);
+  padding: clamp(1rem, 2.4vh, 2rem) clamp(1rem, 3vw, 3.5rem);
+  overflow: auto; color: var(--c-parchment-100);
+  background: radial-gradient(ellipse 60% 45% at 50% 0%, rgb(var(--c-gold-500-rgb) / .22), transparent 70%), radial-gradient(circle at 50% 120%, rgb(70 40 100 / .35), transparent 60%), rgb(10 7 9 / .94);
+  animation: victoryFade .8s ease both;
+}
+@keyframes victoryFade { from { opacity: 0; } to { opacity: 1; } }
+.victory-ceremony__header { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.victory-ceremony__header small { color: var(--c-gold-400); font: 800 var(--fs-xs) var(--font-text); letter-spacing: .26em; }
+.victory-ceremony__header h1 { display: flex; align-items: center; gap: .4em; margin: 0; color: var(--c-gold-200); font: 700 clamp(2rem, 3.4vw, 3.6rem)/1 var(--font-display); text-transform: uppercase; text-shadow: 0 0 30px rgb(var(--c-gold-500-rgb) / .55); }
+.victory-ceremony__header h1 .icon { color: var(--c-gold-400); font-size: .8em; }
+.victory-ceremony__header p { margin: 0; color: var(--c-parchment-300); font: italic var(--fs-md) var(--font-text); }
+.victory-ceremony__stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: clamp(1rem, 2.4vw, 2.5rem); align-items: end; min-height: 0; }
+
+/* Podest: Zweiter links, Erster in der Mitte (am höchsten), Dritter rechts. */
+.victory-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: var(--space-3); }
+.victory-podium__step { display: grid; justify-items: center; gap: 4px; text-align: center; color: var(--player-accent); }
+.victory-podium__hero { position: relative; width: clamp(5rem, 7.5vw, 8.5rem); aspect-ratio: 1; animation: podiumHero .7s cubic-bezier(.2, .8, .2, 1.2) both; animation-delay: calc(var(--step-delay) + 450ms); }
+.victory-podium__hero .hud-player__portrait { position: relative; display: block; width: 100%; height: 100%; overflow: hidden; border: 3px solid var(--player-accent); border-radius: 50%; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--player-accent) 40%, transparent), rgb(0 0 0 / .7)); box-shadow: 0 0 0 3px rgb(var(--c-gold-500-rgb) / .8), 0 0 30px color-mix(in srgb, var(--player-accent) 55%, transparent); }
+.victory-podium__hero .hud-player__portrait img { position: absolute; left: -22%; top: -2%; width: 144%; height: 184%; max-width: none; object-fit: contain; object-position: 50% 0; }
+.victory-podium__crown { position: absolute; top: -38%; left: 50%; translate: -50% 0; color: var(--c-gold-300); font-size: clamp(2rem, 3vw, 3.2rem); filter: drop-shadow(0 0 14px rgb(var(--c-gold-400-rgb) / .8)); }
+.victory-podium__step strong { color: var(--c-parchment-50); font: 700 var(--fs-lg) var(--font-display); }
+.victory-podium__step span { color: var(--c-parchment-400); font: 600 var(--fs-xs) var(--font-text); }
+.victory-podium__block { display: grid; place-items: center; width: 100%; margin-top: 6px; border: 1px solid rgb(var(--c-gold-400-rgb) / .6); border-bottom: 0; border-radius: 6px 6px 0 0; background: linear-gradient(180deg, rgb(94 70 38 / .95), rgb(40 28 16 / .95)); box-shadow: inset 0 2px 0 rgb(var(--c-gold-300-rgb) / .5), inset 0 0 22px rgb(0 0 0 / .45); transform-origin: bottom; animation: podiumRise .8s cubic-bezier(.2, .8, .2, 1) both; animation-delay: var(--step-delay); }
+.victory-podium__block b { color: var(--c-gold-200); font: 700 clamp(2rem, 3vw, 3rem) var(--font-display); text-shadow: 0 2px 0 rgb(0 0 0 / .6); }
+.victory-podium__step--1 .victory-podium__block { height: clamp(7rem, 17vh, 11rem); background: linear-gradient(180deg, rgb(150 110 40 / .95), rgb(60 42 18 / .95)); }
+.victory-podium__step--2 .victory-podium__block { height: clamp(5rem, 12vh, 8rem); }
+.victory-podium__step--3 .victory-podium__block { height: clamp(3.5rem, 8vh, 5.5rem); }
+.victory-podium__rest { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2) var(--space-4); margin: var(--space-2) 0 0; padding: 0; list-style-position: inside; color: var(--c-parchment-400); }
+.victory-podium__rest b { color: var(--player-accent); margin-inline: .3em; }
+@keyframes podiumRise { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes podiumHero { from { opacity: 0; transform: translateY(-30px) scale(.8); } to { opacity: 1; transform: none; } }
+
+/* Diagramm und Rekorde */
+.victory-ceremony__chart { display: grid; gap: var(--space-3); min-width: 0; padding: var(--space-4); border: 1px solid rgb(var(--c-gold-400-rgb) / .3); border-radius: 12px; background: rgb(22 16 13 / .82); }
+.victory-ceremony__empty { margin: 0; color: var(--c-parchment-400); font-style: italic; }
+.wealth-chart { display: grid; gap: var(--space-2); margin: 0; }
+.wealth-chart figcaption { color: var(--c-gold-300); font: 700 var(--fs-sm) var(--font-text); letter-spacing: .08em; text-transform: uppercase; }
+.wealth-chart__legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; padding: 0; list-style: none; color: var(--c-parchment-200); font: 600 var(--fs-xs) var(--font-text); }
+.wealth-chart__legend li { display: inline-flex; align-items: center; gap: 6px; }
+.wealth-key { display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--player-accent); }
+.wealth-chart__plot { position: relative; }
+.wealth-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.wealth-chart__grid line { stroke: rgb(240 230 210 / .1); stroke-width: 1; }
+.wealth-chart__grid text, .wealth-chart__round { fill: var(--c-parchment-500); font: 600 13px var(--font-text); }
+.wealth-chart__line { fill: none; stroke: var(--player-accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.wealth-chart__end circle { fill: var(--player-accent); stroke: rgb(22 16 13); stroke-width: 2; }
+.wealth-chart__leader { stroke: var(--c-parchment-500); stroke-width: 1; }
+.wealth-chart__label { fill: var(--c-parchment-100); font: 700 14px var(--font-text); }
+.wealth-chart__label tspan { fill: var(--c-parchment-400); font-weight: 600; }
+.wealth-chart__crosshair { stroke: var(--c-parchment-300); stroke-width: 1; }
+.wealth-chart__tooltip { position: absolute; top: 0; translate: -50% 0; display: grid; gap: 2px; padding: 6px 10px; pointer-events: none; color: var(--c-parchment-100); border: 1px solid rgb(var(--c-gold-400-rgb) / .5); border-radius: 6px; background: rgb(14 10 9 / .95); font: 500 12px var(--font-text); white-space: nowrap; }
+.wealth-chart__tooltip small { color: var(--c-parchment-400); }
+.wealth-chart__tooltip span { display: flex; align-items: center; gap: 6px; }
+/* Linien zeichnen sich nacheinander, der Endpunkt erscheint danach. */
+.wealth-chart.is-animated .wealth-chart__line { stroke-dasharray: 1; stroke-dashoffset: 1; animation: wealthDraw 1.6s ease-out forwards; animation-delay: calc(900ms + var(--line-delay)); }
+.wealth-chart.is-animated .wealth-chart__end { opacity: 0; animation: victoryItemIn .4s ease forwards; animation-delay: calc(2400ms + var(--line-delay)); }
+@keyframes wealthDraw { to { stroke-dashoffset: 0; } }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.victory-records { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--space-2); margin: 0; }
+.victory-records > div { display: grid; gap: 2px; padding: var(--space-2) var(--space-3); border-left: 2px solid var(--c-gold-500); background: rgb(255 255 255 / .03); animation: victoryItemIn .5s ease both; animation-delay: var(--item-delay); }
+.victory-records dt { color: var(--c-parchment-400); font: 700 var(--fs-2xs) var(--font-text); letter-spacing: .1em; text-transform: uppercase; }
+.victory-records dd { display: grid; margin: 0; }
+.victory-records dd b { color: var(--c-gold-200); font: 800 var(--fs-lg) var(--font-text); }
+.victory-records dd span { color: var(--c-parchment-300); font-size: var(--fs-xs); }
+
+/* Auszeichnungen für alle */
+.victory-awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.victory-award { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); gap: var(--space-3); align-items: start; padding: var(--space-3); border: 1px solid rgb(var(--c-gold-400-rgb) / .35); border-top: 3px solid var(--player-accent); border-radius: 10px; background: linear-gradient(170deg, rgb(40 29 20 / .95), rgb(16 11 9 / .95)); animation: victoryItemIn .5s ease both; animation-delay: var(--item-delay); }
+.victory-award .hud-player__portrait { position: relative; display: block; width: 3.2rem; height: 3.2rem; overflow: hidden; border: 2px solid var(--player-accent); border-radius: 50%; background: rgb(0 0 0 / .5); }
+.victory-award .hud-player__portrait img { position: absolute; left: -22%; top: -2%; width: 144%; height: 184%; max-width: none; object-fit: contain; object-position: 50% 0; }
+.victory-award strong { color: var(--c-parchment-50); font: 700 var(--fs-md) var(--font-display); }
+.victory-award p { display: grid; margin: 4px 0 0; }
+.victory-award p b { color: var(--c-gold-300); font: 800 var(--fs-sm) var(--font-text); }
+.victory-award p span { color: var(--c-parchment-300); font-size: var(--fs-xs); }
+.victory-ceremony__again { justify-self: center; min-width: 14rem; }
+@keyframes victoryItemIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.victory-ceremony.is-calm, .victory-ceremony.is-calm * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .victory-ceremony, .victory-ceremony *, .victory-moment__banner { animation: none !important; } }
+
+/* --- Handy: persönliche Zusammenfassung ------------------------------------------------------------------- */
+.mobile-victory { display: grid; gap: var(--space-3); margin-top: var(--space-4); text-align: left; }
+.mobile-victory__place { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--c-gold-200); font: 700 var(--fs-xl) var(--font-display); }
+.mobile-victory__awards { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.mobile-victory__awards li { display: grid; padding: var(--space-2) var(--space-3); border-left: 3px solid var(--player-accent, var(--c-gold-400)); border-radius: 6px; background: rgb(255 255 255 / .05); }
+.mobile-victory__awards b { color: var(--c-gold-300); font: 800 var(--fs-md) var(--font-text); }
+.mobile-victory__awards span { color: var(--c-parchment-300); font-size: var(--fs-sm); }
+.mobile-victory__sparkline { display: grid; gap: 4px; margin: 0; }
+.mobile-victory__sparkline figcaption { color: var(--c-parchment-400); font-size: var(--fs-xs); }
+.mobile-victory__sparkline svg { width: 100%; height: 60px; }
+.mobile-victory__sparkline polyline { fill: none; stroke: var(--player-accent, var(--c-gold-400)); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.mobile-victory__facts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-1) var(--space-3); margin: 0; }
+.mobile-victory__facts div { display: grid; }
+.mobile-victory__facts dt { color: var(--c-parchment-500); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .08em; }
+.mobile-victory__facts dd { margin: 0; color: var(--c-parchment-100); font: 700 var(--fs-md) var(--font-text); }

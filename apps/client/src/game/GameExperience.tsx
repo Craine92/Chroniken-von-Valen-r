@@ -6,7 +6,7 @@ import { getGraphicsQuality } from "./visual-config";
 import { getCurrentBoardContext } from "./board-context";
 import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
 import { CardReveal } from "../components/CardReveal";
-import { GameResultPanel } from "../components/GameResultPanel";
+import { VictoryCeremony } from "../components/victory/VictoryCeremony";
 import { DEFAULT_BOARD_PRESENTATION_MODE, getCardPresentationKey, type BoardPresentationMode } from "./board-presentation";
 import { audioManager } from "../audio/AudioManager";
 import { GameAudioEventTracker } from "../audio/game-audio-events";
@@ -238,11 +238,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
         )}
       </section>
       {onReturnToLobby && <button type="button" className="return-to-lobby" title="Zur Lobby" aria-label="Zur Lobby" onClick={onReturnToLobby}><Icon name="lobby" /></button>}
-      {gameState.status === "finished" && (
-        <section className="victory-overlay">
-          <GameResultPanel gameState={gameState} onNewChronicle={onNewChronicle} />
-        </section>
-      )}
+      {gameState.status === "finished" && <VictoryCeremony gameState={gameState} onNewChronicle={onNewChronicle} />}
       {introVisible && gameState.status !== "finished" && (
         <div className="game-intro" aria-live="polite">
           <div className="game-intro__rune" aria-hidden="true"><Icon name="seal" /></div>

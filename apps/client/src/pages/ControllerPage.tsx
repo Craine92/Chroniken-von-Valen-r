@@ -40,6 +40,7 @@ import { LocateButton, type SendLocate } from "../components/LocateButton";
 import { MobileTargetField } from "../components/MobileTargetField";
 import { MobileWorldStatus } from "../components/MobileWorldStatus";
 import { RealmBackdrop } from "../components/RealmBackdrop";
+import { MobileVictorySummary } from "../components/victory/MobileVictorySummary";
 import { getRealmBackdrop } from "../mobile/realm-backdrop";
 import { getLandingPreview } from "../mobile/landing-preview";
 import { resolveRoomGameState, shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
@@ -616,7 +617,7 @@ export function ControllerPage() {
   if (gameState && activePlayer) {
     const current = gameState.players.find((candidate) => candidate.id === gameState.currentPlayerId);
     if (gameState.status === "finished") {
-      return <main className={`controller-page controller-page--active player-theme--${player.color}`}><Ambience /><section className="controller-card controller-card--started end-controller"><BrandMark compact /><GameResultPanel gameState={gameState} viewerId={player.id} /><ConnectionBadge connected={connected} /></section></main>;
+      return <main className={`controller-page controller-page--active player-theme--${player.color}`}><Ambience /><section className="controller-card controller-card--started end-controller"><BrandMark compact /><GameResultPanel gameState={gameState} viewerId={player.id} /><MobileVictorySummary gameState={gameState} playerId={player.id} /><ConnectionBadge connected={connected} /></section></main>;
     }
     if (activePlayer.isBankrupt) {
       return <BankruptcySpectator gameState={gameState} player={player} connected={connected} onSendEmote={sendEmote} />;

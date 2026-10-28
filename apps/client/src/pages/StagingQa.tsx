@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BOARD_TILES, CHRONICLE_EVENTS, getPropertyGroupTiles, getRegionalChronicleDefinition, type GameState, type RegionType } from "@valenor/shared";
 import { GameExperience } from "../game/GameExperience";
+import { showcaseMatchStats } from "./victory-showcase";
 
 /** Szenen der Inszenierung: Würfel, Kamerafahrten, Stimmungen, Tag und Nacht, Kartenwendung, Spielstart. */
 const MOOD_SCENES = CHRONICLE_EVENTS.map(event => `mood-${event.id}`);
@@ -10,7 +11,9 @@ export const STAGING_SCENES = [
   "camera-dragon", "camera-rent", "camera-group", "camera-build5", "camera-bankrupt", "camera-auction", "camera-move",
   "card-flip", ...MOOD_SCENES, ...DAYTIME_SCENES,
   // Feinschliff: Landekarte mit Kaufpreis bzw. Miete, Banner weicht dem Geschehen aus.
-  "landing-free-discount", "landing-rent-low", "landing-own"
+  "landing-free-discount", "landing-rent-low", "landing-own",
+  // Siegerehrung: live mit Siegmoment, oder gleich die Ehrung.
+  "victory", "victory-ceremony"
 ] as const;
 export type StagingScene = string;
 
@@ -31,6 +34,16 @@ function land(draft: GameState, playerId: string, from: number, to: number): voi
   const path = Array.from({ length: (to - from + 40) % 40 }, (_, step) => (from + step + 1) % 40);
   draft.lastMovement = { kind: "normal", sequence: 300 + sequence, playerId, from, to, path, passedStart: false, landedTile: BOARD_TILES[to]! };
   draft.turnPhase = "waitingForEndTurn";
+}
+
+/** Die Zeit ist um: Eldric hat das größte Vermögen und gewinnt, Ragna ist zuvor ausgeschieden. */
+function finish(draft: GameState, finishedAt: number): void {
+  draft.status = "finished";
+  draft.players[2]!.isBankrupt = true;
+  draft.winnerId = "p4";
+  draft.winnerIds = ["p4"];
+  draft.finishReason = "quickGameTimeExpired";
+  draft.gameResult = { finishReason: "quickGameTimeExpired", winnerIds: ["p4"], finishedAt, roundsPlayed: draft.currentRound };
 }
 
 function rollState(draft: GameState, die1: number, die2: number): void {
@@ -112,6 +125,13 @@ const SCENES: Record<string, { prepare?: (draft: GameState) => void; trigger?: (
       draft.propertyOwnerships.push({ tileIndex: 24, ownerId: "p1", buildingLevel: 1, mortgaged: false });
     },
     trigger: draft => land(draft, "p1", 21, 24)
+  },
+  "victory": {
+    prepare: draft => { draft.currentRound = 12; draft.players[2]!.isBankrupt = true; draft.matchStats = showcaseMatchStats(draft); draft.players[2]!.isBankrupt = false; },
+    trigger: draft => finish(draft, Date.now())
+  },
+  "victory-ceremony": {
+    prepare: draft => { draft.currentRound = 12; finish(draft, Date.now() - 60_000); draft.matchStats = showcaseMatchStats(draft); }
   },
   "card-flip": {
     trigger: draft => {

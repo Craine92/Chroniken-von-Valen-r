@@ -41,3 +41,23 @@ test("the card shows its theme picture with title and text, on the TV and compac
     assert.match(markup, /card-reveal__text/);
   }
 });
+
+test("the frame lies on top: picture and parchment fill exactly the inner opening measured from the frame image", async () => {
+  const { CARD_FRAME_OPENINGS } = await import("../game/assets/card-frame-openings");
+  const { existsSync } = await import("node:fs");
+  for (const [deck, cardId] of [["adventure", "adv_025"], ["fate", "fate_010"]] as const) {
+    const opening = CARD_FRAME_OPENINGS[deck];
+    // Die Öffnung liegt innen im Rahmen: oben Platz für das Medaillon, ringsum für Ranken und Goldlinie.
+    assert.ok(opening.inset.top > .2 && opening.inset.top < .26, `${deck} top`);
+    for (const side of ["left", "right", "bottom"] as const) assert.ok(opening.inset[side] > .12 && opening.inset[side] < .18, `${deck} ${side}`);
+    // Der Text hält unten Abstand zum Medaillon.
+    assert.ok(opening.textBottom > .08 && opening.textBottom < .16, `${deck} text`);
+    for (const path of [opening.overlay, opening.mask]) assert.ok(existsSync(new URL(`../../public${path}`, import.meta.url)), path);
+    const markup = renderToStaticMarkup(<CardReveal activeCard={{ cardId, deck, playerId: "p1", status: "readyToAcknowledge" }} />);
+    // Reihenfolge der Ebenen: Rahmen, Inhalt in der Öffnung, Rahmen-Deckschicht ganz vorn.
+    const frame = markup.indexOf("card-reveal__frame\""), content = markup.indexOf("card-reveal__content"), overlay = markup.indexOf("card-reveal__frame-overlay");
+    assert.ok(frame >= 0 && frame < content && content < overlay, `${deck}: frame, content, overlay`);
+    assert.match(markup, new RegExp(`--opening-top:${(opening.inset.top * 100).toFixed(2)}%`));
+    assert.ok(markup.includes(`--opening-mask:url(&quot;${opening.mask}&quot;)`), `${deck}: mask`);
+  }
+});

@@ -14,6 +14,7 @@ import { useChroniclerVoice } from "../audio/useChroniclerVoice";
 import { MomentumCelebrationBanner, WorldImpulseBanner } from "../components/WorldImpulseUi";
 import { TvQuickTradeBanner, isQuickTradeAction } from "./TvQuickTrade";
 import { Icon, dieIcon, GROUP_ICONS } from "../components/icons/Icon";
+import { VALENOR_ASSETS } from "./assets/asset-manifest";
 
 const GameCanvas = lazy(() =>
   import("./GameCanvas").then((module) => ({ default: module.GameCanvas }))
@@ -210,7 +211,15 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
         </div>
         {gameState.activeCard && (
           <aside key={getCardPresentationKey(gameState)} className="board-card-event" data-deck={gameState.activeCard.deck} aria-live="polite">
-            <CardReveal activeCard={gameState.activeCard} />
+            {/* Die Karte fliegt vom Stapel, zeigt erst ihren Rücken und dreht sich dann um. */}
+            <div className="card-flip">
+              <div className="card-flip__back" aria-hidden="true">
+                <img src={(gameState.activeCard.deck === "adventure" ? VALENOR_ASSETS.cards.adventureFrame : VALENOR_ASSETS.cards.fateFrame).path} alt="" />
+                <span><Icon name={gameState.activeCard.deck === "adventure" ? "adventure" : "fate"} /></span>
+                <b>{gameState.activeCard.deck === "adventure" ? "ABENTEUER" : "SCHICKSAL"}</b>
+              </div>
+              <div className="card-flip__front"><CardReveal activeCard={gameState.activeCard} /></div>
+            </div>
           </aside>
         )}
         {focusedPropertyGroup && (

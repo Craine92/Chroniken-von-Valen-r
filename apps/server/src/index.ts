@@ -8,6 +8,7 @@ import { Server } from "socket.io";
 import {
   SOCKET_EVENTS,
   LOCATE_COOLDOWN_MS,
+  canSkipGrandStart,
   getPropertyGroup,
   type EmoteId,
   type Player,
@@ -748,6 +749,19 @@ io.on("connection", (socket) => {
     }
     const sentAt = Date.now();
     io.to(roomCode).emit(SOCKET_EVENTS.playerLocate, { id: `${player.id}:${sentAt}`, playerId: player.id, color: player.color, sentAt });
+    callback({ ok: true });
+  });
+
+  socket.on(SOCKET_EVENTS.grandStartSkip, (callback) => {
+    const { roomCode, playerId } = socket.data;
+    if (typeof callback !== "function") return;
+    const state = roomCode ? rooms.getRoom(roomCode)?.gameState : undefined;
+    // Rein darstellend: Der TV beendet nur seinen Kameraflug; am Spielstand ändert sich nichts.
+    if (!roomCode || !playerId || !state || !canSkipGrandStart(state, playerId, Date.now())) {
+      callback({ ok: false, message: "Den Spielstart kann gerade nur der Spieler am Zug überspringen." });
+      return;
+    }
+    io.to(roomCode).emit(SOCKET_EVENTS.grandStartSkip, { playerId, sentAt: Date.now() });
     callback({ ok: true });
   });
 

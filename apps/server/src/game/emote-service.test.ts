@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EMOTE_COOLDOWN_MS, EMOTE_IDS, getEmoteCooldownRemaining, isEmoteId, LOCATE_COOLDOWN_MS, type EconomyLogEntry, type GameState, type Player } from "@valenor/shared";
+import { canSkipGrandStart, getGrandStartLeadPlayerId, GRAND_START_SKIP_WINDOW_MS, EMOTE_COOLDOWN_MS, EMOTE_IDS, getEmoteCooldownRemaining, isEmoteId, LOCATE_COOLDOWN_MS, type EconomyLogEntry, type GameState, type Player } from "@valenor/shared";
 import { COMPUTER_EMOTE_CHANCE, COMPUTER_EMOTE_RENT_THRESHOLD, EmoteGate, pickComputerEmotes, validateEmoteRequest, validateLocateRequest } from "./emote-service";
 
 function game(): GameState {
@@ -110,4 +110,17 @@ test("'Wo bin ich?' works for connected players in a running game and has its ow
   assert.equal(gate.tryEmote("VAL-1", "p1", 0).ok, true);
   assert.deepEqual(gate.tryEmote("VAL-1", "p1", 1_000), { ok: false, cooldownMs: 2_000 });
   assert.equal(gate.tryEmote("VAL-1", "p1", LOCATE_COOLDOWN_MS).ok, true);
+});
+
+test("only the leading player may skip the grand start, and only at the very beginning of a game", () => {
+  const state = game();
+  state.currentRound = 1; state.turnNumber = 0; state.startedAt = 1_000;
+  assert.equal(getGrandStartLeadPlayerId(state), "p1");
+  assert.equal(canSkipGrandStart(state, "p1", 2_000), true);
+  assert.equal(canSkipGrandStart(state, "c1", 2_000), false, "not the leading player");
+  assert.equal(canSkipGrandStart(state, "p1", 1_000 + GRAND_START_SKIP_WINDOW_MS + 1), false, "too late");
+  delete state.currentPlayerId;
+  assert.equal(getGrandStartLeadPlayerId(state), "p1", "before the order is set, the first human leads");
+  state.currentPlayerId = "p1"; state.turnNumber = 5;
+  assert.equal(canSkipGrandStart(state, "p1", 2_000), false, "the game is already running");
 });

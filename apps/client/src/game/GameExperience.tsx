@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { BOARD_TILES, RELIC_DEFINITIONS, canBuildOnProperty, getActiveChronicleEvent, getPropertyGroup, getPropertyGroupTiles, type GameState, type LocateSignal, type PropertyGroupId } from "@valenor/shared";
+import { BOARD_TILES, RELIC_DEFINITIONS, canBuildOnProperty, getActiveChronicleEvent, getPropertyGroup, getPropertyGroupTiles, type GameState, type GrandStartSkipSignal, type LocateSignal, type PropertyGroupId } from "@valenor/shared";
 import { GameHud, type ActiveEmotes } from "./GameHud";
 import { ChroniclePanel, useChronicleLines } from "../components/ChroniclePanel";
 import { getGraphicsQuality } from "./visual-config";
@@ -23,7 +23,7 @@ export const DOUBLE_BANNER_DURATION_MS = 2_200;
 export const CHRONICLE_NOTICE_DURATION_MS = 3_000;
 export const TAVERN_NOTICE_DURATION_MS = 4_000;
 
-export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE, suppressIntro = false, emotes, locateSignal }: { gameState: GameState; onNewChronicle?: () => void; onReturnToLobby?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined; suppressIntro?: boolean | undefined; emotes?: ActiveEmotes | undefined; locateSignal?: LocateSignal | undefined }) {
+export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, focusedPropertyGroupId, focusedPropertyGroupPlayerId, boardPresentationMode = DEFAULT_BOARD_PRESENTATION_MODE, suppressIntro = false, emotes, locateSignal, grandStartSkip }: { gameState: GameState; onNewChronicle?: () => void; onReturnToLobby?: () => void; focusedPropertyGroupId?: PropertyGroupId | undefined; focusedPropertyGroupPlayerId?: string | undefined; boardPresentationMode?: BoardPresentationMode | undefined; suppressIntro?: boolean | undefined; emotes?: ActiveEmotes | undefined; locateSignal?: LocateSignal | undefined; grandStartSkip?: GrandStartSkipSignal | undefined }) {
   const chronicleLines = useChronicleLines(gameState);
   const [graphicsQuality] = useState(getGraphicsQuality);
   const [introVisible, setIntroVisible] = useState(!suppressIntro);
@@ -154,7 +154,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
       <section className="board-stage" aria-label="Brettbereich">
         <BoardTopHud state={gameState} />
         <Suspense fallback={<div className="game-loading">Die Welt von Valenør erwacht …</div>}>
-          <GameCanvas gameState={gameState} focusedPropertyGroupId={focusedPropertyGroupId} presentationMode={boardPresentationMode} locateSignal={locateSignal} />
+          <GameCanvas gameState={gameState} focusedPropertyGroupId={focusedPropertyGroupId} presentationMode={boardPresentationMode} locateSignal={locateSignal} grandStartSkip={grandStartSkip} />
         </Suspense>
         <div className="board-notification-lane" aria-live="polite" aria-atomic="true">
           {doubleAction && (

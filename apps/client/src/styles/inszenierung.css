@@ -8,3 +8,21 @@
 /* Nur die Mitte des Bretts: Dort rollen die Würfel; weniger Fläche heißt weniger Arbeit für die Grafik. */
 .dice-stage { position: absolute; inset: 15% 20%; z-index: 3; pointer-events: none; }
 .dice-stage__canvas { display: block; width: 100%; height: 100%; }
+
+/* --- Großer Spielstart: Die Reihenfolge-Tafel macht den Blick auf die Reiche frei --- */
+/* Die Tafel selbst hält ihre Deckkraft per Einblend-Animation fest, deshalb blendet die Ebene darüber aus. */
+.board-event-layer { transition: opacity .4s ease; }
+body:has(canvas[data-camera="grand-start"]) .board-event-layer:has(.order-overlay) { opacity: 0; }
+
+/* --- Spielstart überspringen (Handy des aktiven Spielers) ------------------ */
+.grand-start-skip {
+  width: 100%;
+  min-height: var(--touch-target);
+  margin-top: var(--space-3);
+  color: var(--accent-soft);
+  background: rgb(var(--c-ink-950-rgb) / .7);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  font: 700 var(--fs-md) var(--font-text);
+  letter-spacing: .04em;
+}

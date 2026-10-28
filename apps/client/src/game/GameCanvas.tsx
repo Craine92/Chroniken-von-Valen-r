@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DiceStage } from "./dice3d/DiceStage";
 import { getGraphicsQuality, prefersReducedMotion } from "./visual-config";
-import type { GameState, LocateSignal, PropertyGroupId } from "@valenor/shared";
+import type { GameState, GrandStartSkipSignal, LocateSignal, PropertyGroupId } from "@valenor/shared";
 import { createGame } from "./createGame";
 import type { ValenorBoardScene } from "./scenes/ValenorBoardScene";
 import { GameSceneBridge } from "./GameSceneBridge";
@@ -14,7 +14,7 @@ function getDiceSignature(state: GameState): string {
     : "";
 }
 
-export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode = DEFAULT_BOARD_PRESENTATION_MODE, locateSignal }: { gameState: GameState; focusedPropertyGroupId?: PropertyGroupId | undefined; presentationMode?: BoardPresentationMode | undefined; locateSignal?: LocateSignal | undefined }) {
+export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode = DEFAULT_BOARD_PRESENTATION_MODE, locateSignal, grandStartSkip }: { gameState: GameState; focusedPropertyGroupId?: PropertyGroupId | undefined; presentationMode?: BoardPresentationMode | undefined; locateSignal?: LocateSignal | undefined; grandStartSkip?: GrandStartSkipSignal | undefined }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<ValenorBoardScene | null>(null);
   const initialStateRef = useRef(gameState);
@@ -80,6 +80,11 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
   useEffect(() => {
     if (locateSignal) sceneRef.current?.locatePlayer(locateSignal.playerId);
   }, [locateSignal?.id]);
+
+  // Spielstart vom Handy des aktiven Spielers übersprungen: Der Kameraflug endet sofort.
+  useEffect(() => {
+    if (grandStartSkip) sceneRef.current?.skipGrandOpening();
+  }, [grandStartSkip?.sentAt]);
 
   return (
     <div className="game-canvas" data-testid="valenor-game-container" aria-label="Spielbrett von Valenør">

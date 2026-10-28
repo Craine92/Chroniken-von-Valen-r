@@ -19,6 +19,9 @@ export class DramaEffectsLayer {
 
   constructor(private readonly scene: Phaser.Scene, private readonly mode: LivingBoardSettings["drama"]) {}
 
+  /** Läuft gerade eine Kamerafahrt, lenkt schon der Zoom den Blick; der Schatten fällt dann leichter aus. */
+  cameraFocus = false;
+
   play(moment: DramaticMoment): void {
     switch (moment.kind) {
       case "highRent":
@@ -62,6 +65,7 @@ export class DramaEffectsLayer {
   /** Dunkelt das Brett kurz ab und spart das Feld aus. Nur mit WebGL und nur im vollen Modus. */
   private dimAround(tileIndex: number | undefined, strength: number): void {
     if (this.mode !== "full") return;
+    if (this.cameraFocus) strength *= .5;
     const shade = this.track(this.scene.add.rectangle(0, 0, BOARD_WIDTH + 1_200, BOARD_HEIGHT + 800, codexColor("black"), 0)
       .setDepth(BOARD_DEPTHS.players - 1).setName("drama-shade"));
     if (tileIndex !== undefined) {

@@ -1,0 +1,76 @@
+/* ==========================================================================
+   Inszenierung
+   Würfel, Kamera, Stimmung und Karten. Rein darstellend; unter
+   reduzierter Bewegung und Qualitätsstufe „low“ ruhig bzw. aus.
+   ========================================================================== */
+
+/* --- Stimmung: Vignette über dem Brett (setzt AtmosphereLayer) ------------ */
+/* Als CSS statt als Phaser-Effekt: Der Browser legt sie ohne eigenen Bildschirmdurchgang darüber. */
+.game-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(ellipse 72% 70% at 50% 50%, transparent 58%, rgb(8 5 12 / .78) 100%);
+  opacity: var(--mood-vignette, 0);
+  transition: opacity var(--mood-transition, 1.5s) ease-in-out;
+}
+
+/* --- 3D-Würfel: durchsichtige Ebene über dem Brett ------------------------ */
+/* Nur die Mitte des Bretts: Dort rollen die Würfel; weniger Fläche heißt weniger Arbeit für die Grafik. */
+.dice-stage { position: absolute; inset: 15% 20%; z-index: 3; pointer-events: none; }
+.dice-stage__canvas { display: block; width: 100%; height: 100%; }
+
+/* --- Großer Spielstart: Die Reihenfolge-Tafel macht den Blick auf die Reiche frei --- */
+/* Die Tafel selbst hält ihre Deckkraft per Einblend-Animation fest, deshalb blendet die Ebene darüber aus. */
+.board-event-layer { transition: opacity .4s ease; }
+body:has(canvas[data-camera="grand-start"]) .board-event-layer:has(.order-overlay) { opacity: 0; }
+
+/* --- Spielstart überspringen (Handy des aktiven Spielers) ------------------ */
+.grand-start-skip {
+  width: 100%;
+  min-height: var(--touch-target);
+  margin-top: var(--space-3);
+  color: var(--accent-soft);
+  background: rgb(var(--c-ink-950-rgb) / .7);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  font: 700 var(--fs-md) var(--font-text);
+  letter-spacing: .04em;
+}
+
+/* --- Karte: vom Stapel zur Mitte, dann in 3D umdrehen --------------------- */
+.board-card-event { perspective: 1400px; }
+.board-card-event .card-flip { position: relative; transform-style: preserve-3d; animation: deckCardDraw .76s cubic-bezier(.2,.72,.2,1) both; }
+.board-card-event .card-flip .card-reveal { animation: none; }
+.board-card-event .card-flip__back,
+.board-card-event .card-flip__front { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.board-card-event .card-flip__front { animation: card-flip-front .9s cubic-bezier(.3,.7,.25,1) both; transform-style: preserve-3d; }
+.board-card-event .card-flip__back {
+  position: absolute; inset: 0; z-index: 1;
+  display: grid; place-content: center; justify-items: center; gap: var(--space-3);
+  overflow: hidden; border-radius: var(--radius-lg);
+  background: radial-gradient(circle at 50% 40%, rgb(var(--c-gold-400-rgb) / .18), transparent 60%), var(--c-ink-900);
+  color: var(--accent-soft);
+  animation: card-flip-back .9s cubic-bezier(.3,.7,.25,1) both;
+}
+.board-card-event .card-flip__back img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+.board-card-event .card-flip__back span { position: relative; font-size: 5rem; filter: drop-shadow(0 0 18px rgb(var(--c-gold-400-rgb) / .6)); }
+.board-card-event .card-flip__back b { position: relative; font: 700 var(--fs-xl) var(--font-display); letter-spacing: .2em; }
+/* Erst die Rückseite zeigen, ab der Mitte des Flugs dreht sich die Vorderseite herein. */
+@keyframes card-flip-front { 0%, 42% { transform: rotateY(-180deg); } 100% { transform: rotateY(0); } }
+@keyframes card-flip-back { 0%, 42% { transform: rotateY(0); } 100% { transform: rotateY(180deg); } }
+
+/* Platz für das spätere Kartenbild. */
+.card-reveal__art { position: relative; width: min(100%, 300px); aspect-ratio: 16 / 9; margin: 0 auto var(--space-2); overflow: hidden; border: 1px solid rgb(var(--c-gold-400-rgb) / .45); border-radius: var(--radius-sm); }
+.card-reveal__art img { width: 100%; height: 100%; object-fit: cover; }
+.card-reveal__art--placeholder { display: grid; place-items: center; color: rgb(var(--c-gold-400-rgb) / .55); font-size: 2.6rem; background: radial-gradient(circle, rgb(var(--c-gold-400-rgb) / .12), transparent 70%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .board-card-event .card-flip, .board-card-event .card-flip__front { animation: none; transform: none; }
+  .board-card-event .card-flip__back { display: none; }
+}
+.board-page[data-quality="low"] .board-card-event .card-flip,
+.board-page[data-quality="low"] .board-card-event .card-flip__front { animation: none; transform: none; }
+.board-page[data-quality="low"] .board-card-event .card-flip__back { display: none; }

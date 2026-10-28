@@ -231,6 +231,16 @@ export function getFieldArtAsset(tile: BoardTile): ImageAssetDefinition | undefi
   return VALENOR_ASSETS.fields[id];
 }
 
+/**
+ * Kartenbilder je Karten-ID. Noch leer: Die Bilder kommen später; bis dahin zeigt die Karte ihr Deck-Siegel
+ * im vorgesehenen Bildfeld.
+ */
+export const CARD_ART: Readonly<Partial<Record<string, ImageAssetDefinition>>> = {};
+
+export function getCardArt(cardId: string): ImageAssetDefinition | undefined {
+  return CARD_ART[cardId];
+}
+
 /** Bilder außerhalb des Bretts, die als CSS-Hintergrund geladen werden (nicht über Phaser). */
 export const LOBBY_ASSETS = {
   title: imageSlot("lobby-title", "/assets/ui/title/titelbild-valenor.webp", 1536, 1024, "ready")

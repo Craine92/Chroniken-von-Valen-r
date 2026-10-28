@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { GameState, LocateSignal, PropertyGroupId } from "@valenor/shared";
+import { DiceStage } from "./dice3d/DiceStage";
+import { getGraphicsQuality, prefersReducedMotion } from "./visual-config";
+import type { GameState, GrandStartSkipSignal, LocateSignal, PropertyGroupId } from "@valenor/shared";
 import { createGame } from "./createGame";
 import type { ValenorBoardScene } from "./scenes/ValenorBoardScene";
 import { GameSceneBridge } from "./GameSceneBridge";
@@ -12,13 +14,16 @@ function getDiceSignature(state: GameState): string {
     : "";
 }
 
-export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode = DEFAULT_BOARD_PRESENTATION_MODE, locateSignal }: { gameState: GameState; focusedPropertyGroupId?: PropertyGroupId | undefined; presentationMode?: BoardPresentationMode | undefined; locateSignal?: LocateSignal | undefined }) {
+export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode = DEFAULT_BOARD_PRESENTATION_MODE, locateSignal, grandStartSkip }: { gameState: GameState; focusedPropertyGroupId?: PropertyGroupId | undefined; presentationMode?: BoardPresentationMode | undefined; locateSignal?: LocateSignal | undefined; grandStartSkip?: GrandStartSkipSignal | undefined }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<ValenorBoardScene | null>(null);
   const initialStateRef = useRef(gameState);
   const bridgeRef = useRef<GameSceneBridge | null>(null);
   const lastDiceSignatureRef = useRef(getDiceSignature(gameState));
   const [loading, setLoading] = useState(true);
+  // 3D-Würfel nur auf „high“/„medium“ ohne reduzierte Bewegung; sonst bleibt die bisherige Würfelanzeige.
+  const [graphicsQuality] = useState(getGraphicsQuality);
+  const [use3dDice] = useState(() => graphicsQuality !== "low" && !prefersReducedMotion());
   const [loadProgress, setLoadProgress] = useState(0);
   if (!bridgeRef.current) bridgeRef.current = new GameSceneBridge(gameState);
 
@@ -76,9 +81,15 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
     if (locateSignal) sceneRef.current?.locatePlayer(locateSignal.playerId);
   }, [locateSignal?.id]);
 
+  // Spielstart vom Handy des aktiven Spielers übersprungen: Der Kameraflug endet sofort.
+  useEffect(() => {
+    if (grandStartSkip) sceneRef.current?.skipGrandOpening();
+  }, [grandStartSkip?.sentAt]);
+
   return (
     <div className="game-canvas" data-testid="valenor-game-container" aria-label="Spielbrett von Valenør">
       <div ref={containerRef} className="game-canvas__mount" />
+      {use3dDice && <DiceStage gameState={gameState} quality={graphicsQuality as "high" | "medium"} onAvailability={available => sceneRef.current?.setExternalDice(available)} />}
       {loading && <div className="asset-loading" role="status"><span>Valenør erwacht …</span><progress value={loadProgress} max={1} aria-label="Grafikassets werden geladen" /></div>}
     </div>
   );

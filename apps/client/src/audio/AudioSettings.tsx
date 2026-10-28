@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { audioManager, type AudioOutputRole, type AudioSettings as Settings } from "./AudioManager";
 import { Icon } from "../components/icons/Icon";
+import { getCameraMovesEnabled, setCameraMovesEnabled } from "../game/camera/camera-director";
 
 function VolumeControl({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   const percent = Math.round(value * 100);
@@ -15,6 +16,7 @@ function VolumeControl({ label, value, onChange }: { label: string; value: numbe
 export function AudioSettingsPanel({ role = "board" }: { role?: AudioOutputRole }) {
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<Settings>(() => audioManager.getSettings());
+  const [cameraMoves, setCameraMoves] = useState(getCameraMovesEnabled);
 
   useEffect(() => audioManager.subscribe(setSettings), []);
   const update = (patch: Partial<Settings>) => audioManager.updateSettings(patch);
@@ -36,6 +38,7 @@ export function AudioSettingsPanel({ role = "board" }: { role?: AudioOutputRole 
             <button type="button" aria-pressed={settings.musicEnabled} onClick={() => update({ musicEnabled: !settings.musicEnabled })}><i />Musik {settings.musicEnabled ? "an" : "aus"}</button>
             <button type="button" aria-pressed={settings.sfxEnabled} onClick={() => update({ sfxEnabled: !settings.sfxEnabled })}><i />Effekte {settings.sfxEnabled ? "an" : "aus"}</button>
             <button type="button" aria-pressed={settings.uiEnabled} onClick={() => update({ uiEnabled: !settings.uiEnabled })}><i />UI {settings.uiEnabled ? "an" : "aus"}</button>
+            {role === "board" && <button type="button" aria-pressed={cameraMoves} onClick={() => { setCameraMovesEnabled(!cameraMoves); setCameraMoves(!cameraMoves); }}><i />Kamerafahrten {cameraMoves ? "an" : "aus"}</button>}
             {role === "board" && <button type="button" aria-pressed={settings.voiceEnabled} onClick={() => update({ voiceEnabled: !settings.voiceEnabled })}><i />Stimme {settings.voiceEnabled ? "an" : "aus"}</button>}
             {role === "controller" && <button type="button" aria-pressed={settings.hapticsEnabled} onClick={() => update({ hapticsEnabled: !settings.hapticsEnabled })}><i />Haptik {settings.hapticsEnabled ? "an" : "aus"}</button>}
             {role === "controller" && <button type="button" aria-pressed={settings.turnChimeEnabled} onClick={() => update({ turnChimeEnabled: !settings.turnChimeEnabled })}><i />Zug-Ton {settings.turnChimeEnabled ? "an" : "aus"}</button>}

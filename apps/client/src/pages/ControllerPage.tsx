@@ -3,6 +3,7 @@ import {
   BOARD_TILES,
   DUNGEON_RELEASE_COST,
   canSellBuilding,
+  canSkipGrandStart,
   canMortgageProperty,
   getAutoMortgagePlan,
   getCardDefinition,
@@ -399,6 +400,12 @@ export function ControllerPage() {
     });
   };
 
+  const skipGrandStart = () => {
+    socket.emit(SOCKET_EVENTS.grandStartSkip, (result) => {
+      if (!result.ok) setError(result.message ?? "Der Spielstart konnte nicht übersprungen werden.");
+    });
+  };
+
   const locateOwnToken: SendLocate = (done) => {
     socket.emit(SOCKET_EVENTS.playerLocate, (result) => {
       if (!result.ok && !result.cooldownMs) setError(result.message ?? "Deine Figur konnte nicht gezeigt werden.");
@@ -613,6 +620,7 @@ export function ControllerPage() {
     }
     const isCurrent = current?.id === player.id;
     const landingPreview = getLandingPreview(gameState, player.id);
+    const maySkipGrandStart = canSkipGrandStart(gameState, player.id, Date.now());
     const orderEntry = gameState.orderRolls.find((entry) => entry.playerId === player.id);
     const needsOrderRoll = gameState.turnPhase === "determiningOrder"
       && gameState.orderContenders.includes(player.id)
@@ -764,6 +772,7 @@ export function ControllerPage() {
             </div>
           )}
           {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} autoMortgagePlan={autoMortgagePlan} onAutoMortgage={() => manageFinance(SOCKET_EVENTS.financeAutoMortgageForPayment)} onDeclareBankruptcy={declareBankruptcy} showActions={false} />}
+          {maySkipGrandStart && <button type="button" className="grand-start-skip" disabled={!connected} onClick={skipGrandStart}>Spielstart überspringen</button>}
           <LocateButton connected={connected} onLocate={locateOwnToken} />
           <EmoteBar connected={connected} onSend={sendEmote} />
           </div>

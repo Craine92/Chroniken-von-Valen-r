@@ -1,9 +1,14 @@
 import Phaser from "phaser";
 import { BOARD_TILES, getPropertyGroupTiles, DUNGEON_TILE_INDEX, MAX_RELICS, RELIC_DEFINITIONS, isRelicArmed, type GameState, type PlayerCharacterId, type PropertyGroupId, type RegionType } from "@valenor/shared";
-import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, CREST_SIZE, getFieldZones, getTilePlacement, getTileWorldPosition, getTokenSeat, TOKEN_FOOTPRINT, type TokenSeat } from "../board-layout";
+import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, CREST_SIZE, getBuildingSeat, getFieldZones, getTilePlacement, getTileWorldPosition, getTokenSeat, TOKEN_FOOTPRINT, type TokenSeat } from "../board-layout";
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { MortgageOverlayLayer } from "../layers/MortgageOverlayLayer";
 import { getCompleteGroupOwner, PropertyGroupLayer } from "../layers/PropertyGroupLayer";
+import { CameraRig } from "../camera/CameraRig";
+import { AtmosphereLayer } from "../atmosphere/AtmosphereLayer";
+import { getCameraMovesEnabled } from "../camera/camera-director";
+import { gameKey, isFreshGame } from "../../audio/useChroniclerVoice";
+import { isHighRent } from "../living/drama";
 import { BoardArtLayer } from "../layers/BoardArtLayer";
 import { getCharacterAsset, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
 import { fitImage } from "../assets/asset-runtime";
@@ -36,6 +41,9 @@ const REGION_TRAIL: Record<RegionType, number> = {
   orcs: 0xff7048,
   steppe: 0xf5d47d
 };
+
+/** Der Flug über die Reiche beginnt, wenn das Titelbild zum Spielstart ausblendet. */
+const GRAND_OPENING_DELAY_MS = 2_600;
 
 /** Durchmesser des Besitzerwappens auf dem Feld (Weltpixel). */
 const OWNER_CREST_SIZE = 34;
@@ -75,6 +83,12 @@ export class ValenorBoardScene extends Phaser.Scene {
   private tileLayer: Phaser.GameObjects.Layer | undefined;
   private propertyGroupLayer: PropertyGroupLayer | undefined;
   private auctionMarker: Phaser.GameObjects.Container | undefined;
+  private externalDice = false;
+  private cameraRig: CameraRig | undefined;
+  private atmosphereLayer: AtmosphereLayer | undefined;
+  private grandOpeningTimer: Phaser.Time.TimerEvent | undefined;
+  /** Spielphase, in der die laufende Kamerafahrt begann; ändert sie sich, hat jemand gehandelt. */
+  private cameraShotPhase: string | undefined;
   private auctionTileIndex: number | undefined;
   private externalPropertyGroupFocus: PropertyGroupId | undefined;
   private currentPlayerId: string | undefined;
@@ -128,6 +142,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.ambientLayer.render();
     this.ambientLayer.sync(this.state);
     this.dramaLayer = new DramaEffectsLayer(this, this.living.drama);
+    this.atmosphereLayer = new AtmosphereLayer(this, this.graphicsQuality, this.reducedMotion);
     this.game.canvas.dataset.graphicsQuality = this.graphicsQuality;
     this.game.canvas.dataset.ambientLife = String(this.ambientLayer.isActive);
     this.game.canvas.dataset.ambientObjects = String(this.ambientLayer.objectCount);
@@ -148,12 +163,15 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.drawOwnershipMarkers();
     this.developmentLayer = new PropertyDevelopmentLayer(this);
     this.developmentLayer.sync(this.state, false);
+    this.atmosphereLayer?.sync(this.state);
     this.mortgageOverlayLayer = new MortgageOverlayLayer(this);
     this.mortgageOverlayLayer.sync(this.state);
     this.fitCamera();
     this.syncRealmNames();
     this.scale.on(Phaser.Scale.Events.RESIZE, this.handleResize);
+    this.cameraRig = new CameraRig(this, () => this.getBoardZoom(), () => this.living.drama === "full" && getCameraMovesEnabled());
     this.boardReady = true;
+    this.startGrandOpening();
     this.game.canvas.dataset.boardReady = "true";
     this.game.canvas.dataset.boardTileCount = String(BOARD_TILES.length);
     this.game.canvas.dataset.boardWidth = String(BOARD_WIDTH);
@@ -179,6 +197,10 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.dramaLayer?.destroy();
       this.ambientLayer = undefined;
       this.dramaLayer = undefined;
+      this.atmosphereLayer?.destroy();
+      this.atmosphereLayer = undefined;
+      this.cameraRig?.destroy();
+      this.cameraRig = undefined;
       this.mortgageOverlayLayer?.destroy();
       this.propertyGroupLayer?.destroy();
       this.artLayer?.destroy();
@@ -218,7 +240,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       : "";
     if (["rolling", "dungeonRolling", "dungeonTransfer"].includes(next.turnPhase) && diceSignature && diceSignature !== this.lastDiceSignature) {
       this.lastDiceSignature = diceSignature;
-      this.animateDice(next.lastDiceRoll!.die1, next.lastDiceRoll!.die2);
+      // Sind die 3D-Würfel bereit, zeigen sie den Wurf; sonst die bisherige Anzeige.
+      if (!this.externalDice) this.animateDice(next.lastDiceRoll!.die1, next.lastDiceRoll!.die2);
     }
 
     const movementSignature = getMovementSignature(next);
@@ -230,6 +253,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const playerChanged = this.currentPlayerId !== next.currentPlayerId;
     const moments = deriveGameMoments(this.state, next);
     if (moments.length) this.game.canvas.dataset.lastMoments = moments.map(moment => moment.kind).join(",");
+    this.directCamera(this.state, next, moments);
     this.state = next;
     this.syncCardDecks(next);
     this.propertyGroupLayer?.sync(next);
@@ -244,8 +268,10 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.syncWorldImpulse(next);
     this.syncMomentumCelebration(next);
     this.developmentLayer?.sync(next, true);
+    this.atmosphereLayer?.sync(next);
     this.ambientLayer?.sync(next);
     if (this.ambientLayer) this.game.canvas.dataset.ambientObjects = String(this.ambientLayer.objectCount);
+    if (this.dramaLayer) this.dramaLayer.cameraFocus = this.cameraRig?.currentMode === "shot";
     selectDramaticMoments(moments).forEach(moment => this.dramaLayer?.play(moment));
     moments.forEach(moment => { if (moment.kind === "purchase" || moment.kind === "auctionWon") this.reactToken(moment.playerId, "cheer"); });
     this.mortgageOverlayLayer?.sync(next);
@@ -295,6 +321,70 @@ export class ValenorBoardScene extends Phaser.Scene {
         repeat: Math.max(0, Math.round(LOCATE_PULSE_MS / 1_000) - 1), ease: "Sine.Out" });
     }
     this.time.delayedCall(LOCATE_PULSE_MS + 700, remove);
+  }
+
+  /** Großer Spielstart: einmal pro Partie (auch nach einem Neuladen nicht doppelt), nur zu Beginn. */
+  private startGrandOpening(): void {
+    if (!isFreshGame(this.state) || !this.cameraRig) return;
+    const key = `valenor:grand-start:${gameKey(this.state)}`;
+    try { if (window.sessionStorage.getItem(key)) return; window.sessionStorage.setItem(key, "1"); } catch { /* Ohne Speicher einfach zeigen. */ }
+    // Erst wenn das Titelbild „Die Chroniken von Valenør beginnen …“ ausblendet, beginnt der Flug.
+    this.grandOpeningTimer = this.time.delayedCall(GRAND_OPENING_DELAY_MS, () => { this.grandOpeningTimer = undefined; this.cameraRig?.grandStart(); });
+  }
+
+  /** Spielstart überspringen (Tipp auf dem Handy des aktiven Spielers). */
+  skipGrandOpening(): void {
+    this.grandOpeningTimer?.remove(false);
+    this.grandOpeningTimer = undefined;
+    if (this.cameraRig?.currentMode === "grandStart") this.cameraRig.interrupt();
+    this.game.canvas.dataset.grandStartSkipped = "true";
+  }
+
+  /** Große Momente bekommen eine kurze Kamerafahrt; die Regeln (Abklingzeit, Vorrang) prüft der Regisseur. */
+  private directCamera(previous: GameState, next: GameState, moments: ReturnType<typeof deriveGameMoments>): void {
+    const rig = this.cameraRig;
+    if (!rig) return;
+    // Jemand hat gehandelt oder das Spiel ist weitergegangen: sofort zurück.
+    if (rig.currentMode === "grandStart") {
+      const humanRolled = next.orderRolls.some(entry => next.players.find(player => player.id === entry.playerId)?.type === "human"
+        && entry.rolls.length > (previous.orderRolls.find(old => old.playerId === entry.playerId)?.rolls.length ?? 0));
+      if (humanRolled || next.turnPhase !== "determiningOrder") rig.interrupt();
+      return;
+    }
+    if (this.grandOpeningTimer && next.turnPhase !== "determiningOrder") this.skipGrandOpening();
+    if (rig.currentMode === "shot" && (next.turnPhase !== this.cameraShotPhase || next.turnNumber !== previous.turnNumber)) rig.interrupt();
+    const tileCenter = (tileIndex: number) => getTileWorldPosition(tileIndex);
+    const tokenAt = (playerId: string) => {
+      const token = this.tokens.get(playerId);
+      return token ? { x: token.x, y: token.y } : tileCenter(next.players.find(player => player.id === playerId)?.position ?? 0);
+    };
+    let started = false;
+    const shoot = (kind: Parameters<CameraRig["shot"]>[0], point: { x: number; y: number }) => {
+      if (started) return;
+      started = rig.shot(kind, point.x, point.y);
+      if (started) this.cameraShotPhase = next.turnPhase;
+    };
+    for (const moment of moments) {
+      if (moment.kind === "victory" && moment.winnerIds[0]) shoot("victory", tokenAt(moment.winnerIds[0]));
+      else if (moment.kind === "bankrupt") shoot("bankrupt", tokenAt(moment.playerId));
+      else if (moment.kind === "dragon") shoot("dragon", moment.tileIndex === undefined ? tokenAt(moment.playerId) : tileCenter(moment.tileIndex));
+      else if (moment.kind === "build" && moment.level === 5) {
+        const seat = getBuildingSeat(moment.tileIndex), tile = tileCenter(moment.tileIndex);
+        shoot("build5", { x: tile.x + seat.x, y: tile.y + seat.y - seat.height / 2 });
+      } else if (moment.kind === "groupComplete") {
+        const tiles = getPropertyGroupTiles(moment.groupId).map(tile => tileCenter(tile.index));
+        if (tiles.length) shoot("groupComplete", { x: tiles.reduce((sum, tile) => sum + tile.x, 0) / tiles.length, y: tiles.reduce((sum, tile) => sum + tile.y, 0) / tiles.length });
+      } else if (moment.kind === "rent" && isHighRent(moment.amount, moment.payerGoldBefore)) {
+        shoot("highRent", moment.tileIndex === undefined ? tokenAt(moment.payerId) : tileCenter(moment.tileIndex));
+      }
+    }
+    if (next.auction && !previous.auction) shoot("auction", tileCenter(next.auction.tileIndex));
+  }
+
+  /** Die 3D-Würfel über dem Brett übernehmen (oder geben zurück, wenn WebGL fehlt). */
+  setExternalDice(available: boolean): void {
+    this.externalDice = available;
+    if (this.game?.canvas) this.game.canvas.dataset.dice3d = String(available);
   }
 
   focusPropertyGroup(groupId: PropertyGroupId | undefined): void {
@@ -989,6 +1079,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       if (tileIndex === undefined) return;
       const stepSeat = getTokenSeat(tileIndex, 1, 0);
       const position = this.getTokenWorldPosition(tileIndex, stepSeat);
+      if (!this.reducedMotion && movement.playerId === next.currentPlayerId) this.cameraRig?.follow(position.x, position.y, 190);
       this.tokenVisuals.get(movement.playerId)?.setScale(this.styleTokenForSeat(movement.playerId, stepSeat, 1));
       const region = BOARD_TILES[tileIndex]?.region;
       const playArrivalAudio = () => {
@@ -1034,6 +1125,7 @@ export class ValenorBoardScene extends Phaser.Scene {
                 this.animateLanding(tileIndex, trailColor);
                 // Beim Landen rücken alle Figuren auf dem Zielfeld in ihre Aufstellung.
                 this.arrangeTokens(true);
+                this.cameraRig?.endFollow();
                 this.reactToken(movement.playerId, "land");
               } else step(index + 1);
             }
@@ -1406,6 +1498,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   }
 
   private fitCamera() {
+    this.cameraRig?.reset();
     const camera = this.cameras.main;
     const finalZoom = this.getBoardZoom();
     this.applyBoardVisualScale(finalZoom);

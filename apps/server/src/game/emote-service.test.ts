@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EMOTE_COOLDOWN_MS, EMOTE_IDS, getEmoteCooldownRemaining, isEmoteId, type EconomyLogEntry, type GameState, type Player } from "@valenor/shared";
-import { COMPUTER_EMOTE_CHANCE, COMPUTER_EMOTE_RENT_THRESHOLD, EmoteGate, pickComputerEmotes, validateEmoteRequest } from "./emote-service";
+import { EMOTE_COOLDOWN_MS, EMOTE_IDS, getEmoteCooldownRemaining, isEmoteId, LOCATE_COOLDOWN_MS, type EconomyLogEntry, type GameState, type Player } from "@valenor/shared";
+import { COMPUTER_EMOTE_CHANCE, COMPUTER_EMOTE_RENT_THRESHOLD, EmoteGate, pickComputerEmotes, validateEmoteRequest, validateLocateRequest } from "./emote-service";
 
 function game(): GameState {
   const ids = ["p1", "c1", "c2"];
@@ -98,4 +98,16 @@ test("computer opponents stay quiet for small rents, empty dragon visits, bankru
   state.players[1]!.isBankrupt = false;
   assert.deepEqual(pickComputerEmotes(state, new Set(), () => COMPUTER_EMOTE_CHANCE), [], "the dice decide: at or above the chance no emote");
   assert.ok(COMPUTER_EMOTE_CHANCE <= 0.35, "computer emotes stay rare");
+});
+
+test("'Wo bin ich?' works for connected players in a running game and has its own three-second cooldown", () => {
+  assert.equal(validateLocateRequest(player, "playing"), undefined);
+  assert.match(validateLocateRequest(undefined, "playing")!, /Verbindung/);
+  assert.match(validateLocateRequest({ ...player, connectionState: "disconnected" }, "playing")!, /Verbindung/);
+  assert.match(validateLocateRequest(player, "lobby")!, /erst auf dem Brett/);
+  const gate = new EmoteGate(LOCATE_COOLDOWN_MS);
+  assert.equal(LOCATE_COOLDOWN_MS, 3_000);
+  assert.equal(gate.tryEmote("VAL-1", "p1", 0).ok, true);
+  assert.deepEqual(gate.tryEmote("VAL-1", "p1", 1_000), { ok: false, cooldownMs: 2_000 });
+  assert.equal(gate.tryEmote("VAL-1", "p1", LOCATE_COOLDOWN_MS).ok, true);
 });

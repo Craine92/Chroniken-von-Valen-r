@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { GameState, PropertyGroupId } from "@valenor/shared";
+import type { GameState, LocateSignal, PropertyGroupId } from "@valenor/shared";
 import { createGame } from "./createGame";
 import type { ValenorBoardScene } from "./scenes/ValenorBoardScene";
 import { GameSceneBridge } from "./GameSceneBridge";
@@ -12,7 +12,7 @@ function getDiceSignature(state: GameState): string {
     : "";
 }
 
-export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode = DEFAULT_BOARD_PRESENTATION_MODE }: { gameState: GameState; focusedPropertyGroupId?: PropertyGroupId | undefined; presentationMode?: BoardPresentationMode | undefined }) {
+export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode = DEFAULT_BOARD_PRESENTATION_MODE, locateSignal }: { gameState: GameState; focusedPropertyGroupId?: PropertyGroupId | undefined; presentationMode?: BoardPresentationMode | undefined; locateSignal?: LocateSignal | undefined }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<ValenorBoardScene | null>(null);
   const initialStateRef = useRef(gameState);
@@ -70,6 +70,11 @@ export function GameCanvas({ gameState, focusedPropertyGroupId, presentationMode
   useEffect(() => {
     sceneRef.current?.focusPropertyGroup(focusedPropertyGroupId);
   }, [focusedPropertyGroupId]);
+
+  // „Wo bin ich?“ vom Handy: die Figur bzw. das Wappen des Spielers pulsiert kurz.
+  useEffect(() => {
+    if (locateSignal) sceneRef.current?.locatePlayer(locateSignal.playerId);
+  }, [locateSignal?.id]);
 
   return (
     <div className="game-canvas" data-testid="valenor-game-container" aria-label="Spielbrett von Valenør">

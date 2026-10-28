@@ -3,7 +3,7 @@ import { BOARD_TILES, getPropertyGroupTiles, DUNGEON_TILE_INDEX, MAX_RELICS, REL
 import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, CREST_SIZE, getFieldZones, getTilePlacement, getTileWorldPosition, getTokenSeat, TOKEN_FOOTPRINT, type TokenSeat } from "../board-layout";
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { MortgageOverlayLayer } from "../layers/MortgageOverlayLayer";
-import { PropertyGroupLayer } from "../layers/PropertyGroupLayer";
+import { getCompleteGroupOwner, PropertyGroupLayer } from "../layers/PropertyGroupLayer";
 import { BoardArtLayer } from "../layers/BoardArtLayer";
 import { getCharacterAsset, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
 import { fitImage } from "../assets/asset-runtime";
@@ -25,7 +25,7 @@ function getMovementSignature(state: GameState): string {
   return movement ? `${movement.sequence ?? state.turnContext.rollSequence}-${movement.kind}-${movement.from}-${movement.to}` : "";
 }
 
-import { PLAYER_COLOR_VALUES as PLAYER_COLORS, PLAYER_CHARACTERS } from "@valenor/shared";
+import { LOCATE_PULSE_MS, PLAYER_COLOR_VALUES as PLAYER_COLORS, PLAYER_CHARACTERS } from "@valenor/shared";
 import { CODEX_DURATIONS, CODEX_FONTS, codexColor } from "../design-tokens";
 import { addIconImage, type BoardIconName } from "../icon-textures";
 import { RELIC_ICONS } from "../../components/icons/Icon";
@@ -36,6 +36,9 @@ const REGION_TRAIL: Record<RegionType, number> = {
   orcs: 0xff7048,
   steppe: 0xf5d47d
 };
+
+/** Durchmesser des Besitzerwappens auf dem Feld (Weltpixel). */
+const OWNER_CREST_SIZE = 34;
 
 export class ValenorBoardScene extends Phaser.Scene {
   private state: GameState;
@@ -50,7 +53,6 @@ export class ValenorBoardScene extends Phaser.Scene {
   private readonly dungeonMarkers = new Map<string, Phaser.GameObjects.Container>();
   private readonly activeRings = new Map<string, Phaser.GameObjects.Container>();
   private readonly ownershipMarkers = new Map<number, Phaser.GameObjects.Container>();
-  private ownershipMarkerScale = 1;
   private ownershipSignature = "";
   private lastDiceSignature = "";
   private lastMovementSignature = "";
@@ -72,6 +74,8 @@ export class ValenorBoardScene extends Phaser.Scene {
   private artLayer: BoardArtLayer | undefined;
   private tileLayer: Phaser.GameObjects.Layer | undefined;
   private propertyGroupLayer: PropertyGroupLayer | undefined;
+  private auctionMarker: Phaser.GameObjects.Container | undefined;
+  private auctionTileIndex: number | undefined;
   private externalPropertyGroupFocus: PropertyGroupId | undefined;
   private currentPlayerId: string | undefined;
   private dragon: Phaser.GameObjects.Container | undefined;
@@ -116,7 +120,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       onPropertyGroupFocus: (groupId, mode) => this.propertyGroupLayer?.focus(groupId, mode)
     });
     this.tileLayer = tileRenderer.renderAll(BOARD_TILES);
-    this.propertyGroupLayer = new PropertyGroupLayer(this, this.state);
+    this.propertyGroupLayer = new PropertyGroupLayer(this, this.state, this.reducedMotion || this.living.drama === "calm");
     this.propertyGroupLayer.setExternalFocus(this.externalPropertyGroupFocus);
     this.artLayer.renderRealmDecorations();
     this.artLayer.renderRealmAtmosphere(this.reducedMotion, this.visualQuality.animateAmbient);
@@ -136,6 +140,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.drawPlayerTokens();
     this.syncTokenRelics(this.state);
     this.syncDragon(this.state);
+    this.syncAuction(this.state);
     this.syncWorldImpulse(this.state);
     this.syncMomentumCelebration(this.state);
     this.syncActivePlayer(this.state.currentPlayerId);
@@ -235,6 +240,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.syncDungeonMarkers(next);
     this.syncTokenRelics(next);
     this.syncDragon(next);
+    this.syncAuction(next);
     this.syncWorldImpulse(next);
     this.syncMomentumCelebration(next);
     this.developmentLayer?.sync(next, true);
@@ -258,6 +264,37 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.arrangeTokens(true);
     }
     this.syncRealmNames();
+  }
+
+  /**
+   * „Wo bin ich?“: Um die Figur (oder ihr Wappen auf einem vollen Feld) laufen ein paar Sekunden Ringe in der
+   * Spielerfarbe. Unter reduzierter Bewegung steht stattdessen ein ruhiger, heller Ring.
+   */
+  locatePlayer(playerId: string): void {
+    const token = this.tokens.get(playerId), player = this.state.players.find(entry => entry.id === playerId);
+    if (!token || !player) return;
+    const color = PLAYER_COLORS[player.color];
+    const crested = Boolean(this.tokenCrests.get(playerId)?.visible);
+    const scale = crested ? 1 : (this.tokenVisuals.get(playerId)?.getData("seatScale") as number | undefined) ?? 1;
+    const center = crested ? { x: 0, y: 0 } : { x: 0, y: -32 * scale };
+    const radius = crested ? CREST_SIZE * .75 : 46 * scale;
+    (token.getByName("locate-marker") as Phaser.GameObjects.Container | null)?.destroy();
+    const marker = this.add.container(center.x, center.y).setName("locate-marker");
+    token.add(marker);
+    this.game.canvas.dataset.lastLocate = playerId;
+    const remove = () => { this.tweens.killTweensOf(marker.list); marker.destroy(); };
+    if (this.reducedMotion) {
+      marker.add([this.add.circle(0, 0, radius, color, .2).setStrokeStyle(5, color, 1), this.add.circle(0, 0, radius + 5, 0x000000, 0).setStrokeStyle(2, 0xfff3cf, .9)]);
+      this.time.delayedCall(LOCATE_PULSE_MS, remove);
+      return;
+    }
+    for (let index = 0; index < 3; index += 1) {
+      const ring = this.add.circle(0, 0, radius, color, .12).setStrokeStyle(5, color, 1).setAlpha(0);
+      marker.add(ring);
+      this.tweens.add({ targets: ring, alpha: { from: 1, to: 0 }, scale: { from: .7, to: 1.9 }, duration: 1_000, delay: index * 330,
+        repeat: Math.max(0, Math.round(LOCATE_PULSE_MS / 1_000) - 1), ease: "Sine.Out" });
+    }
+    this.time.delayedCall(LOCATE_PULSE_MS + 700, remove);
   }
 
   focusPropertyGroup(groupId: PropertyGroupId | undefined): void {
@@ -607,7 +644,18 @@ export class ValenorBoardScene extends Phaser.Scene {
         const silhouette = this.add.ellipse(0, -15, 36, 55, 0x050507, .46);
         miniatureVisual.add([silhouette, this.createMiniature(PLAYER_CHARACTERS.findIndex(character=>character.id===player.characterId), color).setScale(TOKEN_VISUAL_CONFIG.miniatureScale)]);
       }
+      // Kräftiger Sockelring in Spielerfarbe: Jede Figur ist vom Sofa aus zuzuordnen.
+      const playerRing = this.add.container(0, 10, [
+        this.add.ellipse(0, 0, TOKEN_VISUAL_CONFIG.base.outerWidth + 22, TOKEN_VISUAL_CONFIG.base.outerHeight + 12, color, .22),
+        this.add.ellipse(0, 0, TOKEN_VISUAL_CONFIG.base.outerWidth + 14, TOKEN_VISUAL_CONFIG.base.outerHeight + 7, 0x000000, 0).setStrokeStyle(5, color, 1),
+        this.add.ellipse(0, 0, TOKEN_VISUAL_CONFIG.base.outerWidth + 14, TOKEN_VISUAL_CONFIG.base.outerHeight + 7, 0x000000, 0).setStrokeStyle(1.5, 0xfff3cf, .7)
+      ]).setName("token-player-ring");
+      // Lichtkegel von oben für die Figur am Zug.
+      const lightCone = this.add.graphics().setName("token-light-cone");
+      lightCone.fillGradientStyle(0xfff1c4, 0xfff1c4, color, color, 0, 0, .3, .3).fillRect(-30, -150, 60, 150);
+      lightCone.fillGradientStyle(0xfff1c4, 0xfff1c4, color, color, 0, 0, .16, .16).fillTriangle(-30, -150, -46, 0, -30, 0).fillTriangle(30, -150, 46, 0, 30, 0);
       const activeRing = this.add.container(0, 7).setVisible(false);
+      lightCone.setPosition(0, 10).setVisible(player.id === this.state.currentPlayerId);
       activeRing.add([
         this.add.circle(0, 0, TOKEN_VISUAL_CONFIG.activeAuraRadius, color, .12),
         this.add.circle(0, 0, TOKEN_VISUAL_CONFIG.activeRingRadius, 0x000000, 0).setStrokeStyle(4, color, .98),
@@ -632,7 +680,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const chain = addIconImage(this, 0, -28, "dungeon", 15, codexColor("oxblood300"));
       dungeonMarker.add([bars, chain]);
       const tokenVisual = this.add.container(0, 0).setName("token-visual");
-      tokenVisual.add([backdrop, shadowSoft, shadowCore, glow, baseLower, baseOuter, baseInner, baseRune, miniatureVisual, dungeonMarker, activeRing, nameLabel]);
+      tokenVisual.add([lightCone, backdrop, shadowSoft, shadowCore, glow, playerRing, baseLower, baseOuter, baseInner, baseRune, miniatureVisual, dungeonMarker, activeRing, nameLabel]);
       const relicBadges = this.add.container(0, 0).setName(`relics-${player.id}`);
       tokenVisual.add(relicBadges);
       this.tokenRelics.set(player.id, relicBadges);
@@ -720,6 +768,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.activeRings.forEach((ring, id) => {
       const active = id === playerId;
       this.tokenNameLabels.get(id)?.setAlpha(active ? 1 : .9);
+      (this.tokenVisuals.get(id)?.getByName("token-light-cone") as Phaser.GameObjects.Graphics | null)?.setVisible(active);
       if(ring.getData("active") === active)return;
       ring.setData("active",active).setVisible(active).setScale(1).setAlpha(active ? .9 : 0);
       if (active && !this.reducedMotion) {
@@ -775,6 +824,29 @@ export class ValenorBoardScene extends Phaser.Scene {
     if(!this.reducedMotion)this.tweens.add({targets:this.tavernGlow,alpha:.65,duration:3600,yoyo:true,repeat:-1,ease:"Sine.InOut"});
   }
 
+  /** Laufende Auktion: Lichtkegel, goldener Rahmen und leichtes Pulsieren auf dem versteigerten Feld. */
+  private syncAuction(state: GameState): void {
+    const tileIndex = state.auction && state.turnPhase === "auction" ? state.auction.tileIndex : undefined;
+    if (tileIndex === this.auctionTileIndex) return;
+    if (this.auctionMarker) { this.tweens.killTweensOf(this.auctionMarker.list); this.tweens.killTweensOf(this.auctionMarker); this.auctionMarker.destroy(); }
+    this.auctionMarker = undefined;
+    this.auctionTileIndex = tileIndex;
+    this.game.canvas.dataset.auctionTile = tileIndex === undefined ? "" : String(tileIndex);
+    if (tileIndex === undefined) return;
+    const place = getTilePlacement(tileIndex);
+    const marker = this.add.container(place.x, place.y).setDepth(BOARD_DEPTHS.ownership + 2).setName("auction-highlight");
+    const cone = this.add.graphics();
+    // Licht fällt von der Brettmitte auf das Feld.
+    cone.fillGradientStyle(0xfff1c4, 0xfff1c4, 0xffd77a, 0xffd77a, 0, 0, .32, .32).fillRect(-place.width / 2, -place.height / 2, place.width, place.height);
+    const outer = this.add.rectangle(0, 0, place.width + 10, place.height + 10, 0x000000, 0).setStrokeStyle(8, 0xf3d681, .35);
+    const frame = this.add.rectangle(0, 0, place.width + 2, place.height + 2, 0x000000, 0).setStrokeStyle(4, 0xf3d681, 1);
+    const seal = addIconImage(this, 0, -place.height / 2 + 4, "auction", 26, codexColor("gold200"));
+    marker.add([cone, outer, frame, seal]);
+    this.auctionMarker = marker;
+    if (this.reducedMotion || this.living.drama === "calm") return;
+    this.tweens.add({ targets: [outer, cone], alpha: .45, duration: 900, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+  }
+
   private drawOwnershipMarkers() {
     const previous=new Map(this.ownershipMarkers);
     this.ownershipMarkers.forEach((marker) => { this.tweens.killTweensOf(marker);marker.destroy(); });
@@ -784,31 +856,30 @@ export class ValenorBoardScene extends Phaser.Scene {
       const owner = this.state.players.find((player) => player.id === ownership.ownerId);
       if (!owner) return;
       const place = getTilePlacement(ownership.tileIndex);
-      const marker = this.add.container(place.x, place.y).setScale(this.ownershipMarkerScale).setDepth(BOARD_DEPTHS.ownership);
+      // Besitzzeichen sind feldgenau; sie wachsen nicht mit der TV-Skalierung über das Feld hinaus.
+      const marker = this.add.container(place.x, place.y).setDepth(BOARD_DEPTHS.ownership);
       if(!previous.has(ownership.tileIndex) && this.boardReady && !this.reducedMotion){
         marker.setAlpha(0);this.tweens.add({targets:marker,alpha:1,duration:500,ease:"Sine.Out"});
       }
       const ownershipFrame = this.add.rectangle(0, 0, place.width - 7, place.height - 7, 0x000000, 0)
         .setName("ownership-frame").setStrokeStyle(5, PLAYER_COLORS[owner.color], 1);
-      // Wappen im Preisband (oben/unten) bzw. in der äußeren unteren Ecke der Seitenfelder; die Gruppenleiste bleibt frei.
+      // Besitzerwappen mit Porträt, vom Sofa aus erkennbar: links im Preisband (oben/unten) bzw. in der äußeren
+      // unteren Ecke der Seitenfelder; die Gruppenleiste an der Innenkante bleibt frei.
       const zones = getFieldZones(ownership.tileIndex);
-      const badgeX = zones.kind === "landscape" && zones.inward.x < 0 ? place.width / 2 - 18 : -place.width / 2 + 18;
-      const badgeY = zones.priceBand ? (zones.priceBand.top + zones.priceBand.bottom) / 2 - (zones.inward.y > 0 ? 2 : 0) : place.height / 2 - 16;
-      const glow = this.add.circle(badgeX, badgeY, 13, PLAYER_COLORS[owner.color], .28);
-      const banner = this.add.rectangle(badgeX, badgeY, 24, 18, 0x09090c, .96)
-        .setStrokeStyle(2.5, PLAYER_COLORS[owner.color], 1);
-      const initials = owner.name.trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "V";
-      const rune = this.add.text(badgeX, badgeY, initials, { color: "#fff3cf", fontFamily: CODEX_FONTS.text, fontSize: "10px", fontStyle: "bold", stroke: "#080709", strokeThickness: 2 }).setOrigin(.5);
+      const crestX = zones.kind === "landscape" && zones.inward.x < 0 ? place.width / 2 - 21 : -place.width / 2 + 21;
+      const crestY = zones.priceBand ? zones.priceBand.bottom - 19 : place.height / 2 - 21;
+      const crest = this.createTokenCrest(owner.characterId, PLAYER_COLORS[owner.color]).setVisible(true)
+        .setPosition(crestX, crestY).setScale(OWNER_CREST_SIZE / CREST_SIZE).setName("owner-crest");
+      const pennant = this.add.triangle(crestX, crestY + OWNER_CREST_SIZE / 2 + 2, -7, 0, 7, 0, 0, 9, PLAYER_COLORS[owner.color], 1)
+        .setStrokeStyle(1, 0x07060a, .9).setName("owner-pennant");
       if(ownership.mortgaged)marker.add(this.add.rectangle(0,0,place.width-9,place.height-9,0x000000,.28).setName("mortgage-shade"));
-      marker.add([ownershipFrame, glow, banner, rune]);
-      const group = BOARD_TILES[ownership.tileIndex]?.propertyGroup;
-      if(group && getPropertyGroupTiles(group).every(tile=>this.state.propertyOwnerships.some(entry=>entry.tileIndex===tile.index && entry.ownerId===owner.id))) {
-        marker.add(addIconImage(this,badgeX,badgeY-19,"crown",15,codexColor("gold300")).setName("complete-group-crown"));
+      marker.add([ownershipFrame, pennant, crest]);
+      const groupId = BOARD_TILES[ownership.tileIndex]?.propertyGroupId;
+      if (groupId && getCompleteGroupOwner(this.state, groupId) === owner.id) {
+        marker.add(addIconImage(this, crestX, crestY - OWNER_CREST_SIZE / 2 - 5, "crown", 17, codexColor("gold300")).setName("complete-group-crown"));
       }
       if (ownership.mortgaged) {
-        glow.setFillStyle(0x292a31, 0.65);
-        banner.setAlpha(.85);
-        rune.setAlpha(.9);
+        crest.setAlpha(.6);
         marker.add(addIconImage(this, 0, 0, "mortgage", 22, codexColor("parchment100")).setName("mortgage-lock"));
       }
       this.ownershipMarkers.set(ownership.tileIndex, marker);
@@ -823,7 +894,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   private getTokenSeatFor(playerId: string, tileIndex: number) {
     const occupants = this.state.players.filter(candidate => candidate.position === tileIndex);
     const index = Math.max(0, occupants.findIndex(candidate => candidate.id === playerId));
-    return { seat: getTokenSeat(tileIndex, occupants.length, index, { activeIndex: this.getLeadIndex(occupants), occupiedByBuilding: this.hasBuilding(tileIndex) }), occupants: occupants.length };
+    return { seat: getTokenSeat(tileIndex, occupants.length, index, { activeIndex: this.getLeadIndex(occupants) }), occupants: occupants.length };
   }
 
   private getLeadIndex(occupants: readonly { id: string }[]): number {
@@ -895,6 +966,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const { seat, occupants } = this.getTokenSeatFor(playerId, tileIndex);
     const target = this.getTokenWorldPosition(tileIndex, seat);
     const scale = this.styleTokenForSeat(playerId, seat, occupants);
+    token.setScale(1);
     // Vordere Figuren liegen über den hinteren.
     token.setDepth(BOARD_DEPTHS.players + (target.y + BOARD_HALF_HEIGHT) / 100_000);
     if (animate && !this.reducedMotion) {
@@ -915,7 +987,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const step = (index: number) => {
       const tileIndex = movement.path[index];
       if (tileIndex === undefined) return;
-      const stepSeat = getTokenSeat(tileIndex, 1, 0, { occupiedByBuilding: this.hasBuilding(tileIndex) });
+      const stepSeat = getTokenSeat(tileIndex, 1, 0);
       const position = this.getTokenWorldPosition(tileIndex, stepSeat);
       this.tokenVisuals.get(movement.playerId)?.setScale(this.styleTokenForSeat(movement.playerId, stepSeat, 1));
       const region = BOARD_TILES[tileIndex]?.region;
@@ -943,8 +1015,8 @@ export class ValenorBoardScene extends Phaser.Scene {
         targets: token,
         x: middleX,
         y: middleY,
-        scaleX: .94,
-        scaleY: 1.08,
+        // Nur gleichmäßig skalieren: Figuren werden nie gestaucht oder verzerrt.
+        scale: 1.05,
         duration: 90,
         ease: "Sine.Out",
         onComplete: () => {
@@ -952,8 +1024,7 @@ export class ValenorBoardScene extends Phaser.Scene {
             targets: token,
             x: position.x,
             y: position.y,
-            scaleX: 1.05,
-            scaleY: .94,
+            scale: 1,
             duration: 100,
             ease: "Sine.In",
             onComplete: () => {
@@ -998,10 +1069,6 @@ export class ValenorBoardScene extends Phaser.Scene {
       const spark = this.add.star(token.x, token.y - 26, 4, 2, 5, index % 2 ? color : codexColor("gold200"), 1).setDepth(BOARD_DEPTHS.effects + 1);
       this.tweens.add({ targets: spark, x: token.x + Math.cos(angle) * 46, y: token.y - 26 + Math.sin(angle) * 40, alpha: 0, angle: 120, duration: base * 3, ease: "Sine.Out", onComplete: () => spark.destroy() });
     }
-  }
-
-  private hasBuilding(tileIndex: number) {
-    return this.state.propertyOwnerships.some(ownership=>ownership.tileIndex===tileIndex && ownership.buildingLevel>0);
   }
 
   private getDragonPosition(tileIndex: number, scale: number) {
@@ -1148,7 +1215,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const tile = getTilePlacement(targetIndex);
     const pulse = this.add.graphics().setDepth(BOARD_DEPTHS.effects + 2);
     pulse.lineStyle(7, impulse.id === "dragonCall" ? 0xef784d : 0xf3ca67, .9).strokeRoundedRect(tile.x - tile.width / 2 + 3, tile.y - tile.height / 2 + 3, tile.width - 6, tile.height - 6, 10);
-    this.tweens.add({ targets: pulse, alpha: 0, scaleX: 1.06, scaleY: 1.06, duration: this.reducedMotion ? 180 : 850, yoyo: !this.reducedMotion, repeat: this.reducedMotion ? 0 : 1, onComplete: () => pulse.destroy() });
+    this.tweens.add({ targets: pulse, alpha: 0, scale: 1.06, duration: this.reducedMotion ? 180 : 850, yoyo: !this.reducedMotion, repeat: this.reducedMotion ? 0 : 1, onComplete: () => pulse.destroy() });
   }
 
   private syncMomentumCelebration(state: GameState): void {
@@ -1195,6 +1262,9 @@ export class ValenorBoardScene extends Phaser.Scene {
     if(signature === this.lastImpactSignature)return;
     this.lastImpactSignature=signature;
     const position = getTileWorldPosition(tileIndex);
+    // Landet eine Figur auf einem Grundstück, leuchtet seine ganze Gruppe kurz auf.
+    const groupId = BOARD_TILES[tileIndex]?.propertyGroupId;
+    if (groupId) this.propertyGroupLayer?.pulseGroup(groupId);
     const impact = this.add.circle(position.x, position.y + 4, 8, 0xe9c77d, .1).setDepth(BOARD_DEPTHS.effects).setStrokeStyle(3, 0xf1d89b, .8);
     this.tweens.add({ targets: impact, scale: 3.8, alpha: 0, duration: this.reducedMotion ? 100 : 600, ease: "Sine.Out", onComplete: () => impact.destroy() });
     for (let index = 0; index < (this.reducedMotion ? 0 : 5); index += 1) {
@@ -1327,10 +1397,8 @@ export class ValenorBoardScene extends Phaser.Scene {
 
   private applyBoardVisualScale(boardZoom: number) {
     const scale = getBoardVisualScale(boardZoom, this.scale.width);
-    this.ownershipMarkerScale = scale.markerScale;
     this.relicBadgeSize = Math.max(18, Math.min(34, 22 / (boardZoom * scale.visualTokenScale)));
     this.syncTokenRelics(this.state);
-    this.ownershipMarkers.forEach((marker) => marker.setScale(scale.markerScale));
     this.propertyGroupLayer?.setVisualScale(scale.groupMarkerScale);
     this.game.canvas.dataset.effectiveBoardScale = scale.effectiveBoardScale.toFixed(4);
     this.game.canvas.dataset.visualTokenScale = scale.visualTokenScale.toFixed(4);

@@ -18,6 +18,9 @@ import { ControllerJournal } from "../components/ControllerJournal";
 import { PlayerPortrait } from "../components/PlayerPortrait";
 import { Icon } from "../components/icons/Icon";
 import { EmoteBar } from "../components/EmoteBar";
+import { LocateButton } from "../components/LocateButton";
+import { MobileTargetField } from "../components/MobileTargetField";
+import { getLandingPreview } from "../mobile/landing-preview";
 import { LivingBoardQa, isLivingBoardScene } from "./LivingBoardQa";
 import { BoardFieldsQa, isBoardFieldScene } from "./BoardFieldsQa";
 import { HostLobby } from "./HostLobby";
@@ -418,6 +421,21 @@ function MobileEmotesQa({ cooldown = false }: { cooldown?: boolean }) {
   </MobileQaShell>;
 }
 
+/** Handy direkt nach dem eigenen Wurf: Zielfeld mit Bild, Gruppe, Besitzer und was dort passiert. */
+function MobileTargetQa({ owned = false }: { owned?: boolean }) {
+  const state = createShowcaseState("buildings");
+  const to = owned ? 24 : 26;
+  state.turnPhase = "moving";
+  state.propertyOwnerships = state.propertyOwnerships.filter(entry => entry.tileIndex !== 26);
+  state.lastMovement = { kind: "normal", sequence: 99, playerId: "p1", from: 18, to, path: [to], passedStart: false, landedTile: BOARD_TILES[to]! };
+  const preview = getLandingPreview(state, "p1");
+  return <MobileQaShell>
+    <div className="turn-controls">{preview && <MobileTargetField preview={preview} />}</div>
+    <LocateButton connected onLocate={done => done({ ok: true })} />
+    <EmoteBar connected onSend={(_, done) => done({ ok: true })} />
+  </MobileQaShell>;
+}
+
 function createResultState(shared = false): GameState {
   const state = createShowcaseState("buildings");
   const scores = [
@@ -544,6 +562,8 @@ export function VisualQaPage() {
   if (scenario === "controller-emotes-cooldown") return <MobileEmotesQa cooldown />;
   if (isBoardFieldScene(scenario)) return <BoardFieldsQa scene={scenario} />;
   if (scenario === "lobby") return <LobbyQa />;
+  if (scenario === "controller-target") return <MobileTargetQa />;
+  if (scenario === "controller-target-rent") return <MobileTargetQa owned />;
   if (scenario === "lobby-empty") return <LobbyQa empty />;
   if (isLivingBoardScene(scenario)) return <LivingBoardQa scene={scenario} createBase={() => createShowcaseState("buildings")} />;
   if (scenario === "one") {

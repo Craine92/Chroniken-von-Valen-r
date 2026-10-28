@@ -3,6 +3,7 @@ import type { GameConfig, GameRoom, GameState, MagicSignal, Player, PlayerColor,
 import type { QuickTradeRequest } from "./quick-trade";
 import type { WorldImpulseChoice } from "./world-impulses";
 import type { EmoteId, EmoteSignal } from "./emotes";
+import type { LocateSignal } from "./locate";
 import type { PropertyGroupId } from "./property-groups";
 
 export const SOCKET_EVENTS = {
@@ -22,6 +23,7 @@ export const SOCKET_EVENTS = {
   playerUpdateReady: "player:updateReady",
   playerMagicSignal: "player:magicSignal",
   playerEmote: "player:emote",
+  playerLocate: "player:locate",
   propertyGroupFocus: "property:groupFocus",
   gameStart: "game:start",
   gameState: "game:state",
@@ -132,6 +134,7 @@ export interface ClientToServerEvents {
   "player:join": (request: JoinRoomRequest, callback: (result: JoinRoomResult) => void) => void;
   "player:magicSignal": (callback: (result: EventResult) => void) => void;
   "player:emote": (emoteId: EmoteId, callback: (result: EmoteResult) => void) => void;
+  "player:locate": (callback: (result: EmoteResult) => void) => void;
   "player:updateColor": (color: PlayerColor, callback: (result: RoomMutationResult) => void) => void;
   "player:updateCharacter": (characterId: PlayerCharacterId, callback: (result: RoomMutationResult) => void) => void;
   "player:updateReady": (ready: boolean, callback: (result: RoomMutationResult) => void) => void;
@@ -179,6 +182,7 @@ export interface ServerToClientEvents {
   "player:reconnect": (player: Player) => void;
   "player:magicSignal": (signal: MagicSignal) => void;
   "player:emote": (signal: EmoteSignal) => void;
+  "player:locate": (signal: LocateSignal) => void;
   "property:groupFocus": (signal: PropertyGroupFocusSignal) => void;
   "game:start": (gameState: GameState) => void;
   "game:state": (gameState: GameState) => void;

@@ -12,3 +12,4 @@ export * from "./quests";
 export * from "./world-impulses";
 export * from "./quick-trade";
 export * from "./emotes";
+export * from "./locate";

@@ -13,6 +13,13 @@ export function validateEmoteRequest(emoteId: unknown, player: Player | undefine
   return undefined;
 }
 
+/** „Wo bin ich?“ gibt es für verbundene Spieler, solange die Chronik läuft. */
+export function validateLocateRequest(player: Player | undefined, roomPhase: GameStatus | undefined): string | undefined {
+  if (!player || player.connectionState !== "connected") return "Deine Verbindung konnte nicht bestätigt werden.";
+  if (roomPhase !== "playing") return "Deine Figur steht erst auf dem Brett, wenn die Chronik läuft.";
+  return undefined;
+}
+
 export type EmoteAttempt = { ok: true } | { ok: false; cooldownMs: number };
 
 /**

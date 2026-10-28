@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { BOARD_CORNER_TILE_INDICES, BOARD_TILES } from "@valenor/shared";
 import { getBoardTileVisualLayout } from "./board-tile-layout";
-import { ACTIVE_TOKEN_SCALE_BOOST, BOARD_FIELD_DEPTH, CREST_FIELD_THRESHOLD, CREST_SIZE, BOARD_HEIGHT, BOARD_WIDTH, getBoardFitZoom, getBuildingSeat, getDragonAnchor, getFieldZones, getTileInnerAnchor, getTilePlacement, getTokenSeat, TOKEN_FOOTPRINT } from "../board-layout";
+import { ACTIVE_TOKEN_SCALE_BOOST, BOARD_FIELD_DEPTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, getGroupStripSlots, CREST_FIELD_THRESHOLD, CREST_SIZE, BOARD_HEIGHT, BOARD_WIDTH, getBoardFitZoom, getBuildingSeat, getDragonAnchor, getFieldZones, getTileInnerAnchor, getTilePlacement, getTokenSeat, TOKEN_FOOTPRINT } from "../board-layout";
 import { getBoardVisualScale } from "../board-presentation";
 import { getFieldSymbol, getPropertyGroupVisual, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, getTileVariant } from "./board-tile-theme";
 import { pickLeadIndex, showsTokenName } from "../tokens/token-visuals";
@@ -175,7 +176,7 @@ test("one to six tokens stand on their own field, below the name band and with d
   for (let tileIndex = 0; tileIndex < 40; tileIndex += 1) {
     const place = getTilePlacement(tileIndex), zones = getFieldZones(tileIndex);
     for (const built of [false, true]) for (let count = 1; count <= 6; count += 1) for (const activeIndex of [-1, 0, count - 1]) {
-      const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index, { activeIndex, occupiedByBuilding: built }));
+      const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index, { activeIndex }));
       assert.equal(new Set(seats.map(seat => `${seat.x.toFixed(2)}:${seat.y.toFixed(2)}`)).size, count, `Feld ${tileIndex}, ${count} Figuren`);
       for (const seat of seats) {
         const box = tokenBox(seat);
@@ -196,7 +197,9 @@ test("the active token stands in front and a little larger; alone it keeps the n
     const active = seats[activeIndex]!;
     assert.ok(active.front, `Feld ${tileIndex}: aktive Figur vorne`);
     assert.ok(seats.every(seat => seat.y <= active.y + .001));
-    assert.ok(seats.every((seat, index) => index === activeIndex || seat.scale < active.scale), `Feld ${tileIndex}: aktive Figur am größten`);
+    // Auf den niedrigen Seitenfeldern begrenzt die Höhe alle gleich; dort ist die aktive Figur nicht kleiner, oben und unten größer.
+    const sideField = getFieldZones(tileIndex).kind === "landscape";
+    assert.ok(seats.every((seat, index) => index === activeIndex || (sideField ? seat.scale <= active.scale : seat.scale < active.scale)), `Feld ${tileIndex}: aktive Figur am größten`);
     assert.ok(active.scale <= seats.find((_, index) => index !== activeIndex)!.scale * ACTIVE_TOKEN_SCALE_BOOST + .001);
   }
   const alone = getTokenSeat(3, 1, 0, { activeIndex: 0 });
@@ -214,25 +217,21 @@ test("tokens shrink as a field fills up, and crowded fields show only the active
   assert.equal(showsTokenName(6, true), true);
 });
 
-test("buildings sit on the inner part of their field and leave room for the tokens", () => {
+test("buildings stand outside the field at its inner edge and lean into the middle of the board on every side", () => {
   for (let tileIndex = 0; tileIndex < 40; tileIndex += 1) {
     const zones = getFieldZones(tileIndex);
     if (!zones.building) continue;
-    const place = getTilePlacement(tileIndex), seat = getBuildingSeat(tileIndex);
-    assert.ok(Math.abs(seat.x) + seat.width / 2 <= place.width / 2 && seat.y <= place.height / 2 && seat.y - seat.height >= zones.nameBand.bottom - .5);
-    if (zones.kind === "landscape") {
-      // Bauplatz an der Innenkante, die Figuren stehen daneben.
-      assert.equal(Math.sign(seat.x), zones.inward.x);
-      for (let count = 1; count <= 6; count += 1) for (let index = 0; index < count; index += 1) {
-        const box = tokenBox(getTokenSeat(tileIndex, count, index, { occupiedByBuilding: true }));
-        assert.ok(zones.inward.x > 0 ? box.right <= zones.building.left + .5 : box.left >= zones.building.right - .5, `Feld ${tileIndex}: Figur auf dem Bauplatz`);
-      }
-    } else {
-      // Oben und unten steht das Gebäude hinter den Figuren; ihre Füße bleiben vor dem Bauplatz.
-      for (let count = 1; count <= 6; count += 1) for (let index = 0; index < count; index += 1) {
-        assert.ok(getTokenSeat(tileIndex, count, index, { occupiedByBuilding: true }).y > zones.building.bottom - 30);
-      }
-    }
+    const place = getTilePlacement(tileIndex), { box } = getBuildingSeat(tileIndex);
+    // Nicht auf dem Feld: Feldbild, Name und Figuren bleiben frei.
+    const overlapsField = box.left < place.width / 2 && box.right > -place.width / 2 && box.top < place.height / 2 && box.bottom > -place.height / 2;
+    assert.equal(overlapsField, false, `Feld ${tileIndex}: Gebäude liegt auf dem Feld`);
+    // Auf der Seite zur Brettmitte, direkt am Feld.
+    if (zones.kind === "landscape") assert.equal(Math.sign(box.left + box.right), zones.inward.x, `Feld ${tileIndex}`);
+    else assert.equal(Math.sign(box.top + box.bottom), zones.inward.y, `Feld ${tileIndex}`);
+    // Bleibt im Brettinneren und berührt weder Kartenstapel noch Mittelsiegel.
+    const world = { left: place.x + box.left, right: place.x + box.right, top: place.y + box.top, bottom: place.y + box.bottom };
+    assert.ok(world.left >= -BOARD_INNER_HALF_WIDTH - .5 && world.right <= BOARD_INNER_HALF_WIDTH + .5 && world.top >= -BOARD_INNER_HALF_HEIGHT - .5 && world.bottom <= BOARD_INNER_HALF_HEIGHT + .5, `Feld ${tileIndex}: außerhalb`);
+    assert.ok(world.bottom <= -BOARD_INNER_HALF_HEIGHT + 70 || world.top >= BOARD_INNER_HALF_HEIGHT - 70 || world.right <= -BOARD_INNER_HALF_WIDTH + 70 || world.left >= BOARD_INNER_HALF_WIDTH - 70, `Feld ${tileIndex}: ragt zu weit hinein`);
   }
 });
 
@@ -245,7 +244,7 @@ test("every field kind has a small symbol for its band", () => {
 test("from four tokens on, only the leading figure stands; the others show crests in a row at the foot of the field", () => {
   assert.equal(CREST_FIELD_THRESHOLD, 4);
   for (let tileIndex = 0; tileIndex < 40; tileIndex += 1) for (const built of [false, true]) for (let count = 4; count <= 6; count += 1) for (const lead of [0, 2, count - 1]) {
-    const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index, { activeIndex: lead, occupiedByBuilding: built }));
+    const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index, { activeIndex: lead }));
     const figures = seats.filter(seat => !seat.crest), crests = seats.filter(seat => seat.crest);
     assert.equal(figures.length, 1, `Feld ${tileIndex}: genau eine Figur`);
     assert.equal(seats[lead]!.crest, undefined, "the leading player is the figure");
@@ -254,8 +253,9 @@ test("from four tokens on, only the leading figure stands; the others show crest
     assert.equal(new Set(crests.map(crest => crest.y)).size, 1);
     assert.ok(crests.every(crest => crest.scale === CREST_SIZE));
     crests.slice(1).forEach((crest, index) => assert.ok(crest.x > crests[index]!.x));
-    // Die Wappen stehen vor den Füßen der Figur.
-    assert.ok(crests[0]!.y > figures[0]!.y);
+    // Oben, unten und in den Ecken stehen die Wappen vor den Füßen der Figur, auf den Seitenfeldern daneben.
+    if (getFieldZones(tileIndex).kind === "landscape") assert.ok(crests.every(crest => crest.x - CREST_SIZE / 2 >= tokenBox(figures[0]!).right - 2), `Feld ${tileIndex}: Wappen neben der Figur`);
+    else assert.ok(crests[0]!.y > figures[0]!.y);
   }
 });
 
@@ -265,4 +265,33 @@ test("the active player leads a full field; otherwise the one whose turn comes n
   assert.equal(pickLeadIndex(["p2", "p3", "p5", "p6"], "p4", order), 2, "p5 plays right after p4");
   assert.equal(pickLeadIndex(["p1", "p2", "p3", "p5"], "p6", order), 0, "wraps around to p1");
   assert.equal(pickLeadIndex(["p2", "p3"], "p4", order), -1, "small fields keep everybody standing");
+});
+
+test("side fields line the figures up side by side at about 60 % of the size on the top and bottom rows", () => {
+  for (const tileIndex of [14, 16, 19, 34, 37, 39]) {
+    for (let count = 1; count <= 3; count += 1) {
+      const seats = Array.from({ length: count }, (_, index) => getTokenSeat(tileIndex, count, index));
+      assert.equal(new Set(seats.map(seat => seat.y.toFixed(2))).size, 1, `Feld ${tileIndex}: ${count} Figuren in einer Reihe`);
+      seats.forEach(seat => assert.ok(seat.scale >= .5, `Feld ${tileIndex}: Figur zu klein (${seat.scale.toFixed(2)})`));
+    }
+    const top = getTokenSeat(25, 1, 0).scale, side = getTokenSeat(tileIndex, 1, 0).scale;
+    assert.ok(side / top >= .55 && side / top <= .7, `Verhältnis ${(side / top).toFixed(2)}`);
+  }
+});
+
+test("the group strip holds the symbol and one dot per field of the group inside the strip", () => {
+  for (const tile of BOARD_TILES.filter(entry => entry.type === "property")) {
+    const strip = getFieldZones(tile.index).groupStrip, group = getPropertyGroupVisual(tile.propertyGroup);
+    const slots = getGroupStripSlots(tile.index, group.size);
+    assert.equal(slots.dots.length, group.size);
+    for (const point of [slots.symbol, ...slots.dots]) {
+      assert.ok(point.x >= strip.left && point.x <= strip.right && point.y >= strip.top && point.y <= strip.bottom, tile.name);
+    }
+    assert.ok(strip.right - strip.left >= 12 && strip.bottom - strip.top >= 12, "a strong strip, at least 12 px");
+  }
+});
+
+test("tokens are only ever scaled evenly: the scene never stretches width and height separately", () => {
+  const scene = readFileSync(new URL("../scenes/ValenorBoardScene.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(scene, /scaleX\s*:|scaleY\s*:|setScale\(\s*[^(),]*,/);
 });

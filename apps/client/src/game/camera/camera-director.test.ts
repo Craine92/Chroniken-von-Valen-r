@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CAMERA_KIND_COOLDOWN_MS, CAMERA_MAX_ZOOM, CAMERA_SHOTS, CAMERA_TIMING, CameraDirector, FOLLOW, clampToBoard, followTarget, grandStartDurationMs, shotDurationMs, type CameraShotKind } from "./camera-director";
+import { CAMERA_KIND_COOLDOWN_MS, CAMERA_MAX_ZOOM, CAMERA_SHOTS, CAMERA_TIMING, CameraDirector, FOLLOW, clampToBoard, followTarget, getFocusZone, grandStartDurationMs, shotDurationMs, type CameraShotKind } from "./camera-director";
 
 test("every camera move lasts at most two seconds and never zooms closer than 1.35x", () => {
   for (const kind of Object.keys(CAMERA_SHOTS) as CameraShotKind[]) {
@@ -57,4 +57,15 @@ test("following a moving figure stays gentle and the grand start is short enough
   assert.deepEqual(followTarget({ x: 800, y: -400 }), { x: 800 * FOLLOW.share, y: -400 * FOLLOW.share });
   assert.ok(FOLLOW.share <= .3 && FOLLOW.zoom <= 1.1);
   assert.ok(grandStartDurationMs() <= 7_000, `${grandStartDurationMs()} ms`);
+});
+
+test("messages make way: something happening low on screen sends the banner to the top", () => {
+  // Gesamtansicht (Mitte 0, Zoom 1, 1080 hoch): untere Feldreihe unten, obere oben, Brettmitte gilt als oben.
+  assert.equal(getFocusZone(440, 0, 1, 1080), "lower");
+  assert.equal(getFocusZone(-440, 0, 1, 1080), "upper");
+  assert.equal(getFocusZone(0, 0, 1, 1080), "upper");
+  // Während einer Fahrt zählt die Lage im gezoomten Bild: Ein Ziel in der Mitte steht dann mittig …
+  assert.equal(getFocusZone(200, 200, 1.35, 1080), "upper");
+  // … die untere Feldreihe bleibt unten, weil die Kamera im Brett bleibt (Mitte höchstens bei y = 100).
+  assert.equal(getFocusZone(440, 100, 1.35, 1080), "lower");
 });

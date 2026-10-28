@@ -76,17 +76,21 @@ export function applyChronicleRentModifier(state: GameState, tile: BoardTile, re
   return rent;
 }
 
+/** Miete aus Besitz allein (Gruppe, Gebäude, Anzahl Häfen bzw. Betriebe) – noch ohne Ereignisse und Weltimpulse. */
+export function getBaseRent(state: GameState, tile: BoardTile, ownerId: string): number {
+  const ownership = state.propertyOwnerships.find((entry) => entry.tileIndex === tile.index && entry.ownerId === ownerId);
+  if (!ownership || ownership.mortgaged) return 0;
+  if (tile.type === "property") return calculatePropertyRent(state.propertyOwnerships, tile, ownerId);
+  const count = state.propertyOwnerships.filter((entry) => entry.ownerId === ownerId && !entry.mortgaged && BOARD_TILES[entry.tileIndex]?.type === tile.type).length;
+  if (tile.type === "harbor") return ECONOMY_CONFIG.harborRents[Math.max(0, count - 1)] ?? 0;
+  if (tile.type === "utility") return ECONOMY_CONFIG.utilityMultipliers[count >= 2 ? 1 : 0] * (state.lastDiceRoll?.total ?? 0);
+  return 0;
+}
+
 export function getEffectiveRent(state: GameState, tile: BoardTile, ownerId: string): number {
   const ownership = state.propertyOwnerships.find((entry) => entry.tileIndex === tile.index && entry.ownerId === ownerId);
   if (!ownership || ownership.mortgaged) return 0;
-  let rent = 0;
-  if (tile.type === "property") rent = calculatePropertyRent(state.propertyOwnerships, tile, ownerId);
-  else {
-    const count = state.propertyOwnerships.filter((entry) => entry.ownerId === ownerId && !entry.mortgaged && BOARD_TILES[entry.tileIndex]?.type === tile.type).length;
-    if (tile.type === "harbor") rent = ECONOMY_CONFIG.harborRents[Math.max(0, count - 1)] ?? 0;
-    if (tile.type === "utility") rent = ECONOMY_CONFIG.utilityMultipliers[count >= 2 ? 1 : 0] * (state.lastDiceRoll?.total ?? 0);
-  }
-  rent = applyChronicleRentModifier(state, tile, rent);
+  let rent = applyChronicleRentModifier(state, tile, getBaseRent(state, tile, ownerId));
   if (tile.type === "harbor" && state.worldImpulseEffects?.harborWindUntilRound === state.currentRound) rent = Math.round(rent * 1.5);
   return rent;
 }

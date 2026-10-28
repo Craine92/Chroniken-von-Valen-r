@@ -3,7 +3,7 @@ import type { GameState } from "@valenor/shared";
 import { BOARD_HEIGHT, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, getBuildingSeat, getTilePlacement } from "../board-layout";
 import { BOARD_DEPTHS } from "../layers/board-depths";
 import type { GraphicsQuality } from "../visual-config";
-import { getAtmosphere, mixColor, type Atmosphere, type Mood } from "./atmosphere";
+import { FIELD_RING_FACTOR, getAtmosphere, mixColor, type Atmosphere, type Mood } from "./atmosphere";
 
 /** Am freien Himmel über der Sonnensteppe: nicht auf Reichsnamen, Bauplätzen oder Kartenstapeln. */
 const MOON_POSITION = { x: 575, y: 40 } as const;
@@ -16,8 +16,9 @@ const MOON_POSITION = { x: 575, y: 40 } as const;
  * Unter dem Schleier bleiben Figuren, Wappen und Gebäude unberührt, damit Besitz und Spieler immer klar zu sehen sind.
  */
 export class AtmosphereLayer {
-  private readonly multiply: Phaser.GameObjects.Rectangle;
-  private readonly screen: Phaser.GameObjects.Rectangle;
+  /** Je Mischmodus ein kräftiger Schleier über dem Inneren und vier halb so starke Streifen über dem Feldring. */
+  private readonly multiply: VeilPart[];
+  private readonly screen: VeilPart[];
   private readonly moon: Phaser.GameObjects.Container;
   private readonly sparkles: Phaser.GameObjects.Arc[] = [];
   private readonly lights: Phaser.GameObjects.GameObject[] = [];
@@ -29,10 +30,9 @@ export class AtmosphereLayer {
   private readonly proxy = { t: 1 };
 
   constructor(private readonly scene: Phaser.Scene, private readonly quality: GraphicsQuality, private readonly reducedMotion: boolean) {
-    const width = BOARD_WIDTH + 120, height = BOARD_HEIGHT + 120;
     // Über Feldern und Reichsbildern, unter Gruppenleisten, Besitz, Gebäuden und Figuren.
-    this.multiply = scene.add.rectangle(0, 0, width, height, 0xffffff, 1).setAlpha(0).setBlendMode(Phaser.BlendModes.MULTIPLY).setDepth(BOARD_DEPTHS.decorations + 5).setName("mood-multiply");
-    this.screen = scene.add.rectangle(0, 0, width, height, 0xffffff, 1).setAlpha(0).setBlendMode(Phaser.BlendModes.SCREEN).setDepth(BOARD_DEPTHS.decorations + 5).setName("mood-screen");
+    this.multiply = createVeil(scene, Phaser.BlendModes.MULTIPLY, "mood-multiply");
+    this.screen = createVeil(scene, Phaser.BlendModes.SCREEN, "mood-screen");
     this.moon = scene.add.container(MOON_POSITION.x, MOON_POSITION.y).setDepth(BOARD_DEPTHS.decorations + 4).setAlpha(0).setName("mood-moon");
     this.moon.add([
       scene.add.circle(0, 0, 70, 0xffffff, .12).setBlendMode(Phaser.BlendModes.ADD).setName("moon-halo"),
@@ -67,7 +67,7 @@ export class AtmosphereLayer {
 
   destroy(): void {
     this.scene.tweens.killTweensOf([this.proxy, ...this.sparkles, ...this.lights]);
-    [this.multiply, this.screen, this.moon, ...this.sparkles, ...this.lights].forEach(object => object.destroy());
+    [...this.multiply.map(part => part.rect), ...this.screen.map(part => part.rect), this.moon, ...this.sparkles, ...this.lights].forEach(object => object.destroy());
     if (this.colorMatrix) this.scene.cameras.main.postFX?.remove(this.colorMatrix as unknown as Phaser.FX.Controller);
     this.frame?.style.removeProperty("--mood-vignette");
     this.frame?.style.removeProperty("--mood-transition");
@@ -78,8 +78,9 @@ export class AtmosphereLayer {
     // Schleier: Der jeweils passende Mischmodus blendet ein, der andere aus.
     const multiplyAlpha = lerp(from.blend === "multiply" ? from.tintAlpha : 0, to.blend === "multiply" ? to.tintAlpha : 0);
     const screenAlpha = lerp(from.blend === "screen" ? from.tintAlpha : 0, to.blend === "screen" ? to.tintAlpha : 0);
-    this.multiply.setFillStyle(mixColor(from.blend === "multiply" ? from.tint : to.tint, to.tint, t)).setAlpha(multiplyAlpha);
-    this.screen.setFillStyle(mixColor(from.blend === "screen" ? from.tint : to.tint, to.tint, t)).setAlpha(screenAlpha);
+    const multiplyColor = mixColor(from.blend === "multiply" ? from.tint : to.tint, to.tint, t), screenColor = mixColor(from.blend === "screen" ? from.tint : to.tint, to.tint, t);
+    this.multiply.forEach(part => part.rect.setFillStyle(multiplyColor).setAlpha(multiplyAlpha * part.factor));
+    this.screen.forEach(part => part.rect.setFillStyle(screenColor).setAlpha(screenAlpha * part.factor));
     if (this.colorMatrix) {
       this.colorMatrix.reset();
       this.colorMatrix.saturate(lerp(from.saturation, to.saturation), true);
@@ -95,10 +96,10 @@ export class AtmosphereLayer {
     this.scene.tweens.killTweensOf(this.sparkles);
     this.sparkles.splice(0).forEach(sparkle => sparkle.destroy());
     if (!mood.sparkles || this.reducedMotion || this.quality === "low") return;
-    const count = this.quality === "high" ? 18 : 9;
+    const count = this.quality === "high" ? 32 : 16;
     for (let index = 0; index < count; index += 1) {
       const x = Phaser.Math.Between(-BOARD_INNER_HALF_WIDTH + 90, BOARD_INNER_HALF_WIDTH - 90), y = Phaser.Math.Between(-BOARD_INNER_HALF_HEIGHT + 80, BOARD_INNER_HALF_HEIGHT - 80);
-      const sparkle = this.scene.add.circle(x, y, Phaser.Math.FloatBetween(1.6, 3.2), mood.sparkles, 1).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD).setDepth(BOARD_DEPTHS.decorations + 6).setName("mood-sparkle");
+      const sparkle = this.scene.add.circle(x, y, Phaser.Math.FloatBetween(2, 3.8), mood.sparkles, 1).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD).setDepth(BOARD_DEPTHS.decorations + 6).setName("mood-sparkle");
       // Auf „high“ glüht jeder Funke weich nach.
       if (this.atmosphere?.bloom) sparkle.setStrokeStyle(5, mood.sparkles, .22);
       this.sparkles.push(sparkle);
@@ -115,7 +116,7 @@ export class AtmosphereLayer {
     this.lightSignature = signature;
     this.scene.tweens.killTweensOf(this.lights);
     this.lights.splice(0).forEach(light => light.destroy());
-    const intensity = Math.max(atmosphere.windowLights, glow ? .7 : 0);
+    const intensity = Math.max(atmosphere.windowLights, glow ? 1 : 0);
     if (!intensity) return;
     const color = glow ?? 0xffc46b;
     buildings.forEach((entry, index) => {
@@ -132,4 +133,27 @@ export class AtmosphereLayer {
       this.scene.tweens.add({ targets: halo, alpha: .1 * intensity, scale: 1.08, duration: 420 + (index % 5) * 90, yoyo: true, repeat: -1, ease: "Sine.InOut" });
     });
   }
+}
+
+interface VeilPart {
+  rect: Phaser.GameObjects.Rectangle;
+  /** 1 über dem Inneren der Reiche, FIELD_RING_FACTOR über dem Feldring. */
+  factor: number;
+}
+
+/** Schleier aus fünf Teilen: das Innere voll, oben, unten, links und rechts der Feldring halb so stark. */
+function createVeil(scene: Phaser.Scene, blend: Phaser.BlendModes, name: string): VeilPart[] {
+  const outerW = BOARD_WIDTH + 120, outerH = BOARD_HEIGHT + 120, innerW = BOARD_INNER_HALF_WIDTH * 2, innerH = BOARD_INNER_HALF_HEIGHT * 2;
+  const band = (outerH - innerH) / 2;
+  const parts: [number, number, number, number, number][] = [
+    [0, 0, innerW, innerH, 1],
+    [0, -(innerH + band) / 2, outerW, band, FIELD_RING_FACTOR],
+    [0, (innerH + band) / 2, outerW, band, FIELD_RING_FACTOR],
+    [-(innerW + (outerW - innerW) / 2) / 2, 0, (outerW - innerW) / 2, innerH, FIELD_RING_FACTOR],
+    [(innerW + (outerW - innerW) / 2) / 2, 0, (outerW - innerW) / 2, innerH, FIELD_RING_FACTOR]
+  ];
+  return parts.map(([x, y, width, height, factor]) => ({
+    rect: scene.add.rectangle(x, y, width, height, 0xffffff, 1).setAlpha(0).setBlendMode(blend).setDepth(BOARD_DEPTHS.decorations + 5).setName(name),
+    factor
+  }));
 }

@@ -88,6 +88,15 @@ export function clampToBoard(point: { x: number; y: number }, zoom: number, view
   return { x: clamp(point.x, room(board.width, view.width)), y: clamp(point.y, room(board.height, view.height)) };
 }
 
+/** Wo das Geschehen auf dem Bildschirm liegt: Meldungen weichen ihm aus (unten → Banner oben). */
+export type FocusZone = "upper" | "lower";
+
+/** Bildschirmhöhe eines Weltpunkts bei gegebener Kameramitte und Zoom; unterhalb von 55 % gilt er als „unten“. */
+export function getFocusZone(worldY: number, cameraCenterY: number, zoom: number, viewHeight: number): FocusZone {
+  const screenY = (worldY - cameraCenterY) * zoom + viewHeight / 2;
+  return screenY > viewHeight * .55 ? "lower" : "upper";
+}
+
 /** Großer Spielstart: Flug über die vier Reiche (Mittelpunkte der Viertel im Brettinneren), dann zurück. */
 export const GRAND_START = {
   stops: [{ realm: "elves", x: -330, y: 155 }, { realm: "humans", x: -330, y: -155 }, { realm: "orcs", x: 330, y: -155 }, { realm: "steppe", x: 330, y: 155 }],

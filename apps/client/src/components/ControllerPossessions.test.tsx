@@ -6,6 +6,9 @@ import { BOARD_TILES, CHRONICLE_EVENTS, getRegionalChronicleDefinition, RELIC_DE
 import { RELIC_ASSETS } from "../game/assets/asset-manifest";
 import { ControllerPossessions, ControllerPropertyDetails } from "./ControllerPossessions";
 
+/** Sichtbarer Text ohne HTML: Preise stehen in eigenen Elementen (alter Preis durchgestrichen, neuer daneben). */
+const text = (html: string) => html.replace(/<[^>]+>/g, "");
+
 function state(): GameState {
   return {
     roomId: "VAL-MOBILE", status: "playing", config: { mode: "chronicles" },
@@ -45,7 +48,7 @@ test("overview shows building levels and direct build and sale actions", () => {
   const game = state(); game.propertyOwnerships = [{tileIndex:1,ownerId:'p1',mortgaged:false,buildingLevel:2},{tileIndex:3,ownerId:'p1',mortgaged:false,buildingLevel:1}];
   const markup = renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
   assert.match(markup,/STUFE 2 · Baumhaus/); assert.match(markup,/STUFE 1 · Wurzelhütte/); assert.match(markup,/controller-level-dots/);
-  assert.match(markup,/controller-inline-build/); assert.match(markup,/\+ BAUEN · 50 GOLD/); assert.match(markup,/− VERKAUFEN · 25 GOLD/);
+  assert.match(markup,/controller-inline-build/); assert.match(text(markup),/\+ BAUEN · 50 GOLD/); assert.match(text(markup),/− VERKAUFEN · 25 GOLD/);
   assert.match(markup,/Zuerst Sternenlichtung ausbauen/); assert.match(markup,/controller-property-group property-group/);
   assert.match(markup,/Dein Besitz:/); assert.doesNotMatch(markup,/controller-property-detail/);
   assert.match(markup,/Unbegrenzt/); assert.doesNotMatch(markup,/Bauwerke \d+ \/ 32|Großbauten \d+ \/ 12/);
@@ -56,9 +59,9 @@ test("overview and detail use the actual regional chronicle build price and reta
   game.activeChronicleEvent = {...getRegionalChronicleDefinition(CHRONICLE_EVENTS[4]!,['elves']),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
   game.propertyOwnerships = getPropertyGroupTiles('group_mondhain').map(tile=>({tileIndex:tile.index,ownerId:'p1',mortgaged:false,buildingLevel:0}));
   const markup = renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
-  assert.match(markup,/UNBEBAUT/); assert.match(markup,/\+ BAUEN · 38 GOLD/); assert.doesNotMatch(markup,/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/);
+  assert.match(markup,/UNBEBAUT/); assert.match(text(markup),/\+ BAUEN · 50 38 GOLD/, "old price crossed out, new price next to it"); assert.match(markup,/<s [^>]*>50<\/s>/); assert.doesNotMatch(markup,/<button\b[^>]*>(?:(?!<\/button>)[\s\S])*<button\b/);
   const detail = renderToStaticMarkup(<ControllerPropertyDetails state={game} playerId="p1" connected tile={BOARD_TILES[1]!} {...callbacks} />);
-  assert.match(detail,/controller-action-bar/); assert.match(detail,/Bauen · 38 Gold/); assert.match(detail,/Mietstaffel anzeigen/); assert.doesNotMatch(detail,/Verkaufen/);
+  assert.match(detail,/controller-action-bar/); assert.match(detail,/Bauen · 38 Gold statt 50/); assert.match(text(detail),/Segen der Baumeister −25 %/); assert.match(detail,/Mietstaffel anzeigen/); assert.doesNotMatch(detail,/Verkaufen/);
 });
 
 test("overview uses the effective Baueifer price and keeps blocked actions visible with their reason", () => {
@@ -66,10 +69,11 @@ test("overview uses the effective Baueifer price and keeps blocked actions visib
   game.worldImpulseEffects = { buildingFervor: true };
   game.propertyOwnerships = getPropertyGroupTiles("group_mondhain").map(tile => ({ tileIndex: tile.index, ownerId: "p1", mortgaged: false, buildingLevel: 0 }));
   let markup = renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
-  assert.match(markup, /\+ BAUEN · 40 GOLD/);
+  assert.match(text(markup), /\+ BAUEN · 50 40 GOLD/);
   game.propertyOwnerships[0]!.mortgaged = true;
   markup = renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
-  assert.match(markup, /disabled=""[^>]*>\+ BAUEN · 40 GOLD/);
+  assert.match(markup, /disabled=""[^>]*>\+ BAUEN · /);
+  assert.match(text(markup), /\+ BAUEN · 50 40 GOLD/);
   assert.match(markup, /Zuerst müssen alle Hypotheken dieser Baugruppe ausgelöst werden/);
 });
 
@@ -85,7 +89,7 @@ test("sale action appears in overview and detail and uses current chronicle proc
   game.activeChronicleEvent={...getRegionalChronicleDefinition(CHRONICLE_EVENTS[7]!,['elves']),startedAfterRound:3,startedAtRound:4,expiresAtRound:6,startedAt:1};
   assert.match(render(),/Verkaufen · \+38 Gold/);
   const overview = renderToStaticMarkup(<ControllerPossessions state={game} playerId="p1" connected {...callbacks} />);
-  assert.match(overview,/− VERKAUFEN · 38 GOLD/);
+  assert.match(text(overview),/− VERKAUFEN · 25 38 GOLD/);
 });
 
 test("overview exposes levels 0, 1, 3 and 5 with correct building names for own and rival properties", () => {

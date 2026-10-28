@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { DICE_ARENA, DICE_FPS, DIE_SIZE, FACE_VALUES, type DiceTrajectory, type Quat } from "./dice-physics";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { DICE_ARENA, DICE_FPS, DIE_SIZE, type DiceTrajectory, type Quat } from "./dice-physics";
+import { RUNE_GLOW_DOUBLE, RUNE_GLOW_IDLE, contactShadowTexture, createFaceMaterials, doubleGlowTexture } from "./dice-material";
 
 export interface DicePlayback {
   trajectory: DiceTrajectory;
@@ -13,43 +15,8 @@ export interface DicePlayback {
 /** Anteil der Brettbreite, den die Würfel-Leinwand einnimmt (CSS .dice-stage: links und rechts je 20 %). */
 const DICE_STAGE_SHARE = .6;
 
-const PIPS: Readonly<Record<number, readonly (readonly [number, number])[]>> = {
-  1: [[.5, .5]], 2: [[.27, .27], [.73, .73]], 3: [[.27, .27], [.5, .5], [.73, .73]],
-  4: [[.27, .27], [.73, .27], [.27, .73], [.73, .73]], 5: [[.27, .27], [.73, .27], [.5, .5], [.27, .73], [.73, .73]],
-  6: [[.27, .25], [.73, .25], [.27, .5], [.73, .5], [.27, .75], [.73, .75]]
-};
-/** Kleine Rune in einer Ecke jeder Seite – Steinwürfel aus Valenør. */
-const RUNES = ["ᚱ", "ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚷ"];
-
-/** Seitenbild: dunkler Stein mit eingelassenen, goldenen Augen und einer Rune. */
-function faceTexture(value: number): THREE.CanvasTexture {
-  const size = 256, canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const context = canvas.getContext("2d")!;
-  const stone = context.createRadialGradient(size * .35, size * .3, size * .1, size * .5, size * .5, size * .75);
-  stone.addColorStop(0, "#6d6255"); stone.addColorStop(.6, "#463d34"); stone.addColorStop(1, "#2b241e");
-  context.fillStyle = stone; context.fillRect(0, 0, size, size);
-  // Feine Maserung, damit der Stein nicht wie Plastik wirkt.
-  for (let index = 0; index < 140; index += 1) {
-    context.fillStyle = `rgba(${index % 2 ? "255,240,210" : "0,0,0"},${.03 + (index % 5) * .01})`;
-    context.fillRect((index * 73) % size, (index * 151) % size, 2 + (index % 4), 1 + (index % 3));
-  }
-  context.strokeStyle = "rgba(216,185,104,.55)"; context.lineWidth = 6;
-  context.strokeRect(14, 14, size - 28, size - 28);
-  context.fillStyle = "rgba(216,185,104,.38)"; context.font = "bold 30px serif"; context.textAlign = "center"; context.textBaseline = "middle";
-  context.fillText(RUNES[value - 1]!, size - 38, 40);
-  for (const [x, y] of PIPS[value]!) {
-    const cx = x * size, cy = y * size, radius = value === 1 ? 30 : 21;
-    context.fillStyle = "rgba(0,0,0,.6)"; context.beginPath(); context.arc(cx + 2, cy + 3, radius + 2, 0, Math.PI * 2); context.fill();
-    const gold = context.createRadialGradient(cx - radius * .35, cy - radius * .35, 1, cx, cy, radius);
-    gold.addColorStop(0, "#fff1b8"); gold.addColorStop(.55, "#e1b955"); gold.addColorStop(1, "#8a6420");
-    context.fillStyle = gold; context.beginPath(); context.arc(cx, cy, radius, 0, Math.PI * 2); context.fill();
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  return texture;
-}
+/** Die Würfel wirken etwas kleiner: Die Kamera zeigt so viel mehr Fläche als die Arena selbst. */
+const DICE_VIEW_MARGIN = 1.2;
 
 /**
  * Zwei Steinwürfel auf einer durchsichtigen Ebene über dem Brett. Gezeichnet wird nur, solange ein Wurf läuft;
@@ -61,7 +28,9 @@ export class DiceRenderer {
   private readonly camera = new THREE.PerspectiveCamera(28, 1, .1, 100);
   private readonly dice: THREE.Mesh[] = [];
   private readonly materials: THREE.MeshStandardMaterial[][] = [];
-  private readonly glow: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
+  /** Pasch: dezenter Lichtschein unter den Würfeln. */
+  private readonly glow: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  private readonly shadows: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[] = [];
   private frameHandle = 0;
   private resizeObserver: ResizeObserver;
 
@@ -69,21 +38,28 @@ export class DiceRenderer {
     this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === "high" ? 2 : 1.25));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = .92;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = quality === "high" ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     this.renderer.domElement.className = "dice-stage__canvas";
     container.appendChild(this.renderer.domElement);
 
-    this.scene.add(new THREE.HemisphereLight(0xfff1d6, 0x2a1d12, 1.2));
-    const sun = new THREE.DirectionalLight(0xffe2a8, 2.4);
-    sun.position.set(-4, 12, 5);
+    // Weiches Umgebungslicht für glaubwürdige Reflexe auf dem Stein; dazu warmes Licht von schräg oben.
+    const environment = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = environment.fromScene(new RoomEnvironment(), .04).texture;
+    environment.dispose();
+    this.scene.add(new THREE.HemisphereLight(0xfff1d6, 0x2a1d12, .3));
+    const sun = new THREE.DirectionalLight(0xffe2b0, 1.7);
+    // Licht von hinten links: Der Schatten fällt nach vorn rechts, wo die Kamera ihn sieht.
+    sun.position.set(-6, 10, -2);
     sun.castShadow = true;
     // Die Würfel sind klein im Bild: 1024 bzw. 512 reichen für weiche Schatten und schonen die Bildrate.
     sun.shadow.mapSize.set(quality === "high" ? 1024 : 512, quality === "high" ? 1024 : 512);
     Object.assign(sun.shadow.camera, { left: -7, right: 7, top: 6, bottom: -6, near: 1, far: 30 });
     sun.shadow.radius = 4;
     this.scene.add(sun);
-    const rim = new THREE.PointLight(0xb98cff, 9, 18);
+    const rim = new THREE.PointLight(0xb98cff, 4, 18);
     rim.position.set(5, 4, -4);
     this.scene.add(rim);
 
@@ -93,21 +69,28 @@ export class DiceRenderer {
     floor.receiveShadow = true;
     this.scene.add(floor);
 
-    const geometry = new RoundedBoxGeometry(DIE_SIZE, DIE_SIZE, DIE_SIZE, 4, .13);
-    const textures = FACE_VALUES.map(value => faceTexture(value));
+    // Kräftig abgerundete Kanten: alt und abgegriffen statt scharfkantig.
+    const geometry = new RoundedBoxGeometry(DIE_SIZE, DIE_SIZE, DIE_SIZE, 5, .17);
+    const shadowTexture = contactShadowTexture();
     for (let index = 0; index < 2; index += 1) {
       // Reihenfolge der Materialien wie die Seiten von BoxGeometry: +x, -x, +y, -y, +z, -z (= FACE_NORMALS).
-      const materials = textures.map(texture => new THREE.MeshStandardMaterial({ map: texture, roughness: .62, metalness: .08, emissive: new THREE.Color(0xf3c25a), emissiveIntensity: 0, transparent: true }));
+      const materials = createFaceMaterials();
       const die = new THREE.Mesh(geometry, materials);
       die.castShadow = true;
       die.visible = false;
       this.dice.push(die);
       this.materials.push(materials);
       this.scene.add(die);
+      // Weicher Kontaktschatten direkt unter dem Würfel, zusätzlich zum Schatten des Lichts.
+      const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 2.3), new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false, opacity: 0 }));
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.y = .01;
+      this.shadows.push(shadow);
+      this.scene.add(shadow);
     }
-    this.glow = new THREE.Mesh(new THREE.RingGeometry(.8, 1.15, 48), new THREE.MeshBasicMaterial({ color: 0xffd77a, transparent: true, opacity: 0, side: THREE.DoubleSide }));
+    this.glow = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4), new THREE.MeshBasicMaterial({ map: doubleGlowTexture(), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.glow.rotation.x = -Math.PI / 2;
-    this.glow.position.y = .02;
+    this.glow.position.y = .015;
     this.scene.add(this.glow);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -146,17 +129,21 @@ export class DiceRenderer {
         next.set(...b.quaternion);
         body.slerp(next, blend);
         die.quaternion.copy(body).multiply(remapQuats[dieIndex]!);
+        // Je höher der Würfel fliegt, desto größer und blasser sein Schatten.
+        const shadow = this.shadows[dieIndex]!, lift = Math.max(0, die.position.y - DIE_SIZE / 2);
+        shadow.position.set(die.position.x + .3 + lift * .6, .01, die.position.z + .1 + lift * .2);
+        shadow.scale.setScalar(1.05 + lift * .35);
+        shadow.material.opacity = this.opacity * Math.max(.15, .85 - lift * .3);
       });
       for (const impact of trajectory.impacts) if (impact <= index && impact > heardImpact) { heardImpact = impact; playback.onImpact?.(impact); }
       if (!settled && index >= lastFrame) { settled = true; playback.onSettled?.(); }
       const afterSettle = elapsed - lastFrame / DICE_FPS * 1_000;
       if (playback.double && afterSettle > 0) {
-        // Pasch: goldener Schimmer auf beiden Würfeln und ein Lichtring.
-        const glow = Math.max(0, Math.sin(Math.min(1, afterSettle / 700) * Math.PI));
-        this.materials.flat().forEach(material => { material.emissiveIntensity = glow * .55; });
-        this.glow.position.set((this.dice[0]!.position.x + this.dice[1]!.position.x) / 2, .02, (this.dice[0]!.position.z + this.dice[1]!.position.z) / 2);
-        this.glow.scale.setScalar(1 + afterSettle / 900);
-        this.glow.material.opacity = glow * .55;
+        // Pasch: Die Runen glühen golden auf, darunter ein dezenter Lichtschein.
+        const glow = Math.min(1, afterSettle / 380) * (afterSettle < 900 ? 1 : Math.max(.35, 1 - (afterSettle - 900) / 600));
+        this.materials.flat().forEach(material => { material.emissiveIntensity = RUNE_GLOW_IDLE + (RUNE_GLOW_DOUBLE - RUNE_GLOW_IDLE) * glow; });
+        this.glow.position.set((this.dice[0]!.position.x + this.dice[1]!.position.x) / 2, .015, (this.dice[0]!.position.z + this.dice[1]!.position.z) / 2);
+        this.glow.material.opacity = glow * .32 * this.opacity;
       }
       if (afterSettle > holdMs) this.setOpacity(Math.max(0, 1 - (afterSettle - holdMs) / fadeMs));
       this.renderer.render(this.scene, this.camera);
@@ -171,7 +158,8 @@ export class DiceRenderer {
     cancelAnimationFrame(this.frameHandle);
     this.dice.forEach(die => { die.visible = false; });
     this.glow.material.opacity = 0;
-    this.materials.flat().forEach(material => { material.emissiveIntensity = 0; });
+    this.shadows.forEach(shadow => { shadow.material.opacity = 0; });
+    this.materials.flat().forEach(material => { material.emissiveIntensity = RUNE_GLOW_IDLE; });
     this.renderer.render(this.scene, this.camera);
     // Ohne Wurf muss der Browser die durchsichtige Ebene nicht über das Brett legen.
     this.renderer.domElement.style.visibility = "hidden";
@@ -183,26 +171,34 @@ export class DiceRenderer {
     this.scene.traverse(object => {
       if (object instanceof THREE.Mesh) {
         object.geometry.dispose();
-        (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => { (material as THREE.MeshStandardMaterial).map?.dispose(); material.dispose(); });
+        (Array.isArray(object.material) ? object.material : [object.material]).forEach(material => {
+          const standard = material as THREE.MeshStandardMaterial;
+          [standard.map, standard.bumpMap, standard.emissiveMap].forEach(map => map?.dispose());
+          material.dispose();
+        });
       }
     });
+    this.scene.environment?.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
 
+  private opacity = 1;
+
   private setOpacity(opacity: number): void {
+    this.opacity = opacity;
     this.materials.flat().forEach(material => { material.opacity = opacity; });
   }
 
   /**
-   * Die Würfelfläche liegt mittig über dem Brett und nimmt etwa 55 % seiner Breite ein. Die Leinwand selbst deckt nur
+   * Die Würfelfläche liegt mittig über dem Brett und nimmt etwa 55 % / DICE_VIEW_MARGIN seiner Breite ein. Die Leinwand selbst deckt nur
    * die Mitte (DICE_STAGE_SHARE der Breite, siehe .dice-stage) – weniger Pixel, gleiche Würfelgröße.
    */
   private resize(): void {
     const width = Math.max(1, this.container.clientWidth), height = Math.max(1, this.container.clientHeight);
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / height;
-    const visibleWidth = DICE_ARENA.width / (.55 / DICE_STAGE_SHARE);
+    const visibleWidth = DICE_ARENA.width / (.55 / DICE_STAGE_SHARE) * DICE_VIEW_MARGIN;
     const distance = visibleWidth / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / this.camera.aspect;
     this.camera.position.set(0, distance * .86, distance * .5);
     this.camera.lookAt(0, 0, .2);

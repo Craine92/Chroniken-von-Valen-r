@@ -6,7 +6,7 @@ import { MortgageOverlayLayer } from "../layers/MortgageOverlayLayer";
 import { getCompleteGroupOwner, PropertyGroupLayer } from "../layers/PropertyGroupLayer";
 import { CameraRig } from "../camera/CameraRig";
 import { AtmosphereLayer } from "../atmosphere/AtmosphereLayer";
-import { getCameraMovesEnabled } from "../camera/camera-director";
+import { getCameraMovesEnabled, getFocusZone } from "../camera/camera-director";
 import { gameKey, isFreshGame } from "../../audio/useChroniclerVoice";
 import { isHighRent } from "../living/drama";
 import { BoardArtLayer } from "../layers/BoardArtLayer";
@@ -16,6 +16,7 @@ import { BOARD_DEPTHS } from "../layers/board-depths";
 import { VISUAL_QUALITY, getGraphicsQuality, getLivingBoardSettings, prefersReducedMotion } from "../visual-config";
 import { AmbientLifeLayer } from "../layers/AmbientLifeLayer";
 import { DramaEffectsLayer } from "../layers/DramaEffectsLayer";
+import { CardDeckLayer } from "../layers/CardDeckLayer";
 import { deriveGameMoments } from "../living/moments";
 import { selectDramaticMoments } from "../living/drama";
 import { BoardTileRenderer } from "../tiles/BoardTileRenderer";
@@ -72,7 +73,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   private activeFieldSignature = "";
   private tavernGlow: Phaser.GameObjects.Graphics | undefined;
   private tavernGlowLevel = -1;
-  private readonly cardDecks = new Map<string, Phaser.GameObjects.Container>();
+  private cardDeckLayer: CardDeckLayer | undefined;
   private cardSignature = "";
   private readonly temporaryVisuals = new Set<Phaser.GameObjects.Container>();
   private boardReady = false;
@@ -150,7 +151,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.artLayer.renderBoardEffects();
     this.drawCenterTitle();
     this.artLayer.syncChronicle(this.state, this.reducedMotion);
-    this.drawCardDecks();
+    this.cardDeckLayer = new CardDeckLayer(this, asset => this.artLayer?.hasAsset(asset) ?? false, this.graphicsQuality, this.reducedMotion);
     this.syncCardDecks(this.state);
     this.drawPlayerTokens();
     this.syncTokenRelics(this.state);
@@ -182,8 +183,8 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE,this.handleResize);
       this.clearLandingHighlight();
-      this.resetCardDecks();
-      this.cardDecks.clear();
+      this.cardDeckLayer?.destroy();
+      this.cardDeckLayer = undefined;
       this.cardSignature="";
       this.activeField=undefined;this.activeFieldSignature="";
       this.temporaryVisuals.forEach(visual => { this.tweens.killTweensOf(visual.list); visual.destroy(); });
@@ -354,6 +355,10 @@ export class ValenorBoardScene extends Phaser.Scene {
     if (this.grandOpeningTimer && next.turnPhase !== "determiningOrder") this.skipGrandOpening();
     if (rig.currentMode === "shot" && (next.turnPhase !== this.cameraShotPhase || next.turnNumber !== previous.turnNumber)) rig.interrupt();
     const tileCenter = (tileIndex: number) => getTileWorldPosition(tileIndex);
+    // Wo das Geschehen liegt (Landefeld, Drache, Bau), solange die Kamera das ganze Brett zeigt; eine Fahrt überschreibt das.
+    const focusTile = moments.find((moment): moment is Extract<typeof moment, { tileIndex: number }> => "tileIndex" in moment && moment.tileIndex !== undefined)?.tileIndex
+      ?? (next.lastMovement && next.lastMovement.sequence !== previous.lastMovement?.sequence ? next.lastMovement.to : undefined);
+    if (focusTile !== undefined) this.game.canvas.dataset.focusZone = getFocusZone(tileCenter(focusTile).y, 0, this.getBoardZoom(), this.cameras.main.height);
     const tokenAt = (playerId: string) => {
       const token = this.tokens.get(playerId);
       return token ? { x: token.x, y: token.y } : tileCenter(next.players.find(player => player.id === playerId)?.position ?? 0);
@@ -637,59 +642,12 @@ export class ValenorBoardScene extends Phaser.Scene {
     logo.add(compass);
   }
 
-  private drawCardDecks() {
-    const createDeck = (x: number, label: string, kind: "adventure" | "fate", glyph: BoardIconName) => {
-      const asset = kind === "adventure" ? VALENOR_ASSETS.cards.adventureFrame : VALENOR_ASSETS.cards.fateFrame;
-      const deck = this.add.container(x, 78).setName(`deck-${kind}`).setDepth(BOARD_DEPTHS.decorations + 4).setRotation(x < 0 ? -.035 : .035);
-      deck.add(this.add.ellipse(7, 13, 138, 165, 0x000000, .16));
-      deck.add(this.add.rectangle(7, 10, 112, 157, 0x000000, .22));
-      const glow=this.add.rectangle(0,0,120,165,kind === "adventure" ? 0xd8b968 : 0xafa1e5,.1).setStrokeStyle(3,0xe5cb8e,.45).setAlpha(.3).setName("deck-glow");
-      deck.add(glow);
-      for (const offset of [8, 4, 0]) {
-        if(offset)deck.add(this.add.rectangle(offset,offset,112,157,0xd5c4a4,.9).setStrokeStyle(1,0x77613e,.8).setRotation(offset===8 ? -.026 : .017));
-        const card = this.artLayer?.hasAsset(asset)
-          ? fitImage(this.add.image(offset, offset, asset.key), 112, 157, "contain")
-          : this.add.rectangle(offset, offset, 112, 157, kind === "adventure" ? 0x5b321d : 0x272653).setStrokeStyle(2, 0xd8bd78);
-        card.setName(`deck-card-${offset}`);
-        card.setRotation(offset===8 ? -.026 : offset===4 ? .017 : 0);
-        if(card instanceof Phaser.GameObjects.Image)card.setTint(offset ? 0xd7c9af : 0xffffff);
-        if(!offset)card.setY(-1.5);
-        deck.add(card);
-      }
-      const symbol = addIconImage(this, 0, -4, glyph, 36, codexColor("leather600"));
-      const title = this.add.text(0, 27, label, { color: "#352315", fontFamily: CODEX_FONTS.display, fontSize: "12px", fontStyle: "bold" }).setOrigin(.5).setResolution(2);
-      deck.add([symbol, title]);
-      this.cardDecks.set(kind,deck);
-      return deck;
-    };
-    createDeck(-390, "ABENTEUER", "adventure", "adventure");
-    createDeck(390, "SCHICKSAL", "fate", "fate");
-  }
-
-  private resetCardDecks() {
-    this.cardDecks.forEach(deck => {
-      const card=deck.getByName("deck-card-0") as Phaser.GameObjects.Image;
-      const glow=deck.getByName("deck-glow") as Phaser.GameObjects.Rectangle;
-      if(!card || !glow)return;
-      this.tweens.killTweensOf([card,glow]);
-      card.setPosition(0,-1.5).setVisible(true).setAlpha(1);
-      glow.setAlpha(.3);
-    });
-  }
-
   private syncCardDecks(state: GameState) {
     const signature=getCardPresentationKey(state);
     if(signature === this.cardSignature)return;
     this.cardSignature=signature;
-    this.resetCardDecks();
-    if(!state.activeCard || this.reducedMotion)return;
-    const deck=this.cardDecks.get(state.activeCard.deck);
-    if(!deck)return;
-    const card=deck.getByName("deck-card-0") as Phaser.GameObjects.Image;
-    const glow=deck.getByName("deck-glow") as Phaser.GameObjects.Rectangle;
-    glow.setAlpha(1);
-    this.tweens.add({targets:glow,alpha:.3,duration:CARD_DRAW_DURATION_MS,ease:"Sine.Out"});
-    this.tweens.add({targets:card,y:-8,alpha:0,duration:160,ease:"Sine.Out"});
+    if(!state.activeCard){ this.cardDeckLayer?.reset(); return; }
+    this.cardDeckLayer?.draw(state.activeCard.deck);
   }
 
   private drawPlayerTokens() {
@@ -874,7 +832,7 @@ export class ValenorBoardScene extends Phaser.Scene {
 
   private syncRealmNames() {
     const blockers=this.children.list.filter(object=>object instanceof Phaser.GameObjects.Container && object.depth === BOARD_DEPTHS.buildings).map(object=>(object as Phaser.GameObjects.Container).getBounds());
-    this.cardDecks.forEach(deck=>blockers.push(deck.getBounds()));
+    this.cardDeckLayer?.decks.forEach(deck=>blockers.push(deck.getBounds()));
     this.state.players.forEach(player=>{
       const token=this.tokens.get(player.id),visual=this.tokenVisuals.get(player.id);
       if(!token || !visual)return;

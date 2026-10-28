@@ -3,13 +3,14 @@ import {
   BOARD_TILES, PROPERTY_GROUPS, SOCKET_EVENTS, ECONOMY_CONFIG, getEffectiveRent, getEffectivePurchasePrice, applyChronicleRentModifier, canBuildOnProperty,
   canSellBuilding, canMortgageProperty, canRedeemMortgage, getBuildingName, getCardDefinition,
   describeCardEffects, getMortgageValue, getEffectiveMortgageRedemptionCost, getEffectiveBuildCost, getEffectiveBuildingSaleValue, getPropertyGroup,
-  getMortgageRedemptionPlan,
+  getMortgageRedemptionPlan, getPriceInfo,
   getPropertyGroupTiles, ownsCompletePropertyGroup, isGroupEconomicallyActive,
   MAX_RELICS, RELIC_DEFINITIONS,
   type GameState, type PropertyGroupId, type BoardTile
 } from "@valenor/shared";
 import { PropertyGroupOverview } from "./PropertyGroupOverview";
 import { RelicIcon } from "./RelicIcon";
+import { PriceTag, priceText } from "./PriceTag";
 import { ControllerActionBar } from "./ControllerActionBar";
 import { Icon, tileIcon } from "./icons/Icon";
 
@@ -62,21 +63,23 @@ export function ControllerPropertyDetails({ state, playerId, connected, tile, on
   const redeem = canRedeemMortgage(state, playerId, tile.index);
   const reason = (allowed: boolean, message?: string) => !connected ? "Keine Verbindung zum Spielserver." : !allowed ? message : undefined;
   const canDevelop = tile.type === "property" && tile.region && schedule;
-  const buildAction = own && canDevelop && build.allowed ? { label: `Bauen · ${getEffectiveBuildCost(state, tile)} Gold`, onClick: () => onBuild(SOCKET_EVENTS.propertyBuild, tile.index), disabled: !connected } : undefined;
-  const sellAction = own && canDevelop && sell.allowed ? { label: `Verkaufen · +${getEffectiveBuildingSaleValue(state, tile)} Gold`, onClick: () => onBuild(SOCKET_EVENTS.propertySellBuilding, tile.index), disabled: !connected, tone: "secondary" as const } : undefined;
+  const buildPrice = getPriceInfo(state, tile, "build"), salePrice = getPriceInfo(state, tile, "buildingSale"), redeemPrice = getPriceInfo(state, tile, "mortgageRedemption");
+  const purchasePrice = getPriceInfo(state, tile, "purchase", playerId);
+  const buildAction = own && canDevelop && build.allowed ? { label: `Bauen · ${priceText(buildPrice)}`, onClick: () => onBuild(SOCKET_EVENTS.propertyBuild, tile.index), disabled: !connected } : undefined;
+  const sellAction = own && canDevelop && sell.allowed ? { label: `Verkaufen · +${priceText(salePrice)}`, onClick: () => onBuild(SOCKET_EVENTS.propertySellBuilding, tile.index), disabled: !connected, tone: "secondary" as const } : undefined;
   return <div className="controller-property-detail has-context-action-bar" style={{ "--property-group-accent": group?.accent ?? "var(--accent-strong)" } as CSSProperties}>
     <article className="property-card controller-detail-card">
       <header><span className="controller-detail-sigil" aria-hidden="true"><Icon name={tileIcon(tile)} /></span><div><h3>{tile.name}</h3><p>{group?.displayName ?? (tile.type === "harbor" ? "Häfen" : "Versorgung")} · Feld {tile.index}</p></div></header>
       <div className="controller-status-chips"><span>{own ? "Dein Besitz" : owner ? `Besitz: ${owner.name}` : "Frei"}</span>{ownership?.mortgaged && <span className="mortgage-status" title="Belehnt"><b aria-hidden="true">×</b> BELEHNT</span>}{complete && <span>{active ? "SETBONUS AKTIV" : "SETBONUS RUHT"}</span>}</div>
       {canDevelop && <div className="controller-rent-highlights">
-        <div><small>Aktuelle Miete</small><strong>{currentRent} Gold</strong></div>
+        <div><small>Aktuelle Miete</small><strong>{owner ? <PriceTag info={getPriceInfo(state, tile, "rent")} /> : `${currentRent} Gold`}</strong></div>
         <div><small>{level < 5 ? "Nächste Stufe" : "Höchste Stufe"}</small><b>{getBuildingName(tile.region!, nextLevel)}</b><strong>{applyChronicleRentModifier(state, tile, schedule[nextLevel])} Gold Miete</strong></div>
       </div>}
       <dl>
-        <div><dt>Kaufpreis</dt><dd>{getEffectivePurchasePrice(state, tile, playerId)} Gold</dd></div>
+        <div className={purchasePrice.changed ? "is-wide" : undefined}><dt>Kaufpreis</dt><dd><PriceTag info={purchasePrice} /></dd></div>
         <div><dt>Hypothekenwert</dt><dd>{getMortgageValue(tile)} Gold</dd></div>
-        {ownership?.mortgaged && <div><dt>Auslösung</dt><dd>{getEffectiveMortgageRedemptionCost(state, tile)} Gold</dd></div>}
-        {canDevelop && <><div><dt>Baustufe</dt><dd>{level} · {getBuildingName(tile.region!, level)}</dd></div><div><dt>Baukosten</dt><dd>{getEffectiveBuildCost(state, tile)} Gold</dd></div><div><dt>Maximalmiete</dt><dd>{applyChronicleRentModifier(state, tile, schedule[5])} Gold</dd></div></>}
+        {ownership?.mortgaged && <div className={redeemPrice.changed ? "is-wide" : undefined}><dt>Auslösung</dt><dd><PriceTag info={redeemPrice} /></dd></div>}
+        {canDevelop && <><div><dt>Baustufe</dt><dd>{level} · {getBuildingName(tile.region!, level)}</dd></div><div className={buildPrice.changed ? "is-wide" : undefined}><dt>Baukosten</dt><dd><PriceTag info={buildPrice} /></dd></div><div><dt>Maximalmiete</dt><dd>{applyChronicleRentModifier(state, tile, schedule[5])} Gold</dd></div></>}
         {tile.type === "harbor" && <div><dt>Miete</dt><dd>{ownership?.mortgaged ? "0 Gold · belehnt" : `${ECONOMY_CONFIG.harborRents.map(rent => applyChronicleRentModifier(state, tile, rent)).join(" / ")} Gold je Hafenzahl`}</dd></div>}
         {tile.type === "utility" && <div><dt>Miete</dt><dd>{ownership?.mortgaged ? "0 Gold · belehnt" : `${currentRent} Gold beim aktuellen Würfelwert`}</dd></div>}
       </dl>
@@ -85,7 +88,7 @@ export function ControllerPropertyDetails({ state, playerId, connected, tile, on
     {own && <div className="controller-property-actions" aria-label="Grundstücksaktionen">
       {canDevelop && !build.allowed && <p>{reason(build.allowed, build.reason)}</p>}
       {canDevelop && level > 0 && !sell.allowed && <p>{reason(sell.allowed, sell.reason)}</p>}
-      <div>{ownership.mortgaged ? <><button type="button" disabled={!connected || !redeem.allowed} onClick={() => onMortgage(SOCKET_EVENTS.propertyRedeemMortgage, tile.index)}>Hypothek auslösen · {getEffectiveMortgageRedemptionCost(state, tile)} Gold</button>{reason(redeem.allowed, redeem.reason) && <p>{reason(redeem.allowed, redeem.reason)}</p>}</> : <><button type="button" disabled={!connected || !mortgage.allowed} onClick={() => onMortgage(SOCKET_EVENTS.propertyMortgage, tile.index)}>Beleihen · +{getMortgageValue(tile)} Gold</button>{reason(mortgage.allowed, mortgage.reason) && <p>{reason(mortgage.allowed, mortgage.reason)}</p>}</>}</div>
+      <div>{ownership.mortgaged ? <><button type="button" disabled={!connected || !redeem.allowed} onClick={() => onMortgage(SOCKET_EVENTS.propertyRedeemMortgage, tile.index)}>Hypothek auslösen · {priceText(redeemPrice)}</button>{reason(redeem.allowed, redeem.reason) && <p>{reason(redeem.allowed, redeem.reason)}</p>}</> : <><button type="button" disabled={!connected || !mortgage.allowed} onClick={() => onMortgage(SOCKET_EVENTS.propertyMortgage, tile.index)}>Beleihen · +{getMortgageValue(tile)} Gold</button>{reason(mortgage.allowed, mortgage.reason) && <p>{reason(mortgage.allowed, mortgage.reason)}</p>}</>}</div>
     </div>}
     {canDevelop && <details className="controller-rent-schedule"><summary>Mietstaffel anzeigen</summary><dl>{schedule.map((rent, index) => <div key={index}><dt>{getBuildingName(tile.region!, index as 0 | 1 | 2 | 3 | 4 | 5)}</dt><dd>{applyChronicleRentModifier(state, tile, rent)} Gold</dd></div>)}<div><dt>Vollständiges unbebautes Set</dt><dd>{applyChronicleRentModifier(state, tile, schedule[0] * 2)} Gold</dd></div></dl></details>}
     <ControllerActionBar primary={buildAction} secondary={sellAction} label="Grundstücksaktionen" />

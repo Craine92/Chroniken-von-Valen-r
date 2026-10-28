@@ -35,6 +35,7 @@ import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
 import { GameResultPanel } from "../components/GameResultPanel";
 import { createValenorSocket } from "../lib/socket";
 import { EmoteBar, type SendEmote } from "../components/EmoteBar";
+import { LocateButton, type SendLocate } from "../components/LocateButton";
 import { resolveRoomGameState, shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
 import { MobileLiveEvents } from "../components/MobileLiveEvents";
@@ -396,6 +397,13 @@ export function ControllerPage() {
     });
   };
 
+  const locateOwnToken: SendLocate = (done) => {
+    socket.emit(SOCKET_EVENTS.playerLocate, (result) => {
+      if (!result.ok && !result.cooldownMs) setError(result.message ?? "Deine Figur konnte nicht gezeigt werden.");
+      done(result);
+    });
+  };
+
   const sendMagicSignal = () => {
     socket.emit(SOCKET_EVENTS.playerMagicSignal, (result) => {
       if (!result.ok) {
@@ -752,6 +760,7 @@ export function ControllerPage() {
             </div>
           )}
           {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} autoMortgagePlan={autoMortgagePlan} onAutoMortgage={() => manageFinance(SOCKET_EVENTS.financeAutoMortgageForPayment)} onDeclareBankruptcy={declareBankruptcy} showActions={false} />}
+          <LocateButton connected={connected} onLocate={locateOwnToken} />
           <EmoteBar connected={connected} onSend={sendEmote} />
           </div>
           <div hidden={controllerTab !== "property"}><ControllerPossessions state={gameState} playerId={player.id} connected={connected} selectedGroupId={selectedPropertyGroupId} onSelectGroup={selectPropertyGroup} onBuild={manageBuilding} onMortgage={manageMortgage} onRedeemAllMortgages={() => manageFinance(SOCKET_EVENTS.financeRedeemAllMortgages)} onOfferTrade={offerPropertyTrade} /></div>

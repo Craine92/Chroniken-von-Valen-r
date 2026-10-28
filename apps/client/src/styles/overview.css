@@ -4,6 +4,28 @@
    Bewegung nur als kurzes Einblenden; unter reduzierter Bewegung und „low“ aus.
    ========================================================================== */
 
+/* --- „Wo bin ich?“ (Handy) -------------------------------------------------- */
+.locate-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--touch-target);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  color: var(--player-accent, var(--accent-soft));
+  background: rgb(var(--c-ink-950-rgb) / .7);
+  border: 2px solid currentColor;
+  border-radius: var(--radius-md);
+  font: 700 var(--fs-md) var(--font-text);
+  letter-spacing: .04em;
+}
+.locate-button .icon { font-size: var(--fs-xl); }
+.locate-button.is-glowing { box-shadow: 0 0 18px color-mix(in srgb, currentColor 45%, transparent); animation: locate-glow 1s ease-in-out infinite alternate; }
+.locate-button:disabled:not(.is-glowing) { opacity: .5; }
+@keyframes locate-glow { to { box-shadow: 0 0 4px color-mix(in srgb, currentColor 20%, transparent); } }
+
 /* --- Auktion: Feldbild groß in der Anzeige (TV) -------------------------- */
 .economy-overlay--auction .economy-overlay__art {
   width: 100%;
@@ -14,3 +36,6 @@
   box-shadow: 0 0 22px rgb(var(--c-gold-400-rgb) / .35);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .locate-button.is-glowing { animation: none; }
+}

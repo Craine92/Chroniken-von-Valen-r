@@ -7,6 +7,7 @@ import {
   type GameRoom,
   type GameState,
   type EmoteSignal,
+  type LocateSignal,
   type MagicSignal,
   type PropertyGroupFocusSignal
 } from "@valenor/shared";
@@ -33,6 +34,7 @@ export function HostPage() {
   const [signal, setSignal] = useState<MagicSignal>();
   const [propertyGroupFocus, setPropertyGroupFocus] = useState<PropertyGroupFocusSignal>();
   const [emotes, setEmotes] = useState<Readonly<Record<string, EmoteSignal>>>({});
+  const [locateSignal, setLocateSignal] = useState<LocateSignal>();
   const emoteTimers = useRef(new Map<string, number>());
   const [creditsOpen, setCreditsOpen] = useState(false);
   const closeCredits = useCallback(() => setCreditsOpen(false), []);
@@ -114,6 +116,7 @@ export function HostPage() {
     socket.on(SOCKET_EVENTS.gameStart, handleGameState);
     socket.on(SOCKET_EVENTS.gameState, handleGameState);
     socket.on(SOCKET_EVENTS.playerMagicSignal, handleSignal);
+    socket.on(SOCKET_EVENTS.playerLocate, setLocateSignal);
     socket.on(SOCKET_EVENTS.playerEmote, handleEmote);
     socket.on(SOCKET_EVENTS.propertyGroupFocus, handlePropertyGroupFocus);
     socket.connect();
@@ -127,6 +130,7 @@ export function HostPage() {
       socket.off(SOCKET_EVENTS.gameStart, handleGameState);
       socket.off(SOCKET_EVENTS.gameState, handleGameState);
       socket.off(SOCKET_EVENTS.playerMagicSignal, handleSignal);
+      socket.off(SOCKET_EVENTS.playerLocate, setLocateSignal);
       socket.off(SOCKET_EVENTS.playerEmote, handleEmote);
       emoteTimers.current.forEach((timer) => window.clearTimeout(timer));
       emoteTimers.current.clear();
@@ -197,7 +201,7 @@ export function HostPage() {
   if (gameState) {
     return (
       <Suspense fallback={<main className="board-page"><div className="game-loading">Das Runentor öffnet sich …</div></main>}>
-        <GameExperience gameState={gameState} onNewChronicle={startNewChronicle} onReturnToLobby={returnToLobby} focusedPropertyGroupId={propertyGroupFocus?.groupId} focusedPropertyGroupPlayerId={propertyGroupFocus?.playerId} emotes={emotes} />
+        <GameExperience gameState={gameState} onNewChronicle={startNewChronicle} onReturnToLobby={returnToLobby} focusedPropertyGroupId={propertyGroupFocus?.groupId} focusedPropertyGroupPlayerId={propertyGroupFocus?.playerId} emotes={emotes} locateSignal={locateSignal} />
         {error && <div className="error-toast" role="alert">{error}</div>}
       </Suspense>
     );

@@ -7,6 +7,7 @@ import path from "node:path";
 import { Server } from "socket.io";
 import {
   SOCKET_EVENTS,
+  LOCATE_COOLDOWN_MS,
   getPropertyGroup,
   type EmoteId,
   type Player,
@@ -20,7 +21,7 @@ import { RoomManager } from "./room-manager";
 import { EconomicAi, getAiEconomyProfile } from "./ai/economic-ai";
 import { chooseNpcTavernAction } from "./game/economy-service";
 import { chooseNpcGoldenMoment } from "./game/world-impulse-service";
-import { EmoteGate, pickComputerEmotes, validateEmoteRequest } from "./game/emote-service";
+import { EmoteGate, pickComputerEmotes, validateEmoteRequest, validateLocateRequest } from "./game/emote-service";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const RECONNECT_GRACE_MS = Number(process.env.RECONNECT_GRACE_MS ?? 5 * 60 * 1000);
@@ -38,6 +39,8 @@ const aiBuildingCounts = new Map<string, number>();
 const aiRedemptionCounts = new Map<string, number>();
 const aiTradeOfferRounds = new Map<string, number>();
 const emoteGate = new EmoteGate();
+/** Eigene Abklingzeit für „Wo bin ich?“, getrennt von den Emotes. */
+const locateGate = new EmoteGate(LOCATE_COOLDOWN_MS);
 /** Bereits gesehene Protokolleinträge je Raum, damit Computer-Gegner auf jedes Ereignis höchstens einmal reagieren. */
 const emoteSeenLogIds = new Map<string, Set<string>>();
 
@@ -90,6 +93,7 @@ function clearRoomGameTimers(roomCode: string) {
   for (const key of aiBuildingCounts.keys()) if (key.startsWith(prefix)) aiBuildingCounts.delete(key);
   for (const key of aiRedemptionCounts.keys()) if (key.startsWith(prefix)) aiRedemptionCounts.delete(key);
   emoteGate.clearRoom(roomCode);
+  locateGate.clearRoom(roomCode);
   emoteSeenLogIds.delete(roomCode);
 }
 
@@ -721,6 +725,29 @@ io.on("connection", (socket) => {
       return;
     }
     emitEmote(roomCode, player, emoteId);
+    callback({ ok: true });
+  });
+
+  socket.on(SOCKET_EVENTS.playerLocate, (callback) => {
+    const { roomCode, playerId } = socket.data;
+    if (typeof callback !== "function") return;
+    if (!roomCode || !playerId) {
+      callback({ ok: false, message: "Du bist mit keinem Spielraum verbunden." });
+      return;
+    }
+    const player = rooms.getPlayer(roomCode, playerId);
+    const invalid = validateLocateRequest(player, rooms.getRoom(roomCode)?.phase);
+    if (invalid !== undefined || !player) {
+      callback({ ok: false, message: invalid ?? "Deine Verbindung konnte nicht bestätigt werden." });
+      return;
+    }
+    const attempt = locateGate.tryEmote(roomCode, playerId, Date.now());
+    if (!attempt.ok) {
+      callback({ ok: false, cooldownMs: attempt.cooldownMs, message: "Deine Figur leuchtet noch." });
+      return;
+    }
+    const sentAt = Date.now();
+    io.to(roomCode).emit(SOCKET_EVENTS.playerLocate, { id: `${player.id}:${sentAt}`, playerId: player.id, color: player.color, sentAt });
     callback({ ok: true });
   });
 

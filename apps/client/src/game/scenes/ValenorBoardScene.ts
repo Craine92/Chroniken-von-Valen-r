@@ -25,7 +25,7 @@ function getMovementSignature(state: GameState): string {
   return movement ? `${movement.sequence ?? state.turnContext.rollSequence}-${movement.kind}-${movement.from}-${movement.to}` : "";
 }
 
-import { PLAYER_COLOR_VALUES as PLAYER_COLORS, PLAYER_CHARACTERS } from "@valenor/shared";
+import { LOCATE_PULSE_MS, PLAYER_COLOR_VALUES as PLAYER_COLORS, PLAYER_CHARACTERS } from "@valenor/shared";
 import { CODEX_DURATIONS, CODEX_FONTS, codexColor } from "../design-tokens";
 import { addIconImage, type BoardIconName } from "../icon-textures";
 import { RELIC_ICONS } from "../../components/icons/Icon";
@@ -264,6 +264,37 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.arrangeTokens(true);
     }
     this.syncRealmNames();
+  }
+
+  /**
+   * „Wo bin ich?“: Um die Figur (oder ihr Wappen auf einem vollen Feld) laufen ein paar Sekunden Ringe in der
+   * Spielerfarbe. Unter reduzierter Bewegung steht stattdessen ein ruhiger, heller Ring.
+   */
+  locatePlayer(playerId: string): void {
+    const token = this.tokens.get(playerId), player = this.state.players.find(entry => entry.id === playerId);
+    if (!token || !player) return;
+    const color = PLAYER_COLORS[player.color];
+    const crested = Boolean(this.tokenCrests.get(playerId)?.visible);
+    const scale = crested ? 1 : (this.tokenVisuals.get(playerId)?.getData("seatScale") as number | undefined) ?? 1;
+    const center = crested ? { x: 0, y: 0 } : { x: 0, y: -32 * scale };
+    const radius = crested ? CREST_SIZE * .75 : 46 * scale;
+    (token.getByName("locate-marker") as Phaser.GameObjects.Container | null)?.destroy();
+    const marker = this.add.container(center.x, center.y).setName("locate-marker");
+    token.add(marker);
+    this.game.canvas.dataset.lastLocate = playerId;
+    const remove = () => { this.tweens.killTweensOf(marker.list); marker.destroy(); };
+    if (this.reducedMotion) {
+      marker.add([this.add.circle(0, 0, radius, color, .2).setStrokeStyle(5, color, 1), this.add.circle(0, 0, radius + 5, 0x000000, 0).setStrokeStyle(2, 0xfff3cf, .9)]);
+      this.time.delayedCall(LOCATE_PULSE_MS, remove);
+      return;
+    }
+    for (let index = 0; index < 3; index += 1) {
+      const ring = this.add.circle(0, 0, radius, color, .12).setStrokeStyle(5, color, 1).setAlpha(0);
+      marker.add(ring);
+      this.tweens.add({ targets: ring, alpha: { from: 1, to: 0 }, scale: { from: .7, to: 1.9 }, duration: 1_000, delay: index * 330,
+        repeat: Math.max(0, Math.round(LOCATE_PULSE_MS / 1_000) - 1), ease: "Sine.Out" });
+    }
+    this.time.delayedCall(LOCATE_PULSE_MS + 700, remove);
   }
 
   focusPropertyGroup(groupId: PropertyGroupId | undefined): void {

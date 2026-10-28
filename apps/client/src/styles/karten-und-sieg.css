@@ -118,3 +118,19 @@
 .game-hud--compact .character-card__body strong, .game-hud--compact .character-card__gold { font-size: var(--fs-sm); }
 @media (prefers-reduced-motion: reduce) { .character-card, .character-card.is-active, .character-card.is-in-danger { animation: none; transition: none; } }
 .board-page[data-quality="low"] .character-card.is-active, .board-page[data-quality="low"] .character-card.is-in-danger { animation: none; }
+
+/* --- Handy: Hintergrund aus dem Feldbild unter der eigenen Figur ------------------------------------------ */
+.realm-backdrop { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #0d0a0c; }
+.realm-backdrop__image {
+  position: absolute;
+  inset: -48px;
+  background: center / cover no-repeat;
+  filter: blur(var(--backdrop-blur)) brightness(var(--backdrop-brightness)) saturate(.85);
+  animation: realmBackdropIn 1.2s ease both;
+}
+.realm-backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(8 6 10 / calc(var(--backdrop-veil) + .1)), rgb(8 6 10 / var(--backdrop-veil)) 40%, rgb(8 6 10 / calc(var(--backdrop-veil) + .15))); }
+@keyframes realmBackdropIn { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+.controller-page:has(> .realm-backdrop) > .controller-card { position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .realm-backdrop__image { animation: none; } }
+/* Die Handykarte lässt den Reichs-Hintergrund durchscheinen; Panels darin behalten ihre eigenen Flächen. */
+.controller-page:has(> .realm-backdrop) .controller-card--started { background: linear-gradient(180deg, rgb(var(--c-ink-850-rgb) / .42), rgb(var(--c-ink-950-rgb) / .62)); }

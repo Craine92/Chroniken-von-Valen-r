@@ -39,6 +39,8 @@ import { EmoteBar, type SendEmote } from "../components/EmoteBar";
 import { LocateButton, type SendLocate } from "../components/LocateButton";
 import { MobileTargetField } from "../components/MobileTargetField";
 import { MobileWorldStatus } from "../components/MobileWorldStatus";
+import { RealmBackdrop } from "../components/RealmBackdrop";
+import { getRealmBackdrop } from "../mobile/realm-backdrop";
 import { getLandingPreview } from "../mobile/landing-preview";
 import { resolveRoomGameState, shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
@@ -693,6 +695,7 @@ export function ControllerPage() {
     return (
       <main className={`controller-page controller-page--active player-theme--${player.color}`}
         style={{ "--mobile-feedback-space": feedbackHeight ? `${feedbackHeight + 24}px` : "0px" } as CSSProperties}>
+        <RealmBackdrop image={getRealmBackdrop(gameState, player.id)} />
         <Ambience />
         <MobileFeedbackToast snapshot={mobileFeedback.snapshot} onDismiss={mobileFeedback.dismiss} onHeightChange={setFeedbackHeight} />
         <MobileWorldImpulseToast impulse={gameState.activeWorldImpulse} />

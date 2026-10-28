@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getFieldArtAsset } from "./assets/asset-manifest";
-import { BOARD_TILES, getEffectiveRent, getEffectivePurchasePrice, getBuildingName, type BoardTileType, type GameState } from "@valenor/shared";
+import { BOARD_TILES, describeRent, getPriceInfo, type BoardTileType, type GameState } from "@valenor/shared";
+import { PriceTag } from "../components/PriceTag";
 import { PropertyCard } from "../components/PropertyCard";
 import { DICE_SETTLE_DURATION_MS } from "./board-presentation";
 import { Icon, dieIcon } from "../components/icons/Icon";
@@ -87,9 +88,7 @@ export function TurnStatus({ state }: { state: GameState }) {
   const shownTile = auctionTile ?? landed;
   const ownership = shownTile ? state.propertyOwnerships.find((entry) => entry.tileIndex === shownTile.index) : undefined;
   const owner = ownership ? state.players.find((player) => player.id === ownership.ownerId) : undefined;
-  const landedRent = landed?.type === "property" && ownership && owner
-    ? getEffectiveRent(state, landed, owner.id)
-    : undefined;
+  const mover = state.players.find((player) => player.id === state.lastMovement?.playerId) ?? current;
   const landedSubtitle = landed ? (landed.type === "property" && landed.propertyGroup ? `${landed.propertyGroup} · ${TYPE_LABELS[landed.type]}` : TYPE_LABELS[landed.type] ?? "") : "";
   return (
     <section className="turn-overlay">
@@ -111,10 +110,16 @@ export function TurnStatus({ state }: { state: GameState }) {
           <strong>{landed.name}</strong>
           {/* Keine Unterzeile, die nur den Titel wiederholt (z. B. „Abenteuer“ auf dem Feld „Abenteuer“). */}
           {landedSubtitle.toLocaleLowerCase("de") !== landed.name.toLocaleLowerCase("de") && <span>{landedSubtitle}</span>}
-          {landed.economy && <b>{getEffectivePurchasePrice(state, landed)} GOLD</b>}
-          {landed.type === "property" && landed.region && ownership && ownership.buildingLevel > 0 && (
-            <><b>{getBuildingName(landed.region, ownership.buildingLevel)}</b><em>Miete: {landedRent} Gold</em></>
-          )}
+          {/* Frei: Kaufpreis. Fremd: groß die Miete mit Besitzer und Aufschlüsselung. Eigen: kein Preis. */}
+          {landed.economy && !ownership && <p className="landed-card__price"><small>KAUFPREIS</small><PriceTag info={getPriceInfo(state, landed, "purchase", mover.id)} /></p>}
+          {landed.economy && ownership && owner && (ownership.ownerId === mover.id
+            ? <em className="landed-card__own">Eigenes Grundstück von {owner.name}</em>
+            : ownership.mortgaged
+              ? <em>Gehört {owner.name} · belehnt, keine Miete</em>
+              : <>
+                <p className={`landed-card__price landed-card__price--rent player-theme--${owner.color}`}><small>MIETE AN {owner.name.toLocaleUpperCase("de")}</small><PriceTag info={getPriceInfo(state, landed, "rent", mover.id)} /></p>
+                <span className="landed-card__details">{describeRent(state, landed).join(" · ")}</span>
+              </>)}
           {state.lastMovement?.passedStart && <em>Das Runentor wurde passiert.</em>}
           {landed.type === "dungeon" && !current.dungeon.inDungeon && <em>Nur zu Besuch · {current.name} ist frei.</em>}
         </div>

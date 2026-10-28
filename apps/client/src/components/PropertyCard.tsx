@@ -1,5 +1,6 @@
-import { getBuildingName, getEffectivePurchasePrice, getEffectiveBuildCost, getEffectiveMortgageRedemptionCost, getMortgageRedemptionCost, getMortgageValue, type BoardTile, type GamePlayerState, type GameState, type PropertyOwnership } from "@valenor/shared";
+import { getBuildingName, getMortgageRedemptionCost, getMortgageValue, getPriceInfo, type BoardTile, type GamePlayerState, type GameState, type PropertyOwnership } from "@valenor/shared";
 import { Icon, tileIcon } from "./icons/Icon";
+import { PriceTag } from "./PriceTag";
 
 const TYPE_LABEL = { property: "Land", harbor: "Hafen", utility: "Versorgung" } as const;
 
@@ -20,14 +21,14 @@ export function PropertyCard({ tile, ownership, owner, state, compact = false, c
       <strong>{tile.name}</strong>
       {tile.propertyGroup && <span>{tile.propertyGroup}</span>}
       <dl>
-        <div><dt>Kaufpreis</dt><dd>{state ? getEffectivePurchasePrice(state, tile) : tile.economy.purchasePrice} Gold</dd></div>
+        <div><dt>Kaufpreis</dt><dd>{state ? <PriceTag info={getPriceInfo(state, tile, "purchase")} /> : `${tile.economy.purchasePrice} Gold`}</dd></div>
         {tile.economy.baseRent !== undefined && <div><dt>Grundmiete</dt><dd>{tile.economy.baseRent} Gold</dd></div>}
         <div><dt>Hypothekenwert</dt><dd>{getMortgageValue(tile)} Gold</dd></div>
-        {ownership?.mortgaged && <div><dt>Auslösung</dt><dd>{state ? getEffectiveMortgageRedemptionCost(state, tile) : getMortgageRedemptionCost(tile)} Gold</dd></div>}
+        {ownership?.mortgaged && <div><dt>Auslösung</dt><dd>{state ? <PriceTag info={getPriceInfo(state, tile, "mortgageRedemption")} /> : `${getMortgageRedemptionCost(tile)} Gold`}</dd></div>}
         {ownership && tile.type === "property" && tile.region && tile.economy.buildCost && (
           <>
             <div><dt>Baustufe</dt><dd>{ownership.buildingLevel} · {getBuildingName(tile.region, ownership.buildingLevel)}</dd></div>
-            <div><dt>Baukosten</dt><dd>{state ? getEffectiveBuildCost(state, tile) : tile.economy.buildCost} Gold</dd></div>
+            <div><dt>Baukosten</dt><dd>{state ? <PriceTag info={getPriceInfo(state, tile, "build")} /> : `${tile.economy.buildCost} Gold`}</dd></div>
           </>
         )}
       </dl>

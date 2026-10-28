@@ -767,7 +767,8 @@ export function ControllerPage() {
                   )}
                 </div>
               )}
-              {isCurrent && landingPreview && <MobileTargetField preview={landingPreview} />}
+              {/* Bei der Kaufentscheidung zeigt die Grundstückskarte schon alles. */}
+              {isCurrent && landingPreview && !canDecide && <MobileTargetField preview={landingPreview} />}
               {isCurrent && !landingPreview && ["rolling", "moving", "landed"].includes(gameState.turnPhase) && <p className="controller-hint">Blick zum gemeinsamen Bildschirm …</p>}
             </div>
           )}

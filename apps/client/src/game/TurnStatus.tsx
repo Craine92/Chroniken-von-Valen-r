@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getFieldArtAsset } from "./assets/asset-manifest";
 import { BOARD_TILES, getEffectiveRent, getEffectivePurchasePrice, getBuildingName, type BoardTileType, type GameState } from "@valenor/shared";
 import { PropertyCard } from "../components/PropertyCard";
 import { DICE_SETTLE_DURATION_MS } from "./board-presentation";
@@ -119,7 +120,8 @@ export function TurnStatus({ state }: { state: GameState }) {
         </div>
       )}
       {shownTile?.economy && ["propertyDecision", "auction"].includes(state.turnPhase) && (
-        <div className="economy-overlay">
+        <div className={`economy-overlay${state.turnPhase === "auction" ? " economy-overlay--auction" : ""}`}>
+          {state.turnPhase === "auction" && getFieldArtAsset(shownTile) && <img className="economy-overlay__art" src={getFieldArtAsset(shownTile)!.path} alt="" />}
           <PropertyCard tile={shownTile} state={state} {...(ownership ? { ownership } : {})} {...(owner ? { owner } : {})} />
           {state.turnPhase === "propertyDecision" ? (
             <p>{current.name} entscheidet über den Kauf.</p>

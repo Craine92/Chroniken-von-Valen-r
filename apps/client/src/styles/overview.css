@@ -1,0 +1,16 @@
+/* ==========================================================================
+   Übersicht
+   Zielfeld auf dem Handy, „Wo bin ich?“ und das Feldbild in der Auktionsanzeige.
+   Bewegung nur als kurzes Einblenden; unter reduzierter Bewegung und „low“ aus.
+   ========================================================================== */
+
+/* --- Auktion: Feldbild groß in der Anzeige (TV) -------------------------- */
+.economy-overlay--auction .economy-overlay__art {
+  width: 100%;
+  height: clamp(90px, 15vh, 150px);
+  object-fit: cover;
+  border: 2px solid var(--c-gold-400);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 22px rgb(var(--c-gold-400-rgb) / .35);
+}
+

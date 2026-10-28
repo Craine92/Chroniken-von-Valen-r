@@ -74,6 +74,8 @@ export class ValenorBoardScene extends Phaser.Scene {
   private artLayer: BoardArtLayer | undefined;
   private tileLayer: Phaser.GameObjects.Layer | undefined;
   private propertyGroupLayer: PropertyGroupLayer | undefined;
+  private auctionMarker: Phaser.GameObjects.Container | undefined;
+  private auctionTileIndex: number | undefined;
   private externalPropertyGroupFocus: PropertyGroupId | undefined;
   private currentPlayerId: string | undefined;
   private dragon: Phaser.GameObjects.Container | undefined;
@@ -138,6 +140,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.drawPlayerTokens();
     this.syncTokenRelics(this.state);
     this.syncDragon(this.state);
+    this.syncAuction(this.state);
     this.syncWorldImpulse(this.state);
     this.syncMomentumCelebration(this.state);
     this.syncActivePlayer(this.state.currentPlayerId);
@@ -237,6 +240,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.syncDungeonMarkers(next);
     this.syncTokenRelics(next);
     this.syncDragon(next);
+    this.syncAuction(next);
     this.syncWorldImpulse(next);
     this.syncMomentumCelebration(next);
     this.developmentLayer?.sync(next, true);
@@ -609,7 +613,18 @@ export class ValenorBoardScene extends Phaser.Scene {
         const silhouette = this.add.ellipse(0, -15, 36, 55, 0x050507, .46);
         miniatureVisual.add([silhouette, this.createMiniature(PLAYER_CHARACTERS.findIndex(character=>character.id===player.characterId), color).setScale(TOKEN_VISUAL_CONFIG.miniatureScale)]);
       }
+      // Kräftiger Sockelring in Spielerfarbe: Jede Figur ist vom Sofa aus zuzuordnen.
+      const playerRing = this.add.container(0, 10, [
+        this.add.ellipse(0, 0, TOKEN_VISUAL_CONFIG.base.outerWidth + 22, TOKEN_VISUAL_CONFIG.base.outerHeight + 12, color, .22),
+        this.add.ellipse(0, 0, TOKEN_VISUAL_CONFIG.base.outerWidth + 14, TOKEN_VISUAL_CONFIG.base.outerHeight + 7, 0x000000, 0).setStrokeStyle(5, color, 1),
+        this.add.ellipse(0, 0, TOKEN_VISUAL_CONFIG.base.outerWidth + 14, TOKEN_VISUAL_CONFIG.base.outerHeight + 7, 0x000000, 0).setStrokeStyle(1.5, 0xfff3cf, .7)
+      ]).setName("token-player-ring");
+      // Lichtkegel von oben für die Figur am Zug.
+      const lightCone = this.add.graphics().setName("token-light-cone");
+      lightCone.fillGradientStyle(0xfff1c4, 0xfff1c4, color, color, 0, 0, .3, .3).fillRect(-30, -150, 60, 150);
+      lightCone.fillGradientStyle(0xfff1c4, 0xfff1c4, color, color, 0, 0, .16, .16).fillTriangle(-30, -150, -46, 0, -30, 0).fillTriangle(30, -150, 46, 0, 30, 0);
       const activeRing = this.add.container(0, 7).setVisible(false);
+      lightCone.setPosition(0, 10).setVisible(player.id === this.state.currentPlayerId);
       activeRing.add([
         this.add.circle(0, 0, TOKEN_VISUAL_CONFIG.activeAuraRadius, color, .12),
         this.add.circle(0, 0, TOKEN_VISUAL_CONFIG.activeRingRadius, 0x000000, 0).setStrokeStyle(4, color, .98),
@@ -634,7 +649,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       const chain = addIconImage(this, 0, -28, "dungeon", 15, codexColor("oxblood300"));
       dungeonMarker.add([bars, chain]);
       const tokenVisual = this.add.container(0, 0).setName("token-visual");
-      tokenVisual.add([backdrop, shadowSoft, shadowCore, glow, baseLower, baseOuter, baseInner, baseRune, miniatureVisual, dungeonMarker, activeRing, nameLabel]);
+      tokenVisual.add([lightCone, backdrop, shadowSoft, shadowCore, glow, playerRing, baseLower, baseOuter, baseInner, baseRune, miniatureVisual, dungeonMarker, activeRing, nameLabel]);
       const relicBadges = this.add.container(0, 0).setName(`relics-${player.id}`);
       tokenVisual.add(relicBadges);
       this.tokenRelics.set(player.id, relicBadges);
@@ -722,6 +737,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.activeRings.forEach((ring, id) => {
       const active = id === playerId;
       this.tokenNameLabels.get(id)?.setAlpha(active ? 1 : .9);
+      (this.tokenVisuals.get(id)?.getByName("token-light-cone") as Phaser.GameObjects.Graphics | null)?.setVisible(active);
       if(ring.getData("active") === active)return;
       ring.setData("active",active).setVisible(active).setScale(1).setAlpha(active ? .9 : 0);
       if (active && !this.reducedMotion) {
@@ -775,6 +791,29 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.tavernGlow.lineStyle(12,0xe9bf65,.035*level).strokeRoundedRect(-tile.width/2+7,-tile.height/2+7,tile.width-14,tile.height-14,7)
       .lineStyle(3,0xffd98a,.14*level).strokeRoundedRect(-tile.width/2+6,-tile.height/2+6,tile.width-12,tile.height-12,7);
     if(!this.reducedMotion)this.tweens.add({targets:this.tavernGlow,alpha:.65,duration:3600,yoyo:true,repeat:-1,ease:"Sine.InOut"});
+  }
+
+  /** Laufende Auktion: Lichtkegel, goldener Rahmen und leichtes Pulsieren auf dem versteigerten Feld. */
+  private syncAuction(state: GameState): void {
+    const tileIndex = state.auction && state.turnPhase === "auction" ? state.auction.tileIndex : undefined;
+    if (tileIndex === this.auctionTileIndex) return;
+    if (this.auctionMarker) { this.tweens.killTweensOf(this.auctionMarker.list); this.tweens.killTweensOf(this.auctionMarker); this.auctionMarker.destroy(); }
+    this.auctionMarker = undefined;
+    this.auctionTileIndex = tileIndex;
+    this.game.canvas.dataset.auctionTile = tileIndex === undefined ? "" : String(tileIndex);
+    if (tileIndex === undefined) return;
+    const place = getTilePlacement(tileIndex);
+    const marker = this.add.container(place.x, place.y).setDepth(BOARD_DEPTHS.ownership + 2).setName("auction-highlight");
+    const cone = this.add.graphics();
+    // Licht fällt von der Brettmitte auf das Feld.
+    cone.fillGradientStyle(0xfff1c4, 0xfff1c4, 0xffd77a, 0xffd77a, 0, 0, .32, .32).fillRect(-place.width / 2, -place.height / 2, place.width, place.height);
+    const outer = this.add.rectangle(0, 0, place.width + 10, place.height + 10, 0x000000, 0).setStrokeStyle(8, 0xf3d681, .35);
+    const frame = this.add.rectangle(0, 0, place.width + 2, place.height + 2, 0x000000, 0).setStrokeStyle(4, 0xf3d681, 1);
+    const seal = addIconImage(this, 0, -place.height / 2 + 4, "auction", 26, codexColor("gold200"));
+    marker.add([cone, outer, frame, seal]);
+    this.auctionMarker = marker;
+    if (this.reducedMotion || this.living.drama === "calm") return;
+    this.tweens.add({ targets: [outer, cone], alpha: .45, duration: 900, yoyo: true, repeat: -1, ease: "Sine.InOut" });
   }
 
   private drawOwnershipMarkers() {

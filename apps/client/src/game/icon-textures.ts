@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { ICON_PATHS, ICON_VIEWBOX, type IconName } from "../components/icons/icon-data";
 
 /** Icons, die das Phaser-Brett braucht. Sie werden weiß gerastert und per Tint eingefärbt. */
-export const BOARD_ICONS = ["adventure", "fate", "rune", "dungeon", "mortgage", "crown", "dragon", "gold", "seal", "feather", "amulet", "companion",
+export const BOARD_ICONS = ["adventure", "fate", "rune", "dungeon", "mortgage", "crown", "dragon", "gold", "seal", "feather", "amulet", "companion", "auction",
   "harbor", "utility", "tavern", "property", "group-mondhain", "group-amethystwald", "group-silberbach", "group-kronenwald",
   "group-aschelande", "group-eisenoede", "group-sonnensteppe", "group-himmelsweite"] as const satisfies readonly IconName[];
 export type BoardIconName = typeof BOARD_ICONS[number];

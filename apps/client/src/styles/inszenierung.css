@@ -4,6 +4,19 @@
    reduzierter Bewegung und Qualitätsstufe „low“ ruhig bzw. aus.
    ========================================================================== */
 
+/* --- Stimmung: Vignette über dem Brett (setzt AtmosphereLayer) ------------ */
+/* Als CSS statt als Phaser-Effekt: Der Browser legt sie ohne eigenen Bildschirmdurchgang darüber. */
+.game-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(ellipse 72% 70% at 50% 50%, transparent 58%, rgb(8 5 12 / .78) 100%);
+  opacity: var(--mood-vignette, 0);
+  transition: opacity var(--mood-transition, 1.5s) ease-in-out;
+}
+
 /* --- 3D-Würfel: durchsichtige Ebene über dem Brett ------------------------ */
 /* Nur die Mitte des Bretts: Dort rollen die Würfel; weniger Fläche heißt weniger Arbeit für die Grafik. */
 .dice-stage { position: absolute; inset: 15% 20%; z-index: 3; pointer-events: none; }

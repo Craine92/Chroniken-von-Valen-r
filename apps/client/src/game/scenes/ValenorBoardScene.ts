@@ -5,6 +5,7 @@ import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { MortgageOverlayLayer } from "../layers/MortgageOverlayLayer";
 import { getCompleteGroupOwner, PropertyGroupLayer } from "../layers/PropertyGroupLayer";
 import { CameraRig } from "../camera/CameraRig";
+import { AtmosphereLayer } from "../atmosphere/AtmosphereLayer";
 import { getCameraMovesEnabled } from "../camera/camera-director";
 import { gameKey, isFreshGame } from "../../audio/useChroniclerVoice";
 import { isHighRent } from "../living/drama";
@@ -84,6 +85,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   private auctionMarker: Phaser.GameObjects.Container | undefined;
   private externalDice = false;
   private cameraRig: CameraRig | undefined;
+  private atmosphereLayer: AtmosphereLayer | undefined;
   private grandOpeningTimer: Phaser.Time.TimerEvent | undefined;
   /** Spielphase, in der die laufende Kamerafahrt begann; ändert sie sich, hat jemand gehandelt. */
   private cameraShotPhase: string | undefined;
@@ -140,6 +142,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.ambientLayer.render();
     this.ambientLayer.sync(this.state);
     this.dramaLayer = new DramaEffectsLayer(this, this.living.drama);
+    this.atmosphereLayer = new AtmosphereLayer(this, this.graphicsQuality, this.reducedMotion);
     this.game.canvas.dataset.graphicsQuality = this.graphicsQuality;
     this.game.canvas.dataset.ambientLife = String(this.ambientLayer.isActive);
     this.game.canvas.dataset.ambientObjects = String(this.ambientLayer.objectCount);
@@ -160,6 +163,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.drawOwnershipMarkers();
     this.developmentLayer = new PropertyDevelopmentLayer(this);
     this.developmentLayer.sync(this.state, false);
+    this.atmosphereLayer?.sync(this.state);
     this.mortgageOverlayLayer = new MortgageOverlayLayer(this);
     this.mortgageOverlayLayer.sync(this.state);
     this.fitCamera();
@@ -193,6 +197,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.dramaLayer?.destroy();
       this.ambientLayer = undefined;
       this.dramaLayer = undefined;
+      this.atmosphereLayer?.destroy();
+      this.atmosphereLayer = undefined;
       this.cameraRig?.destroy();
       this.cameraRig = undefined;
       this.mortgageOverlayLayer?.destroy();
@@ -262,6 +268,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     this.syncWorldImpulse(next);
     this.syncMomentumCelebration(next);
     this.developmentLayer?.sync(next, true);
+    this.atmosphereLayer?.sync(next);
     this.ambientLayer?.sync(next);
     if (this.ambientLayer) this.game.canvas.dataset.ambientObjects = String(this.ambientLayer.objectCount);
     if (this.dramaLayer) this.dramaLayer.cameraFocus = this.cameraRig?.currentMode === "shot";

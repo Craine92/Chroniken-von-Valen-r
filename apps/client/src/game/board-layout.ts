@@ -87,11 +87,15 @@ export interface FieldZones {
 
 export const FIELD_BANDS = {
   portrait: { name: 40, price: 22 },
-  landscape: { name: 30 },
+  landscape: { name: 26 },
   corner: { name: 56 },
-  groupStrip: 6,
-  inset: 4
+  /** Kräftige Leiste in Gruppenfarbe an der Innenkante, mit Gruppensymbol und Besitzpunkten. */
+  groupStrip: 12,
+  inset: 2
 } as const;
+
+/** Gebäude stehen außerhalb des Feldes und ragen so weit ins Mittelbild hinein. */
+export const BUILDING_PROTRUSION = { portrait: 58, landscape: 64 } as const;
 
 export function getFieldKind(tileIndex: number): FieldKind {
   const side = getTilePlacement(tileIndex).side;
@@ -105,29 +109,32 @@ export function getFieldZones(tileIndex: number): FieldZones {
   const edge = getInnerEdgeOffset(tileIndex, 0);
   const inward = { x: Math.sign(edge.x), y: Math.sign(edge.y) };
   if (kind === "portrait") {
-    const nameBottom = -halfH + FIELD_BANDS.portrait.name, priceTop = halfH - FIELD_BANDS.portrait.price;
+    // Die Gruppenleiste liegt an der Innenkante; Namens- und Preisband rücken daneben.
+    const top = inward.y < 0 ? -halfH + strip + inset : -halfH, bottom = inward.y > 0 ? halfH - strip - inset : halfH;
+    const nameBottom = top + FIELD_BANDS.portrait.name, priceTop = bottom - FIELD_BANDS.portrait.price;
+    const protrusion = BUILDING_PROTRUSION.portrait;
     return {
       kind, inward,
-      nameBand: { left: -halfW, top: -halfH, right: halfW, bottom: nameBottom },
-      priceBand: { left: -halfW, top: priceTop, right: halfW, bottom: halfH },
+      nameBand: { left: -halfW, top, right: halfW, bottom: nameBottom },
+      priceBand: { left: -halfW, top: priceTop, right: halfW, bottom },
       groupStrip: inward.y < 0 ? { left: -halfW + inset, top: -halfH + inset, right: halfW - inset, bottom: -halfH + inset + strip }
         : { left: -halfW + inset, top: halfH - inset - strip, right: halfW - inset, bottom: halfH - inset },
-      building: { left: -halfW + 8, top: nameBottom + 2, right: halfW - 8, bottom: nameBottom + 74 },
+      building: inward.y < 0 ? { left: -halfW + 12, top: -halfH - protrusion, right: halfW - 12, bottom: -halfH - 2 }
+        : { left: -halfW + 12, top: halfH + 2, right: halfW - 12, bottom: halfH + protrusion },
       tokens: { left: -halfW + inset + 2, top: nameBottom + 2, right: halfW - inset - 2, bottom: priceTop - 6 }
     };
   }
   if (kind === "landscape") {
-    const nameBottom = -halfH + FIELD_BANDS.landscape.name, buildingWidth = 64;
-    const building = inward.x > 0
-      ? { left: halfW - inset - strip - buildingWidth, top: nameBottom, right: halfW - inset - strip, bottom: halfH - inset }
-      : { left: -halfW + inset + strip, top: nameBottom, right: -halfW + inset + strip + buildingWidth, bottom: halfH - inset };
+    const nameBottom = -halfH + FIELD_BANDS.landscape.name, protrusion = BUILDING_PROTRUSION.landscape;
     return {
       kind, inward,
       nameBand: { left: -halfW, top: -halfH, right: halfW, bottom: nameBottom },
       groupStrip: inward.x > 0 ? { left: halfW - inset - strip, top: -halfH + inset, right: halfW - inset, bottom: halfH - inset }
         : { left: -halfW + inset, top: -halfH + inset, right: -halfW + inset + strip, bottom: halfH - inset },
-      building,
-      tokens: { left: -halfW + inset + strip + 2, top: nameBottom + 1, right: halfW - inset - strip - 2, bottom: halfH - inset - 12 }
+      building: inward.x > 0 ? { left: halfW + 2, top: -halfH + 4, right: halfW + protrusion, bottom: halfH - 4 }
+        : { left: -halfW - protrusion, top: -halfH + 4, right: -halfW - 2, bottom: halfH - 4 },
+      // Eine Reihe nebeneinander; unten bleibt Platz für das Namensschild.
+      tokens: { left: -halfW + inset + strip + 4, top: nameBottom + 1, right: halfW - inset - strip - 4, bottom: halfH - inset - 6 }
     };
   }
   const nameTop = halfH - FIELD_BANDS.corner.name;
@@ -135,8 +142,23 @@ export function getFieldZones(tileIndex: number): FieldZones {
     kind, inward,
     nameBand: { left: -halfW, top: nameTop, right: halfW, bottom: halfH },
     groupStrip: { left: 0, top: 0, right: 0, bottom: 0 },
-    tokens: { left: -halfW + inset + 6, top: -halfH + inset + 2, right: halfW - inset - 6, bottom: nameTop - 14 }
+    tokens: { left: -halfW + inset + 8, top: -halfH + inset + 4, right: halfW - inset - 8, bottom: nameTop - 14 }
   };
+}
+
+/**
+ * Plätze auf der Gruppenleiste: links bzw. oben das Gruppensymbol, daneben ein Punkt je Feld der Gruppe
+ * (gefüllt in der Farbe des Besitzers, leer wenn frei). Koordinaten relativ zur Feldmitte.
+ */
+export function getGroupStripSlots(tileIndex: number, dotCount: number) {
+  const strip = getFieldZones(tileIndex).groupStrip;
+  const vertical = strip.bottom - strip.top > strip.right - strip.left;
+  const centerX = (strip.left + strip.right) / 2, centerY = (strip.top + strip.bottom) / 2;
+  const symbol = vertical ? { x: centerX, y: strip.top + 9 } : { x: strip.left + 9, y: centerY };
+  const dots = Array.from({ length: dotCount }, (_, index) => vertical
+    ? { x: centerX, y: strip.top + 23 + index * 11 }
+    : { x: strip.left + 23 + index * 11, y: centerY });
+  return { symbol, symbolSize: 11, dots, dotRadius: 3.6, vertical };
 }
 
 /**
@@ -183,12 +205,12 @@ function splitRows(count: number, rows: number, columns: number): number[] {
   return [...back, front];
 }
 
-function layoutSeats(zone: FieldRect, count: number): TokenSeat[] {
+function layoutSeats(zone: FieldRect, count: number, maxRows = 3): TokenSeat[] {
   const width = zone.right - zone.left, height = zone.bottom - zone.top;
   const cap = TOKEN_SEAT_MAX_SCALE[count - 1]!;
   const tall = TOKEN_FOOTPRINT.above + TOKEN_FOOTPRINT.below;
   let best = { rows: 1, columns: count, scale: 0 };
-  for (let rows = 1; rows <= Math.min(3, count); rows += 1) {
+  for (let rows = 1; rows <= Math.min(maxRows, count); rows += 1) {
     const columns = Math.ceil(count / rows);
     // Nachbarn dürfen sich um 8 % überlappen; die äußeren Figuren bleiben ganz auf der Standfläche.
     const byWidth = width / (TOKEN_FOOTPRINT.width * (1 + (columns - 1) * .92));
@@ -215,22 +237,17 @@ function layoutSeats(zone: FieldRect, count: number): TokenSeat[] {
 }
 
 /**
- * Platz einer Figur auf ihrem Feld. Bis zu sechs Figuren stehen in ein bis drei Reihen auf der Standfläche,
- * die aktive Figur vorne in der Mitte und etwas größer. Steht ein Gebäude auf dem Feld, bleibt sein Bauplatz frei.
+ * Platz einer Figur auf ihrem Feld. Bis zu drei Figuren stehen auf der Standfläche (auf den Seitenfeldern in einer Reihe
+ * nebeneinander), die aktive vorne in der Mitte und etwas größer; ab vier Figuren zeigen die anderen Wappen.
+ * Gebäude stehen außerhalb des Feldes und nehmen keinen Platz weg.
  */
-export function getTokenSeat(tileIndex: number, count: number, index: number, options: { activeIndex?: number; occupiedByBuilding?: boolean } = {}): TokenSeat {
+export function getTokenSeat(tileIndex: number, count: number, index: number, options: { activeIndex?: number } = {}): TokenSeat {
   const zones = getFieldZones(tileIndex);
   const zone = { ...zones.tokens };
-  if (options.occupiedByBuilding && zones.building) {
-    if (zones.kind === "portrait") zone.top = zones.building.bottom - 30;
-    else if (zones.inward.x > 0) zone.right = zones.building.left;
-    else zone.left = zones.building.right;
-  }
   const total = Math.min(6, Math.max(1, count));
   const active = options.activeIndex !== undefined && options.activeIndex >= 0 && options.activeIndex < total ? options.activeIndex : undefined;
-  // Auf vollen Feldern stehen nur Wappen und eine Figur; oben und unten darf diese vor das Gebäude treten.
-  if (total >= CREST_FIELD_THRESHOLD) return getCrowdedSeat(zones.kind === "landscape" ? zone : zones.tokens, total, index, active ?? 0);
-  const seats = layoutSeats(zone, total);
+  if (total >= CREST_FIELD_THRESHOLD) return getCrowdedSeat(zone, total, index, active ?? 0, zones.kind === "landscape");
+  const seats = layoutSeats(zone, total, zones.kind === "landscape" ? 1 : 3);
   const seatIndex = active === undefined ? index : index === active ? 0 : index < active ? index + 1 : index;
   const seat = seats[Math.min(seats.length - 1, Math.max(0, seatIndex))]!;
   if (active === undefined || index !== active || total === 1) return seat;
@@ -243,23 +260,27 @@ export function getTokenSeat(tileIndex: number, count: number, index: number, op
  * Volles Feld: Die führende Figur (die aktive, sonst die als Nächste am Zug ist) steht hinter einer Reihe kleiner Wappen;
  * die Wappen der anderen stehen in Spielreihenfolge am Fuß der Standfläche und dürfen sich leicht überlappen.
  */
-function getCrowdedSeat(zone: FieldRect, total: number, index: number, lead: number): TokenSeat {
-  const crestY = zone.bottom - CREST_SIZE / 2;
+function getCrowdedSeat(zone: FieldRect, total: number, index: number, lead: number, sideBySide: boolean): TokenSeat {
+  // Seitenfelder: die Figur links, die Wappen rechts daneben – so bleibt die Figur so groß wie allein.
+  const split = sideBySide ? zone.left + (zone.right - zone.left) * .36 : undefined;
+  const crestZone = split === undefined ? zone : { ...zone, left: split };
+  const crestY = crestZone.bottom - CREST_SIZE / 2;
   if (index === lead) {
-    const [seat] = layoutSeats({ ...zone, bottom: zone.bottom - CREST_SIZE * .45 }, 1);
+    const figureZone = split === undefined ? { ...zone, bottom: zone.bottom - CREST_SIZE * .45 } : { ...zone, right: split };
+    const [seat] = layoutSeats(figureZone, 1);
     return { ...seat!, scale: Math.min(seat!.scale, CROWDED_LEAD_MAX_SCALE), front: true };
   }
   const crests = total - 1, position = index < lead ? index : index - 1;
-  const width = zone.right - zone.left, centerX = (zone.left + zone.right) / 2;
+  const width = crestZone.right - crestZone.left, centerX = (crestZone.left + crestZone.right) / 2;
   const spacing = crests > 1 ? Math.min(CREST_SIZE * 1.12, (width - CREST_SIZE) / (crests - 1)) : 0;
   return { x: centerX + (position - (crests - 1) / 2) * spacing, y: crestY, scale: CREST_SIZE, row: 1, front: true, crest: true };
 }
 
-/** Bauplatz in Feldkoordinaten: Fußpunkt (Mitte unten) und das Rechteck, in das das Gebäudebild passt. */
+/** Bauplatz in Feldkoordinaten, außerhalb des Feldes am inneren Rand: Fußpunkt (Mitte unten) und das Rechteck für das Gebäudebild. */
 export function getBuildingSeat(tileIndex: number) {
   const zones = getFieldZones(tileIndex);
   const box = zones.building ?? zones.tokens;
-  return { x: (box.left + box.right) / 2, y: box.bottom, width: box.right - box.left, height: box.bottom - box.top };
+  return { x: (box.left + box.right) / 2, y: box.bottom, width: box.right - box.left, height: box.bottom - box.top, box };
 }
 
 /** Where the dragon stands just inside the board, expressed in units of the field's shorter side. */
@@ -268,8 +289,10 @@ export function getTileInnerAnchor(tileIndex: number) {
   const unit = Math.min(place.width, place.height);
   const normal = getInnerEdgeOffset(tileIndex, 0);
   const bounds = {left:.54,right:.54,top:.72,bottom:.46};
-  return {x:normal.x ? normal.x + Math.sign(normal.x)*unit*(normal.x>0 ? bounds.left : bounds.right) : 0,
-    y:normal.y ? normal.y + Math.sign(normal.y)*unit*(normal.y>0 ? bounds.top : bounds.bottom) : 0};
+  // Der Drache steht hinter dem Gebäudestreifen, der ins Brettinnere ragt.
+  const building = {x:BUILDING_PROTRUSION.landscape,y:BUILDING_PROTRUSION.portrait};
+  return {x:normal.x ? normal.x + Math.sign(normal.x)*(unit*(normal.x>0 ? bounds.left : bounds.right)+building.x) : 0,
+    y:normal.y ? normal.y + Math.sign(normal.y)*(unit*(normal.y>0 ? bounds.top : bounds.bottom)+building.y) : 0};
 }
 
 export function getDragonAnchor(tileIndex: number, visualScale = 1) {

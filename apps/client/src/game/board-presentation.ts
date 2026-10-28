@@ -1,5 +1,5 @@
 import type { GameState } from "@valenor/shared";
-import { BOARD_FIELD_DEPTH, BOARD_HEIGHT, getBoardFitZoom } from "./board-layout";
+import { BOARD_FIELD_DEPTH, BOARD_HEIGHT, BUILDING_PROTRUSION, getBoardFitZoom } from "./board-layout";
 
 export type BoardPresentationMode = "gameplay" | "tabletop";
 
@@ -17,8 +17,8 @@ export function getCardPresentationKey(state: GameState): string {
 export function getBoardScreenLayout(width: number, height: number) {
   const zoom = getBoardFitZoom(width, height);
   const topSpace = Math.max(0, (height - (BOARD_HEIGHT + 40) * zoom) / 2);
-  // Oberkante des Brettinneren: Rahmen (20) plus obere Feldreihe; Meldungen beginnen erst darunter.
-  return { zoom, topSpace, innerTop: topSpace + (20 + BOARD_FIELD_DEPTH) * zoom,
+  // Oberkante des freien Brettinneren: Rahmen (20), obere Feldreihe und die hineinragenden Gebäude; Meldungen beginnen erst darunter.
+  return { zoom, topSpace, innerTop: topSpace + (20 + BOARD_FIELD_DEPTH + BUILDING_PROTRUSION.portrait) * zoom,
     deckX: 390 * zoom, deckY: 78 * zoom,
     cardScale: 112 * zoom / Math.max(1, Math.min(520, (height - 112) * .7115, width - 48)) };
 }

@@ -823,7 +823,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   private getTokenSeatFor(playerId: string, tileIndex: number) {
     const occupants = this.state.players.filter(candidate => candidate.position === tileIndex);
     const index = Math.max(0, occupants.findIndex(candidate => candidate.id === playerId));
-    return { seat: getTokenSeat(tileIndex, occupants.length, index, { activeIndex: this.getLeadIndex(occupants), occupiedByBuilding: this.hasBuilding(tileIndex) }), occupants: occupants.length };
+    return { seat: getTokenSeat(tileIndex, occupants.length, index, { activeIndex: this.getLeadIndex(occupants) }), occupants: occupants.length };
   }
 
   private getLeadIndex(occupants: readonly { id: string }[]): number {
@@ -895,6 +895,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const { seat, occupants } = this.getTokenSeatFor(playerId, tileIndex);
     const target = this.getTokenWorldPosition(tileIndex, seat);
     const scale = this.styleTokenForSeat(playerId, seat, occupants);
+    token.setScale(1);
     // Vordere Figuren liegen über den hinteren.
     token.setDepth(BOARD_DEPTHS.players + (target.y + BOARD_HALF_HEIGHT) / 100_000);
     if (animate && !this.reducedMotion) {
@@ -915,7 +916,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const step = (index: number) => {
       const tileIndex = movement.path[index];
       if (tileIndex === undefined) return;
-      const stepSeat = getTokenSeat(tileIndex, 1, 0, { occupiedByBuilding: this.hasBuilding(tileIndex) });
+      const stepSeat = getTokenSeat(tileIndex, 1, 0);
       const position = this.getTokenWorldPosition(tileIndex, stepSeat);
       this.tokenVisuals.get(movement.playerId)?.setScale(this.styleTokenForSeat(movement.playerId, stepSeat, 1));
       const region = BOARD_TILES[tileIndex]?.region;
@@ -943,8 +944,8 @@ export class ValenorBoardScene extends Phaser.Scene {
         targets: token,
         x: middleX,
         y: middleY,
-        scaleX: .94,
-        scaleY: 1.08,
+        // Nur gleichmäßig skalieren: Figuren werden nie gestaucht oder verzerrt.
+        scale: 1.05,
         duration: 90,
         ease: "Sine.Out",
         onComplete: () => {
@@ -952,8 +953,7 @@ export class ValenorBoardScene extends Phaser.Scene {
             targets: token,
             x: position.x,
             y: position.y,
-            scaleX: 1.05,
-            scaleY: .94,
+            scale: 1,
             duration: 100,
             ease: "Sine.In",
             onComplete: () => {
@@ -998,10 +998,6 @@ export class ValenorBoardScene extends Phaser.Scene {
       const spark = this.add.star(token.x, token.y - 26, 4, 2, 5, index % 2 ? color : codexColor("gold200"), 1).setDepth(BOARD_DEPTHS.effects + 1);
       this.tweens.add({ targets: spark, x: token.x + Math.cos(angle) * 46, y: token.y - 26 + Math.sin(angle) * 40, alpha: 0, angle: 120, duration: base * 3, ease: "Sine.Out", onComplete: () => spark.destroy() });
     }
-  }
-
-  private hasBuilding(tileIndex: number) {
-    return this.state.propertyOwnerships.some(ownership=>ownership.tileIndex===tileIndex && ownership.buildingLevel>0);
   }
 
   private getDragonPosition(tileIndex: number, scale: number) {
@@ -1148,7 +1144,7 @@ export class ValenorBoardScene extends Phaser.Scene {
     const tile = getTilePlacement(targetIndex);
     const pulse = this.add.graphics().setDepth(BOARD_DEPTHS.effects + 2);
     pulse.lineStyle(7, impulse.id === "dragonCall" ? 0xef784d : 0xf3ca67, .9).strokeRoundedRect(tile.x - tile.width / 2 + 3, tile.y - tile.height / 2 + 3, tile.width - 6, tile.height - 6, 10);
-    this.tweens.add({ targets: pulse, alpha: 0, scaleX: 1.06, scaleY: 1.06, duration: this.reducedMotion ? 180 : 850, yoyo: !this.reducedMotion, repeat: this.reducedMotion ? 0 : 1, onComplete: () => pulse.destroy() });
+    this.tweens.add({ targets: pulse, alpha: 0, scale: 1.06, duration: this.reducedMotion ? 180 : 850, yoyo: !this.reducedMotion, repeat: this.reducedMotion ? 0 : 1, onComplete: () => pulse.destroy() });
   }
 
   private syncMomentumCelebration(state: GameState): void {

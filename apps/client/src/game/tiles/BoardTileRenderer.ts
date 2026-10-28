@@ -4,7 +4,7 @@ import { FIELD_BASE_ASSETS, getFieldArtAsset, SPECIAL_TILE_ASSETS, type ImageAss
 import { fitImage, hasLoadedAsset } from "../assets/asset-runtime";
 import type { BoardArtLayer } from "../layers/BoardArtLayer";
 import { BOARD_DEPTHS } from "../layers/board-depths";
-import { FIELD_BANDS, getFieldZones, type FieldRect } from "../board-layout";
+import { FIELD_BANDS, getFieldZones, getGroupStripSlots, type FieldRect } from "../board-layout";
 import { getBoardTileVisualLayout, type BoardTileVisualLayout } from "./board-tile-layout";
 import { getFieldSymbol, getPropertyGroupVisual, getRegionAccent, getTileFooter, getTilePalette, getTilePrimaryAction, getTileTitle, type TilePalette } from "./board-tile-theme";
 import { CODEX_FONTS } from "../design-tokens";
@@ -191,13 +191,19 @@ export class BoardTileRenderer {
     };
     band(zones.nameBand, zones.kind === "corner" ? -1 : 1);
     if (zones.priceBand) band(zones.priceBand, -1);
+    const stripMarks: Phaser.GameObjects.GameObject[] = [];
     if (tile.type === "property") {
-      const strip = zones.groupStrip;
-      bands.fillStyle(getPropertyGroupVisual(tile.propertyGroup).accent, .98).fillRect(strip.left, strip.top, strip.right - strip.left, strip.bottom - strip.top);
+      // Kräftige Gruppenleiste mit Symbol; die Besitzpunkte daneben zeichnet die Gruppenebene, weil sie sich ändern.
+      const strip = zones.groupStrip, group = getPropertyGroupVisual(tile.propertyGroup);
+      bands.fillStyle(0x07060a, .9).fillRect(strip.left - 1, strip.top - 1, strip.right - strip.left + 2, strip.bottom - strip.top + 2);
+      bands.fillStyle(group.accent, 1).fillRect(strip.left, strip.top, strip.right - strip.left, strip.bottom - strip.top);
+      const slots = getGroupStripSlots(tile.index, group.size);
+      bands.fillStyle(0x07060a, .85).fillCircle(slots.symbol.x, slots.symbol.y, slots.symbolSize * .62);
+      stripMarks.push(addIconImage(this.scene, slots.symbol.x, slots.symbol.y, group.icon as BoardIconName, slots.symbolSize, group.accent));
     }
     bands.lineStyle(3, 0x0b0907, 1).strokeRoundedRect(-width / 2 + 1.5, -height / 2 + 1.5, width - 3, height - 3, 5);
     bands.lineStyle(1.5, palette.specialFrame ? palette.accent : palette.rim, palette.specialFrame ? .95 : .78).strokeRoundedRect(-width / 2 + 3.5, -height / 2 + 3.5, width - 7, height - 7, 4);
-    const objects: Phaser.GameObjects.GameObject[] = [bands];
+    const objects: Phaser.GameObjects.GameObject[] = [bands, ...stripMarks];
 
     const titleStyle = (fontSize: number, align: "center" | "left") => ({
       color: palette.text, fontFamily: CODEX_FONTS.display, fontSize: `${fontSize}px`, fontStyle: "bold", align,

@@ -38,6 +38,7 @@ import { createValenorSocket } from "../lib/socket";
 import { EmoteBar, type SendEmote } from "../components/EmoteBar";
 import { LocateButton, type SendLocate } from "../components/LocateButton";
 import { MobileTargetField } from "../components/MobileTargetField";
+import { MobileWorldStatus } from "../components/MobileWorldStatus";
 import { getLandingPreview } from "../mobile/landing-preview";
 import { resolveRoomGameState, shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
@@ -703,6 +704,7 @@ export function ControllerPage() {
           </header>
           {!connected && <p className="controller-reconnecting" role="status">VERBINDUNG WIRD WIEDERHERGESTELLT</p>}
           <QuickGameClockDisplay clock={gameState.quickGameClock} compact />
+          <MobileWorldStatus state={gameState} />
           {gameState.quickGameClock?.expired && <p className="controller-last-round">DIE LETZTE RUNDE</p>}
           <div id="controller-action" hidden={controllerTab !== "action"}>
           {!isCurrent && !ownWorldImpulseDecision && <MobileLiveEvents state={gameState} playerId={player.id} />}

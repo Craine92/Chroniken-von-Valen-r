@@ -40,6 +40,26 @@
 .target-field--settled strong { font-size: var(--fs-lg); }
 .target-field--settled .target-field__price .price-tag { font-size: var(--fs-xl); }
 
+/* --- Handy: Ereignisse und Weltimpulse ------------------------------------ */
+.mobile-world-status { margin: var(--space-2) 0 0; color: var(--c-parchment-100); border: 1px solid rgb(var(--c-gold-400-rgb) / .55); border-radius: var(--radius-md); background: linear-gradient(120deg, rgb(var(--c-gold-700-rgb, 120 86 30) / .3), rgb(var(--c-ink-950-rgb) / .92) 70%); box-shadow: 0 0 18px rgb(var(--c-gold-400-rgb) / .14); }
+.mobile-world-status--impulse { border-color: rgb(140 170 255 / .55); background: linear-gradient(120deg, rgb(70 90 170 / .3), rgb(var(--c-ink-950-rgb) / .92) 70%); }
+.mobile-world-status summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--space-2); min-height: var(--touch-target); padding: 0 var(--space-3); cursor: pointer; list-style: none; font: 600 var(--fs-xs) var(--font-text); }
+.mobile-world-status summary::-webkit-details-marker { display: none; }
+.mobile-world-status summary > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-world-status summary b { color: var(--c-gold-300); }
+.mobile-world-status summary small { color: var(--c-parchment-400); font-size: var(--fs-2xs); white-space: nowrap; }
+.mobile-world-status summary::after { content: "▾"; color: var(--c-gold-400); }
+.mobile-world-status[open] summary::after { content: "▴"; }
+.mobile-world-status ul { display: grid; gap: var(--space-3); margin: 0; padding: 0 var(--space-3) var(--space-3); list-style: none; }
+.mobile-world-status li { display: grid; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid rgb(var(--c-gold-400-rgb) / .25); }
+.mobile-world-status li > small { color: var(--c-gold-400); font: 800 var(--fs-2xs) var(--font-text); letter-spacing: .18em; }
+.mobile-world-status li > strong { color: var(--c-gold-200); font: 700 var(--fs-lg) var(--font-display); }
+.mobile-world-status li > p { margin: 0; color: var(--c-parchment-200); font-size: var(--fs-sm); line-height: 1.45; }
+.mobile-world-status dl { display: grid; gap: var(--space-1); margin: 0; }
+.mobile-world-status dl > div { display: grid; grid-template-columns: 5.5rem 1fr; gap: var(--space-2); font-size: var(--fs-xs); }
+.mobile-world-status dt { color: var(--c-parchment-500); }
+.mobile-world-status dd { margin: 0; color: var(--c-parchment-100); font-weight: 700; }
+
 /* Lange Gebäudenamen in schmalen Zellen mit Silbentrennung statt mitten im Wort. */
 .controller-page .controller-detail-card dd { overflow-wrap: break-word; hyphens: auto; }
 .controller-page .controller-detail-card dd .price-tag__reason { hyphens: manual; }

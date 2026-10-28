@@ -36,6 +36,8 @@ import { GameResultPanel } from "../components/GameResultPanel";
 import { createValenorSocket } from "../lib/socket";
 import { EmoteBar, type SendEmote } from "../components/EmoteBar";
 import { LocateButton, type SendLocate } from "../components/LocateButton";
+import { MobileTargetField } from "../components/MobileTargetField";
+import { getLandingPreview } from "../mobile/landing-preview";
 import { resolveRoomGameState, shouldApplyAuthoritativeGameState } from "../lib/authoritative-game-state";
 import { MobileFeedbackToast, useMobileFeedback } from "../mobile/MobileFeedback";
 import { MobileLiveEvents } from "../components/MobileLiveEvents";
@@ -610,6 +612,7 @@ export function ControllerPage() {
       return <BankruptcySpectator gameState={gameState} player={player} connected={connected} onSendEmote={sendEmote} />;
     }
     const isCurrent = current?.id === player.id;
+    const landingPreview = getLandingPreview(gameState, player.id);
     const orderEntry = gameState.orderRolls.find((entry) => entry.playerId === player.id);
     const needsOrderRoll = gameState.turnPhase === "determiningOrder"
       && gameState.orderContenders.includes(player.id)
@@ -756,7 +759,8 @@ export function ControllerPage() {
                   )}
                 </div>
               )}
-              {isCurrent && ["rolling", "moving", "landed"].includes(gameState.turnPhase) && <p className="controller-hint">Blick zum gemeinsamen Bildschirm …</p>}
+              {isCurrent && landingPreview && <MobileTargetField preview={landingPreview} />}
+              {isCurrent && !landingPreview && ["rolling", "moving", "landed"].includes(gameState.turnPhase) && <p className="controller-hint">Blick zum gemeinsamen Bildschirm …</p>}
             </div>
           )}
           {payment && <PaymentManagement payment={payment} playerGold={activePlayer.gold} hasLegalPaymentAction={Boolean(hasLegalPaymentSale)} connected={connected} onSettle={settlePayment} autoMortgagePlan={autoMortgagePlan} onAutoMortgage={() => manageFinance(SOCKET_EVENTS.financeAutoMortgageForPayment)} onDeclareBankruptcy={declareBankruptcy} showActions={false} />}

@@ -3,7 +3,7 @@ import { BOARD_TILES, getPropertyGroupTiles, DUNGEON_TILE_INDEX, MAX_RELICS, REL
 import { BOARD_HEIGHT, BOARD_HALF_HEIGHT, BOARD_HALF_WIDTH, BOARD_INNER_HALF_HEIGHT, BOARD_INNER_HALF_WIDTH, BOARD_WIDTH, REALM_LABEL_SAFE_ZONES, getBoardFitZoom, getDragonAnchor, CREST_SIZE, getFieldZones, getTilePlacement, getTileWorldPosition, getTokenSeat, TOKEN_FOOTPRINT, type TokenSeat } from "../board-layout";
 import { PropertyDevelopmentLayer } from "../layers/PropertyDevelopmentLayer";
 import { MortgageOverlayLayer } from "../layers/MortgageOverlayLayer";
-import { PropertyGroupLayer } from "../layers/PropertyGroupLayer";
+import { getCompleteGroupOwner, PropertyGroupLayer } from "../layers/PropertyGroupLayer";
 import { BoardArtLayer } from "../layers/BoardArtLayer";
 import { getCharacterAsset, DRAGON_ANIMATION, getAvailableDragonFrames, getDragonTerritoryVisuals, RELIC_ASSETS, VALENOR_ASSETS } from "../assets/asset-manifest";
 import { fitImage } from "../assets/asset-runtime";
@@ -37,6 +37,9 @@ const REGION_TRAIL: Record<RegionType, number> = {
   steppe: 0xf5d47d
 };
 
+/** Durchmesser des Besitzerwappens auf dem Feld (Weltpixel). */
+const OWNER_CREST_SIZE = 34;
+
 export class ValenorBoardScene extends Phaser.Scene {
   private state: GameState;
   private readonly tokens = new Map<string, Phaser.GameObjects.Container>();
@@ -50,7 +53,6 @@ export class ValenorBoardScene extends Phaser.Scene {
   private readonly dungeonMarkers = new Map<string, Phaser.GameObjects.Container>();
   private readonly activeRings = new Map<string, Phaser.GameObjects.Container>();
   private readonly ownershipMarkers = new Map<number, Phaser.GameObjects.Container>();
-  private ownershipMarkerScale = 1;
   private ownershipSignature = "";
   private lastDiceSignature = "";
   private lastMovementSignature = "";
@@ -116,7 +118,7 @@ export class ValenorBoardScene extends Phaser.Scene {
       onPropertyGroupFocus: (groupId, mode) => this.propertyGroupLayer?.focus(groupId, mode)
     });
     this.tileLayer = tileRenderer.renderAll(BOARD_TILES);
-    this.propertyGroupLayer = new PropertyGroupLayer(this, this.state);
+    this.propertyGroupLayer = new PropertyGroupLayer(this, this.state, this.reducedMotion || this.living.drama === "calm");
     this.propertyGroupLayer.setExternalFocus(this.externalPropertyGroupFocus);
     this.artLayer.renderRealmDecorations();
     this.artLayer.renderRealmAtmosphere(this.reducedMotion, this.visualQuality.animateAmbient);
@@ -784,31 +786,30 @@ export class ValenorBoardScene extends Phaser.Scene {
       const owner = this.state.players.find((player) => player.id === ownership.ownerId);
       if (!owner) return;
       const place = getTilePlacement(ownership.tileIndex);
-      const marker = this.add.container(place.x, place.y).setScale(this.ownershipMarkerScale).setDepth(BOARD_DEPTHS.ownership);
+      // Besitzzeichen sind feldgenau; sie wachsen nicht mit der TV-Skalierung über das Feld hinaus.
+      const marker = this.add.container(place.x, place.y).setDepth(BOARD_DEPTHS.ownership);
       if(!previous.has(ownership.tileIndex) && this.boardReady && !this.reducedMotion){
         marker.setAlpha(0);this.tweens.add({targets:marker,alpha:1,duration:500,ease:"Sine.Out"});
       }
       const ownershipFrame = this.add.rectangle(0, 0, place.width - 7, place.height - 7, 0x000000, 0)
         .setName("ownership-frame").setStrokeStyle(5, PLAYER_COLORS[owner.color], 1);
-      // Wappen im Preisband (oben/unten) bzw. in der äußeren unteren Ecke der Seitenfelder; die Gruppenleiste bleibt frei.
+      // Besitzerwappen mit Porträt, vom Sofa aus erkennbar: links im Preisband (oben/unten) bzw. in der äußeren
+      // unteren Ecke der Seitenfelder; die Gruppenleiste an der Innenkante bleibt frei.
       const zones = getFieldZones(ownership.tileIndex);
-      const badgeX = zones.kind === "landscape" && zones.inward.x < 0 ? place.width / 2 - 18 : -place.width / 2 + 18;
-      const badgeY = zones.priceBand ? (zones.priceBand.top + zones.priceBand.bottom) / 2 - (zones.inward.y > 0 ? 2 : 0) : place.height / 2 - 16;
-      const glow = this.add.circle(badgeX, badgeY, 13, PLAYER_COLORS[owner.color], .28);
-      const banner = this.add.rectangle(badgeX, badgeY, 24, 18, 0x09090c, .96)
-        .setStrokeStyle(2.5, PLAYER_COLORS[owner.color], 1);
-      const initials = owner.name.trim().split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "V";
-      const rune = this.add.text(badgeX, badgeY, initials, { color: "#fff3cf", fontFamily: CODEX_FONTS.text, fontSize: "10px", fontStyle: "bold", stroke: "#080709", strokeThickness: 2 }).setOrigin(.5);
+      const crestX = zones.kind === "landscape" && zones.inward.x < 0 ? place.width / 2 - 21 : -place.width / 2 + 21;
+      const crestY = zones.priceBand ? zones.priceBand.bottom - 19 : place.height / 2 - 21;
+      const crest = this.createTokenCrest(owner.characterId, PLAYER_COLORS[owner.color]).setVisible(true)
+        .setPosition(crestX, crestY).setScale(OWNER_CREST_SIZE / CREST_SIZE).setName("owner-crest");
+      const pennant = this.add.triangle(crestX, crestY + OWNER_CREST_SIZE / 2 + 2, -7, 0, 7, 0, 0, 9, PLAYER_COLORS[owner.color], 1)
+        .setStrokeStyle(1, 0x07060a, .9).setName("owner-pennant");
       if(ownership.mortgaged)marker.add(this.add.rectangle(0,0,place.width-9,place.height-9,0x000000,.28).setName("mortgage-shade"));
-      marker.add([ownershipFrame, glow, banner, rune]);
-      const group = BOARD_TILES[ownership.tileIndex]?.propertyGroup;
-      if(group && getPropertyGroupTiles(group).every(tile=>this.state.propertyOwnerships.some(entry=>entry.tileIndex===tile.index && entry.ownerId===owner.id))) {
-        marker.add(addIconImage(this,badgeX,badgeY-19,"crown",15,codexColor("gold300")).setName("complete-group-crown"));
+      marker.add([ownershipFrame, pennant, crest]);
+      const groupId = BOARD_TILES[ownership.tileIndex]?.propertyGroupId;
+      if (groupId && getCompleteGroupOwner(this.state, groupId) === owner.id) {
+        marker.add(addIconImage(this, crestX, crestY - OWNER_CREST_SIZE / 2 - 5, "crown", 17, codexColor("gold300")).setName("complete-group-crown"));
       }
       if (ownership.mortgaged) {
-        glow.setFillStyle(0x292a31, 0.65);
-        banner.setAlpha(.85);
-        rune.setAlpha(.9);
+        crest.setAlpha(.6);
         marker.add(addIconImage(this, 0, 0, "mortgage", 22, codexColor("parchment100")).setName("mortgage-lock"));
       }
       this.ownershipMarkers.set(ownership.tileIndex, marker);
@@ -1191,6 +1192,9 @@ export class ValenorBoardScene extends Phaser.Scene {
     if(signature === this.lastImpactSignature)return;
     this.lastImpactSignature=signature;
     const position = getTileWorldPosition(tileIndex);
+    // Landet eine Figur auf einem Grundstück, leuchtet seine ganze Gruppe kurz auf.
+    const groupId = BOARD_TILES[tileIndex]?.propertyGroupId;
+    if (groupId) this.propertyGroupLayer?.pulseGroup(groupId);
     const impact = this.add.circle(position.x, position.y + 4, 8, 0xe9c77d, .1).setDepth(BOARD_DEPTHS.effects).setStrokeStyle(3, 0xf1d89b, .8);
     this.tweens.add({ targets: impact, scale: 3.8, alpha: 0, duration: this.reducedMotion ? 100 : 600, ease: "Sine.Out", onComplete: () => impact.destroy() });
     for (let index = 0; index < (this.reducedMotion ? 0 : 5); index += 1) {
@@ -1323,10 +1327,8 @@ export class ValenorBoardScene extends Phaser.Scene {
 
   private applyBoardVisualScale(boardZoom: number) {
     const scale = getBoardVisualScale(boardZoom, this.scale.width);
-    this.ownershipMarkerScale = scale.markerScale;
     this.relicBadgeSize = Math.max(18, Math.min(34, 22 / (boardZoom * scale.visualTokenScale)));
     this.syncTokenRelics(this.state);
-    this.ownershipMarkers.forEach((marker) => marker.setScale(scale.markerScale));
     this.propertyGroupLayer?.setVisualScale(scale.groupMarkerScale);
     this.game.canvas.dataset.effectiveBoardScale = scale.effectiveBoardScale.toFixed(4);
     this.game.canvas.dataset.visualTokenScale = scale.visualTokenScale.toFixed(4);

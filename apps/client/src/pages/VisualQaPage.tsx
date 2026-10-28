@@ -23,6 +23,7 @@ import { MobileTargetField } from "../components/MobileTargetField";
 import { getLandingPreview } from "../mobile/landing-preview";
 import { LivingBoardQa, isLivingBoardScene } from "./LivingBoardQa";
 import { BoardFieldsQa, isBoardFieldScene } from "./BoardFieldsQa";
+import { StagingQa, isStagingScene } from "./StagingQa";
 import { HostLobby } from "./HostLobby";
 
 const PLAYERS: GamePlayerState[] = [
@@ -196,7 +197,8 @@ function ControllerPropertyShowcase() {
   );
 }
 
-function ControllerTurnShowcase() {
+/** `grandStart`: Handy des Startspielers, während der Fernseher über die vier Reiche fliegt. */
+function ControllerTurnShowcase({ grandStart = false }: { grandStart?: boolean }) {
   const player = PLAYERS[0]!;
   return (
     <main className="controller-page controller-page--active player-theme--violet visual-qa-controller visual-qa-controller--turn">
@@ -211,6 +213,7 @@ function ControllerTurnShowcase() {
           <p className="waiting-copy">Du bist am Zug</p>
           <button className="turn-action-button" type="button"><span aria-hidden="true"><Icon name="dice" /></span> Würfeln</button>
           <p className="controller-hint">Der gemeinsame Bildschirm zeigt anschließend deinen Weg.</p>
+          {grandStart && <button type="button" className="grand-start-skip">Spielstart überspringen</button>}
         </div>
         <nav className="controller-nav" aria-label="Controller-Bereiche">
           <a href="#controller-action"><span><Icon name="dice" /></span>Aktion</a><a href="#controller-property"><span><Icon name="property" /></span>Besitz</a><a href="#controller-trade"><span><Icon name="trade" /></span>Handel</a><a href="#controller-journal"><span><Icon name="journal" /></span>Journal</a>
@@ -550,6 +553,7 @@ export function VisualQaPage() {
   if (scenario === "quick-trade") return <QuickTradeTvQa />;
   if (scenario === "quick-trade-sealed") return <QuickTradeTvQa sealed />;
   if (scenario === "controller-turn") return <ControllerTurnShowcase />;
+  if (scenario === "controller-grand-start") return <ControllerTurnShowcase grandStart />;
   if (scenario === "controller-feedback") return <ControllerFeedbackShowcase />;
   if (scenario === "controller-impulse") return <ControllerImpulseShowcase />;
   if (scenario === "controller-impulse-twist") return <ControllerImpulseShowcase variant="twist" />;
@@ -561,6 +565,7 @@ export function VisualQaPage() {
   if (scenario === "controller-emotes") return <MobileEmotesQa />;
   if (scenario === "controller-emotes-cooldown") return <MobileEmotesQa cooldown />;
   if (isBoardFieldScene(scenario)) return <BoardFieldsQa scene={scenario} />;
+  if (isStagingScene(scenario)) return <StagingQa scene={scenario} createBase={() => createShowcaseState("buildings")} />;
   if (scenario === "lobby") return <LobbyQa />;
   if (scenario === "controller-target") return <MobileTargetQa />;
   if (scenario === "controller-target-rent") return <MobileTargetQa owned />;

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { BOARD_TILES, DUNGEON_TILE_INDEX, getAutoMortgagePlan, getWorldImpulseDefinition, type BuildingLevel, type GamePlayerState, type GameRoom, type GameState, type Player, type PropertyOwnership } from "@valenor/shared";
+import { BOARD_TILES, CHRONICLE_EVENTS, DUNGEON_TILE_INDEX, getRegionalChronicleDefinition, getAutoMortgagePlan, getWorldImpulseDefinition, type BuildingLevel, type GamePlayerState, type GameRoom, type GameState, type Player, type PropertyOwnership } from "@valenor/shared";
 import { BrandMark } from "../components/BrandMark";
 import { PropertyCard } from "../components/PropertyCard";
 import { PropertyGroupOverview } from "../components/PropertyGroupOverview";
@@ -20,6 +20,7 @@ import { Icon } from "../components/icons/Icon";
 import { EmoteBar } from "../components/EmoteBar";
 import { LocateButton } from "../components/LocateButton";
 import { MobileTargetField } from "../components/MobileTargetField";
+import { MobileWorldStatus } from "../components/MobileWorldStatus";
 import { getLandingPreview } from "../mobile/landing-preview";
 import { LivingBoardQa, isLivingBoardScene } from "./LivingBoardQa";
 import { BoardFieldsQa, isBoardFieldScene } from "./BoardFieldsQa";
@@ -284,8 +285,44 @@ function MobileActionQa({ variant }: { variant: "fate" | "buy" }) {
   return <MobileQaShell primary={{ label: "Kaufen · 100 Gold", onClick: () => undefined }} secondary={{ label: "Auktion starten", onClick: () => undefined }}><div className="personal-turn-result"><span><Icon name="dice" /> 3 + 2 = <strong>5</strong></span><span><Icon name="arrow-right" /> <strong>{BOARD_TILES[6]!.name}</strong></span></div><div className="controller-economy"><PropertyCard tile={BOARD_TILES[6]!} state={state} compact /></div></MobileQaShell>;
 }
 
-function MobilePossessionsQa({ detail = false, trade = false }: { detail?: boolean; trade?: boolean }) {
+/** Ein Chronik-Ereignis, das nur in den genannten Reichen gilt (Runde 7 bis 9). */
+function withRegionalEvent(state: GameState, eventId: string, regions: ("elves" | "humans" | "orcs" | "steppe")[]): GameState {
+  const definition = getRegionalChronicleDefinition(CHRONICLE_EVENTS.find(event => event.id === eventId)!, regions);
+  state.activeChronicleEvent = { ...definition, startedAfterRound: state.currentRound - 1, startedAtRound: state.currentRound, expiresAtRound: state.currentRound + 2, startedAt: 1 };
+  return state;
+}
+
+/** Feinschliff am Handy: Zielfeld mit Miete oder Kaufpreis samt Ereignis, Kerker-Transfer und der Ereignis-Hinweis oben. */
+function MobileFeinschliffQa({ variant }: { variant: "rent" | "buy" | "dungeon" | "events" }) {
+  const state = createShowcaseState("buildings");
+  state.currentRound = 7;
+  state.propertyOwnerships = state.propertyOwnerships.filter(entry => ![6, 8, 9, 26].includes(entry.tileIndex));
+  let to = 8;
+  if (variant === "rent" || variant === "events") {
+    state.propertyOwnerships.push(ownership(6, "p3"), ownership(8, "p3", 3), ownership(9, "p3"));
+    withRegionalEvent(state, "blood-moon", ["elves", "orcs"]);
+  }
+  if (variant === "buy") { to = 26; withRegionalEvent(state, "traders-festival", ["orcs"]); }
+  if (variant === "events") state.worldImpulseEffects = { buildingFervor: true };
+  state.turnPhase = variant === "dungeon" ? "dungeonTransfer" : "moving";
+  state.lastMovement = variant === "dungeon"
+    ? { kind: "dungeonTransfer", sequence: 99, playerId: "p1", from: 3, to: DUNGEON_TILE_INDEX, path: [DUNGEON_TILE_INDEX], passedStart: false, landedTile: BOARD_TILES[DUNGEON_TILE_INDEX]! }
+    : { kind: "normal", sequence: 99, playerId: "p1", from: 3, to, path: [to], passedStart: false, landedTile: BOARD_TILES[to]! };
+  const preview = getLandingPreview(state, "p1");
+  useEffect(() => {
+    if (variant === "events") document.querySelector<HTMLDetailsElement>(".mobile-world-status")?.setAttribute("open", "");
+  }, [variant]);
+  return <MobileQaShell>
+    <MobileWorldStatus state={state} />
+    <div className="turn-controls">{preview && <MobileTargetField preview={preview} />}</div>
+    <LocateButton connected onLocate={done => done({ ok: true })} />
+  </MobileQaShell>;
+}
+
+function MobilePossessionsQa({ detail = false, trade = false, event = false }: { detail?: boolean; trade?: boolean; event?: boolean }) {
   const state = createShowcaseState("four");
+  // Segen der Baumeister nur im Amethystwald: dort sinken die Baukosten, anderswo nicht.
+  if (event) withRegionalEvent(state, "builders-blessing", ["elves"]);
   state.players[0]!.relics = ["golden-feather", "runestone"];
   if (trade) state.players[1]!.name = "Myrra mit einem sehr langen Namen";
   state.propertyOwnerships = trade
@@ -535,6 +572,12 @@ export function VisualQaPage() {
   if (scenario === "mobile-possessions-groups") return <MobilePossessionsQa />;
   if (scenario === "mobile-possessions-trade") return <MobilePossessionsQa trade />;
   if (scenario === "mobile-property-detail") return <MobilePossessionsQa detail />;
+  if (scenario === "mobile-prices-event") return <MobilePossessionsQa event />;
+  if (scenario === "mobile-prices-event-detail") return <MobilePossessionsQa detail event />;
+  if (scenario === "mobile-target-rent-event") return <MobileFeinschliffQa variant="rent" />;
+  if (scenario === "mobile-target-buy-event") return <MobileFeinschliffQa variant="buy" />;
+  if (scenario === "mobile-target-dungeon") return <MobileFeinschliffQa variant="dungeon" />;
+  if (scenario === "mobile-world-status") return <MobileFeinschliffQa variant="events" />;
   if (scenario === "mobile-finance") return <MobileFinanceQa />;
   if (scenario === "mobile-dungeon-payment") return <MobileDungeonPaymentQa />;
   if (scenario === "mobile-runestone") return <MobileRuneStoneQa />;

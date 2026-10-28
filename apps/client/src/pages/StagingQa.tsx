@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BOARD_TILES, CHRONICLE_EVENTS, getPropertyGroupTiles, type GameState } from "@valenor/shared";
+import { BOARD_TILES, CHRONICLE_EVENTS, getPropertyGroupTiles, getRegionalChronicleDefinition, type GameState, type RegionType } from "@valenor/shared";
 import { GameExperience } from "../game/GameExperience";
 
 /** Szenen der Inszenierung: Würfel, Kamerafahrten, Stimmungen, Tag und Nacht, Kartenwendung, Spielstart. */
@@ -8,7 +8,9 @@ const DAYTIME_SCENES = ["time-morning", "time-day", "time-evening", "time-night"
 export const STAGING_SCENES = [
   "dice-roll", "dice-double", "grand-start",
   "camera-dragon", "camera-rent", "camera-group", "camera-build5", "camera-bankrupt", "camera-auction", "camera-move",
-  "card-flip", ...MOOD_SCENES, ...DAYTIME_SCENES
+  "card-flip", ...MOOD_SCENES, ...DAYTIME_SCENES,
+  // Feinschliff: Landekarte mit Kaufpreis bzw. Miete, Banner weicht dem Geschehen aus.
+  "landing-free-discount", "landing-rent-low", "landing-own"
 ] as const;
 export type StagingScene = string;
 
@@ -91,6 +93,26 @@ const SCENES: Record<string, { prepare?: (draft: GameState) => void; trigger?: (
       draft.lastMovement = { kind: "normal", sequence: 400, playerId: player.id, from, to, path: Array.from({ length: 8 }, (_, step) => (from + step + 1) % 40), passedStart: false, landedTile: BOARD_TILES[to]! };
     }
   },
+  "landing-free-discount": {
+    prepare: draft => { draft.propertyOwnerships = draft.propertyOwnerships.filter(entry => entry.tileIndex !== 26); regionalEvent(draft, "traders-festival", ["orcs"]); },
+    trigger: draft => { land(draft, "p1", 21, 26); draft.turnPhase = "propertyDecision"; }
+  },
+  "landing-rent-low": {
+    prepare: draft => {
+      draft.propertyOwnerships = draft.propertyOwnerships.filter(entry => ![6, 8, 9].includes(entry.tileIndex));
+      draft.propertyOwnerships.push({ tileIndex: 6, ownerId: "p3", buildingLevel: 0, mortgaged: false }, { tileIndex: 8, ownerId: "p3", buildingLevel: 3, mortgaged: false }, { tileIndex: 9, ownerId: "p3", buildingLevel: 0, mortgaged: false });
+      draft.players[0]!.position = 3;
+      regionalEvent(draft, "blood-moon", ["elves"]);
+    },
+    trigger: draft => land(draft, "p1", 3, 8)
+  },
+  "landing-own": {
+    prepare: draft => {
+      draft.propertyOwnerships = draft.propertyOwnerships.filter(entry => entry.tileIndex !== 24);
+      draft.propertyOwnerships.push({ tileIndex: 24, ownerId: "p1", buildingLevel: 1, mortgaged: false });
+    },
+    trigger: draft => land(draft, "p1", 21, 24)
+  },
   "card-flip": {
     trigger: draft => {
       draft.turnPhase = "cardAcknowledgement";
@@ -99,6 +121,12 @@ const SCENES: Record<string, { prepare?: (draft: GameState) => void; trigger?: (
     }
   }
 };
+
+/** Ein Chronik-Ereignis, das nur in den genannten Reichen gilt. */
+function regionalEvent(draft: GameState, eventId: string, regions: RegionType[]): void {
+  const definition = getRegionalChronicleDefinition(CHRONICLE_EVENTS.find(event => event.id === eventId)!, regions);
+  draft.activeChronicleEvent = { ...definition, startedAfterRound: draft.currentRound - 1, startedAtRound: draft.currentRound, expiresAtRound: draft.currentRound + 2, startedAt: Date.now() };
+}
 
 function chronicleTrigger(eventId: string) {
   return (draft: GameState) => {

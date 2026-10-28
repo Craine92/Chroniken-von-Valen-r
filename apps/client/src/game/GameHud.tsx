@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
 import { EMOTE_LABELS, EMOTE_SHOUTS, type EmoteSignal, type GameState } from "@valenor/shared";
 import { WorldStatus } from "../components/WorldStatus";
 import { QuickGameClockDisplay } from "../components/QuickGameClockDisplay";
-import { PlayerPortrait } from "../components/PlayerPortrait";
+import { CharacterCard } from "../components/CharacterCard";
+import { getPlayerGroupDots } from "./character-card";
 import { EMOTE_ICONS, Icon } from "../components/icons/Icon";
 import { getPlayersInDanger } from "./living/drama";
 
@@ -14,20 +14,6 @@ export function EmoteBubble({ emote, playerName }: { emote: EmoteSignal; playerN
     <Icon name={EMOTE_ICONS[emote.emoteId]} />
     <em aria-hidden="true">{EMOTE_SHOUTS[emote.emoteId]}</em>
   </span>;
-}
-
-function GoldAmount({ gold }: { gold: number }) {
-  const previous = useRef(gold);
-  const [delta, setDelta] = useState(0);
-  useEffect(() => {
-    const difference = gold - previous.current;
-    previous.current = gold;
-    if (difference === 0) return;
-    setDelta(difference);
-    const timer = window.setTimeout(() => setDelta(0), 1_800);
-    return () => window.clearTimeout(timer);
-  }, [gold]);
-  return <b><Icon name="gold" className="hud-gold-icon" />{gold.toLocaleString("de-DE")} <small>Gold</small>{delta !== 0 && <span className={`gold-delta ${delta > 0 ? "is-positive" : "is-negative"}`}>{delta > 0 ? "+" : ""}{delta}</span>}</b>;
 }
 
 export function GameHud({ gameState, emotes = {} }: { gameState: GameState; emotes?: ActiveEmotes | undefined }) {
@@ -44,17 +30,12 @@ export function GameHud({ gameState, emotes = {} }: { gameState: GameState; emot
       <QuickGameClockDisplay clock={gameState.quickGameClock} />
       <div className="game-hud__players">
         {displayedPlayers.map((player, index) => (
-          <article key={player.id} className={`hud-player hud-player--${player.color} ${gameState.currentPlayerId === player.id ? "is-active" : ""} ${player.isBankrupt ? "is-bankrupt" : ""}${inDanger.has(player.id) ? " is-in-danger" : ""}`}>
-            {gameState.turnOrder.length > 0 && <em>{index + 1}</em>}
-            <PlayerPortrait characterId={player.characterId} />
-            <div>
-              <strong>{player.name}</strong>
-              {/* Auf dem TV nur Ausnahmen zeigen; Besitz und Spielertyp stehen auf dem Handy. */}
-              {(player.isBankrupt || player.dungeon.inDungeon || inDanger.has(player.id)) && <span>{player.isBankrupt ? "Zuschauer" : inDanger.has(player.id) ? "Bankrott droht" : `Im Kerker · ${player.dungeon.failedAttempts}/3`}</span>}
-            </div>
-            <GoldAmount gold={player.gold} />
+          <CharacterCard key={player.id} player={player} active={gameState.currentPlayerId === player.id} order={gameState.turnOrder.length > 0 ? index + 1 : undefined}
+            dots={getPlayerGroupDots(gameState, player.id)} inDanger={inDanger.has(player.id)}
+            // Auf dem TV nur Ausnahmen als Text; Einzelheiten stehen auf dem Handy.
+            status={player.isBankrupt ? "Zuschauer" : inDanger.has(player.id) ? "Bankrott droht" : player.dungeon.inDungeon ? `Im Kerker · ${player.dungeon.failedAttempts}/3` : undefined}>
             {emotes[player.id] && <EmoteBubble key={emotes[player.id]!.id} emote={emotes[player.id]!} playerName={player.name} />}
-          </article>
+          </CharacterCard>
         ))}
 
         <WorldStatus state={gameState} />

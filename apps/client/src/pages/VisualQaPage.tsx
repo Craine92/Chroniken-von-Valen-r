@@ -21,6 +21,11 @@ import { EmoteBar } from "../components/EmoteBar";
 import { LocateButton } from "../components/LocateButton";
 import { MobileTargetField } from "../components/MobileTargetField";
 import { MobileWorldStatus } from "../components/MobileWorldStatus";
+import { RealmBackdrop } from "../components/RealmBackdrop";
+import { GameResultPanel } from "../components/GameResultPanel";
+import { MobileVictorySummary } from "../components/victory/MobileVictorySummary";
+import { showcaseMatchStats } from "./victory-showcase";
+import { getRealmBackdrop, type RealmBackdropImage } from "../mobile/realm-backdrop";
 import { getLandingPreview } from "../mobile/landing-preview";
 import { LivingBoardQa, isLivingBoardScene } from "./LivingBoardQa";
 import { BoardFieldsQa, isBoardFieldScene } from "./BoardFieldsQa";
@@ -258,14 +263,17 @@ function ControllerQaNav({ active = "action" }: { active?: "action" | "property"
   </nav>;
 }
 
-function MobileQaShell({ children, active = "action", primary, secondary }: {
+function MobileQaShell({ children, active = "action", primary, secondary, backdrop }: {
   children: ReactNode;
   active?: "action" | "property" | "trade" | "journal";
   primary?: { label: string; onClick: () => void };
   secondary?: { label: string; onClick: () => void };
+  /** Hintergrund aus dem Feldbild unter der eigenen Figur (wie auf dem echten Handy). */
+  backdrop?: RealmBackdropImage | undefined;
 }) {
   const player = PLAYERS[0]!;
   return <main className="controller-page controller-page--active player-theme--violet visual-qa-controller">
+    <RealmBackdrop image={backdrop} />
     <section className="controller-card controller-card--started">
       <header className="controller-player-bar controller-player-bar--violet">
         <PlayerPortrait characterId={player.characterId} />
@@ -293,6 +301,34 @@ function withRegionalEvent(state: GameState, eventId: string, regions: ("elves" 
 }
 
 /** Feinschliff am Handy: Zielfeld mit Miete oder Kaufpreis samt Ereignis, Kerker-Transfer und der Ereignis-Hinweis oben. */
+/** Handy nach dem Spiel: Ergebnis, Platz, eigene Auszeichnungen, eigene Zahlen und Verlauf. */
+function MobileVictoryQa({ playerId }: { playerId: string }) {
+  const state = createShowcaseState("buildings");
+  state.currentRound = 12;
+  state.status = "finished"; state.players[2]!.isBankrupt = true; state.winnerId = "p4"; state.winnerIds = ["p4"];
+  state.gameResult = { finishReason: "quickGameTimeExpired", winnerIds: ["p4"], finishedAt: Date.now() - 60_000, roundsPlayed: 12 };
+  state.matchStats = showcaseMatchStats(state);
+  const player = state.players.find(entry => entry.id === playerId)!;
+  return <main className={`controller-page controller-page--active player-theme--${player.color} visual-qa-controller`}>
+    <section className="controller-card controller-card--started end-controller"><BrandMark compact /><GameResultPanel gameState={state} viewerId={playerId} /><MobileVictorySummary gameState={state} playerId={playerId} /></section>
+  </main>;
+}
+
+/** Handy-Hintergrund je Reich: Feldbild unter der eigenen Figur, abgedunkelt und unscharf. */
+function MobileRealmBackdropQa({ position }: { position: number }) {
+  const state = createShowcaseState("buildings");
+  state.players[0]!.position = position;
+  state.turnPhase = "waitingForEndTurn";
+  state.lastMovement = { kind: "normal", sequence: 99, playerId: "p1", from: position - 3, to: position, path: [position], passedStart: false, landedTile: BOARD_TILES[position]! };
+  const preview = getLandingPreview(state, "p1");
+  return <MobileQaShell backdrop={getRealmBackdrop(state, "p1")} primary={{ label: "Zug beenden", onClick: () => undefined }}>
+    <MobileWorldStatus state={state} />
+    <div className="turn-controls"><p className="waiting-copy">Du bist am Zug</p>{preview && <MobileTargetField preview={preview} />}</div>
+    <LocateButton connected onLocate={done => done({ ok: true })} />
+    <EmoteBar connected onSend={(_, done) => done({ ok: true })} />
+  </MobileQaShell>;
+}
+
 function MobileFeinschliffQa({ variant }: { variant: "rent" | "buy" | "dungeon" | "events" }) {
   const state = createShowcaseState("buildings");
   state.currentRound = 7;
@@ -578,6 +614,11 @@ export function VisualQaPage() {
   if (scenario === "mobile-target-buy-event") return <MobileFeinschliffQa variant="buy" />;
   if (scenario === "mobile-target-dungeon") return <MobileFeinschliffQa variant="dungeon" />;
   if (scenario === "mobile-world-status") return <MobileFeinschliffQa variant="events" />;
+  if (scenario === "mobile-victory") return <MobileVictoryQa playerId="p4" />;
+  if (scenario === "mobile-victory-second") return <MobileVictoryQa playerId="p1" />;
+  if (scenario === "mobile-realm-elves") return <MobileRealmBackdropQa position={8} />;
+  if (scenario === "mobile-realm-orcs") return <MobileRealmBackdropQa position={26} />;
+  if (scenario === "mobile-realm-steppe") return <MobileRealmBackdropQa position={34} />;
   if (scenario === "mobile-finance") return <MobileFinanceQa />;
   if (scenario === "mobile-dungeon-payment") return <MobileDungeonPaymentQa />;
   if (scenario === "mobile-runestone") return <MobileRuneStoneQa />;

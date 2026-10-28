@@ -17,6 +17,7 @@ import { VISUAL_QUALITY, getGraphicsQuality, getLivingBoardSettings, prefersRedu
 import { AmbientLifeLayer } from "../layers/AmbientLifeLayer";
 import { DramaEffectsLayer } from "../layers/DramaEffectsLayer";
 import { CardDeckLayer } from "../layers/CardDeckLayer";
+import { VictoryStageLayer } from "../layers/VictoryStageLayer";
 import { deriveGameMoments } from "../living/moments";
 import { selectDramaticMoments } from "../living/drama";
 import { BoardTileRenderer } from "../tiles/BoardTileRenderer";
@@ -74,6 +75,7 @@ export class ValenorBoardScene extends Phaser.Scene {
   private tavernGlow: Phaser.GameObjects.Graphics | undefined;
   private tavernGlowLevel = -1;
   private cardDeckLayer: CardDeckLayer | undefined;
+  private victoryStage: VictoryStageLayer | undefined;
   private cardSignature = "";
   private readonly temporaryVisuals = new Set<Phaser.GameObjects.Container>();
   private boardReady = false;
@@ -185,6 +187,8 @@ export class ValenorBoardScene extends Phaser.Scene {
       this.clearLandingHighlight();
       this.cardDeckLayer?.destroy();
       this.cardDeckLayer = undefined;
+      this.victoryStage?.clear();
+      this.victoryStage = undefined;
       this.cardSignature="";
       this.activeField=undefined;this.activeFieldSignature="";
       this.temporaryVisuals.forEach(visual => { this.tweens.killTweensOf(visual.list); visual.destroy(); });
@@ -274,6 +278,10 @@ export class ValenorBoardScene extends Phaser.Scene {
     if (this.ambientLayer) this.game.canvas.dataset.ambientObjects = String(this.ambientLayer.objectCount);
     if (this.dramaLayer) this.dramaLayer.cameraFocus = this.cameraRig?.currentMode === "shot";
     selectDramaticMoments(moments).forEach(moment => this.dramaLayer?.play(moment));
+    // Sieg: Lichtkegel und Funkenregen über der Siegerfigur, bis die Siegerehrung übernimmt.
+    const victory = moments.find((moment): moment is Extract<typeof moment, { kind: "victory" }> => moment.kind === "victory");
+    const champion = victory?.winnerIds[0] ? this.tokens.get(victory.winnerIds[0]) : undefined;
+    if (champion) (this.victoryStage ??= new VictoryStageLayer(this, this.living.drama !== "full")).celebrate(champion.x, champion.y);
     moments.forEach(moment => { if (moment.kind === "purchase" || moment.kind === "auctionWon") this.reactToken(moment.playerId, "cheer"); });
     this.mortgageOverlayLayer?.sync(next);
     const ownershipSignature = next.propertyOwnerships.map((entry) => `${entry.tileIndex}:${entry.ownerId}:${entry.mortgaged}`).join("|");

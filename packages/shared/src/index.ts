@@ -15,3 +15,4 @@ export * from "./emotes";
 export * from "./locate";
 export * from "./grand-start";
 export * from "./price-info";
+export * from "./match-stats";

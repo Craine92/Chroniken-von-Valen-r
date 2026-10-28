@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CAMERA_KIND_COOLDOWN_MS, CAMERA_MAX_ZOOM, CAMERA_SHOTS, CAMERA_TIMING, CameraDirector, FOLLOW, clampToBoard, followTarget, getFocusZone, grandStartDurationMs, shotDurationMs, type CameraShotKind } from "./camera-director";
+import { FINALE_SHOTS, CAMERA_KIND_COOLDOWN_MS, CAMERA_MAX_ZOOM, CAMERA_SHOTS, CAMERA_TIMING, CameraDirector, FOLLOW, clampToBoard, followTarget, getFocusZone, grandStartDurationMs, shotDurationMs, type CameraShotKind } from "./camera-director";
 
-test("every camera move lasts at most two seconds and never zooms closer than 1.35x", () => {
+test("every camera move lasts at most two seconds and never zooms closer than 1.35x; only the victory finale stays longer", () => {
   for (const kind of Object.keys(CAMERA_SHOTS) as CameraShotKind[]) {
-    assert.ok(shotDurationMs(kind) <= CAMERA_TIMING.maxShotMs, kind);
+    if (FINALE_SHOTS.includes(kind)) assert.ok(shotDurationMs(kind) <= 5_200, "the finale ends when the ceremony begins");
+    else assert.ok(shotDurationMs(kind) <= CAMERA_TIMING.maxShotMs, kind);
     assert.ok(CAMERA_SHOTS[kind].zoom <= CAMERA_MAX_ZOOM, kind);
   }
   assert.ok(CAMERA_TIMING.interruptMs <= 250, "when a player acts the camera is back almost at once");

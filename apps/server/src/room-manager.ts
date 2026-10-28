@@ -15,7 +15,9 @@ import {
   type PlayerCharacterId,
   type PlayerType,
   type AuctionBidIncrement,
-  type CardDeckType
+  type CardDeckType,
+  type MatchStats,
+  recordMatchStats
 } from "@valenor/shared";
 import type { TavernChoice } from "@valenor/shared";
 import type { WorldImpulseChoice } from "@valenor/shared";
@@ -64,6 +66,8 @@ export interface JoinOutcome {
 
 export class RoomManager {
   private readonly rooms = new Map<string, InternalRoom>();
+  /** Statistik je Raum für die Siegerehrung (nur im Arbeitsspeicher). */
+  private readonly matchStats = new Map<string, { startedAt: number; previous: GameState; stats: MatchStats }>();
 
   private readonly turns: TurnEngine;
   private readonly economy = new EconomyService();
@@ -775,7 +779,21 @@ export class RoomManager {
     return { id, name, type, color, characterId, ready, connectionState, joinedAt };
   }
 
+  /**
+   * Jede Kopie nach außen nimmt die Statistik der Partie auf (Vergleich mit dem zuletzt aufgenommenen Stand) und trägt
+   * sie mit. Die Statistik lebt nur hier im Arbeitsspeicher; eine neue Partie im selben Raum beginnt mit leerer Statistik.
+   */
   private cloneGameState(gameState: GameState): GameState {
+    const copy = this.copyGameState(gameState);
+    const entry = this.matchStats.get(copy.roomId);
+    const known = entry?.startedAt === copy.startedAt ? entry : undefined;
+    const stats = recordMatchStats(known?.stats, known?.previous, copy);
+    const { matchStats: _ignored, ...withoutStats } = copy;
+    this.matchStats.set(copy.roomId, { startedAt: copy.startedAt, previous: structuredClone(withoutStats), stats });
+    return { ...copy, matchStats: structuredClone(stats) };
+  }
+
+  private copyGameState(gameState: GameState): GameState {
     this.quickClock.sync(gameState);
     this.finishGameIfReady(gameState);
     this.trades.expireStaleQuickTrades(gameState);

@@ -6,7 +6,7 @@ import { getGraphicsQuality } from "./visual-config";
 import { getCurrentBoardContext } from "./board-context";
 import { BoardTopHud, hasTurnStatusContent, TurnStatus } from "./TurnStatus";
 import { CardReveal } from "../components/CardReveal";
-import { GameResultPanel } from "../components/GameResultPanel";
+import { VictoryCeremony } from "../components/victory/VictoryCeremony";
 import { DEFAULT_BOARD_PRESENTATION_MODE, getCardPresentationKey, type BoardPresentationMode } from "./board-presentation";
 import { audioManager } from "../audio/AudioManager";
 import { GameAudioEventTracker } from "../audio/game-audio-events";
@@ -14,7 +14,7 @@ import { useChroniclerVoice } from "../audio/useChroniclerVoice";
 import { MomentumCelebrationBanner, WorldImpulseBanner } from "../components/WorldImpulseUi";
 import { TvQuickTradeBanner, isQuickTradeAction } from "./TvQuickTrade";
 import { Icon, dieIcon, GROUP_ICONS } from "../components/icons/Icon";
-import { VALENOR_ASSETS } from "./assets/asset-manifest";
+import { CARD_THEME_ART, VALENOR_ASSETS } from "./assets/asset-manifest";
 
 const GameCanvas = lazy(() =>
   import("./GameCanvas").then((module) => ({ default: module.GameCanvas }))
@@ -42,6 +42,11 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
   useChroniclerVoice(gameState);
   const audioTimers = useRef(new Set<number>());
 
+  // Kartenbilder im Hintergrund vorladen, damit die erste gezogene Karte sofort ihr Bild zeigt.
+  useEffect(() => {
+    const timer = window.setTimeout(() => Object.values(CARD_THEME_ART).forEach(art => { const image = new Image(); image.decoding = "async"; image.src = art.path; }), 3_000);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => {
     audioManager.setGameActive(true);
     return () => {
@@ -233,11 +238,7 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
         )}
       </section>
       {onReturnToLobby && <button type="button" className="return-to-lobby" title="Zur Lobby" aria-label="Zur Lobby" onClick={onReturnToLobby}><Icon name="lobby" /></button>}
-      {gameState.status === "finished" && (
-        <section className="victory-overlay">
-          <GameResultPanel gameState={gameState} onNewChronicle={onNewChronicle} />
-        </section>
-      )}
+      {gameState.status === "finished" && <VictoryCeremony gameState={gameState} onNewChronicle={onNewChronicle} />}
       {introVisible && gameState.status !== "finished" && (
         <div className="game-intro" aria-live="polite">
           <div className="game-intro__rune" aria-hidden="true"><Icon name="seal" /></div>

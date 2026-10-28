@@ -11,10 +11,12 @@ const attributions = readFileSync(new URL("../../../../../ATTRIBUTIONS.md", impo
 test("the credits read ATTRIBUTIONS.md and skip the maintainer notes", () => {
   const blocks = parseCreditsMarkdown(attributions);
   const headings = blocks.filter(block => block.kind === "heading").map(block => block.kind === "heading" ? block.text : "");
-  assert.deepEqual(headings, ["Asset attributions", "Valenør Core Asset Pack", "Feld-, Gebäude- und Titelbilder", "Stimme des Chronisten", "Fonts (design system \"Codex\")", "Icons (design system \"Codex\")"]);
+  assert.deepEqual(headings, ["Asset attributions", "Valenør Core Asset Pack", "Feld-, Gebäude-, Karten- und Titelbilder", "Stimme des Chronisten", "Fonts (design system \"Codex\")", "Icons (design system \"Codex\")"]);
   const images = blocks.find(block => block.kind === "table" && block.rows.some(row => row[0]?.startsWith("Feldbilder")));
   assert.ok(images && images.kind === "table");
-  assert.ok(images.rows.every(row => row[2] === "vom Projektinhaber mit ChatGPT erstellt" && row[6] === "2026-10-27"));
+  assert.ok(images.rows.every(row => row[2] === "vom Projektinhaber mit ChatGPT erstellt"));
+  // Feld-, Gebäude- und Titelbilder kamen am 27., die Kartenbilder am 28. Oktober dazu.
+  assert.deepEqual(images.rows.map(row => [row[0]!.split(" ")[0], row[6]]), [["Feldbilder", "2026-10-27"], ["Gebäude", "2026-10-27"], ["Titelbild", "2026-10-27"], ["Kartenbilder", "2026-10-28"]]);
   const voice = blocks.find(block => block.kind === "table" && block.rows.some(row => row[0]?.startsWith("Sprachaufnahmen")));
   assert.ok(voice && voice.kind === "table" && voice.rows[0]![2] === "vom Projektinhaber mit ElevenLabs erstellt" && voice.rows[0]![6] === "2026-10-27");
   assert.ok(!blocks.some(block => block.kind === "list"), "the 'record for every future asset' checklist stays hidden");

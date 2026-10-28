@@ -154,15 +154,22 @@ for (const playerCount of [2, 3, 4, 5, 6] as const) {
   });
 }
 
-test("a finished game renders the winner and new-chronicle action", () => {
+test("a finished game first gives the board its victory moment, then the ceremony with the new-chronicle action", () => {
   const state = startedGameState(2);
   state.status = "finished";
   state.winnerId = "p1";
   state.finishReason = "lastPlayerStanding";
-  const markup = renderToStaticMarkup(<GameExperience gameState={state} onNewChronicle={() => undefined} />);
-  assert.match(markup, /Die Chronik ist entschieden/);
-  assert.match(markup, /Mensch/);
-  assert.match(markup, /Neue Chronik/);
+  state.gameResult = { finishReason: "lastPlayerStanding", winnerIds: ["p1"], finishedAt: Date.now(), roundsPlayed: 3 };
+  const moment = renderToStaticMarkup(<GameExperience gameState={state} onNewChronicle={() => undefined} />);
+  assert.match(moment, /data-stage="moment"/);
+  assert.match(moment, /DIE CHRONIK IST ENTSCHIEDEN/);
+  assert.match(moment, /Mensch/);
+  // Wer später dazukommt (Neuladen), sieht gleich die Ehrung.
+  state.gameResult.finishedAt = Date.now() - 60_000;
+  const ceremony = renderToStaticMarkup(<GameExperience gameState={state} onNewChronicle={() => undefined} />);
+  assert.match(ceremony, /data-stage="ceremony"/);
+  assert.match(ceremony, /Siegerpodest/);
+  assert.match(ceremony, /Neue Chronik/);
 });
 
 test("TV presents an active fate card over the board without a permanent chronicle rail", () => {

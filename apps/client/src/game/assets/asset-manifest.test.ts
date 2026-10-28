@@ -153,3 +153,18 @@ test("the new field, building and title images stay below 10 MB together and bui
   }
   assert.deepEqual(webpSize(LOBBY_ASSETS.title.path), [1536, 1024]);
 });
+
+test("every one of the 56 cards has exactly one theme picture, and every picture exists as a 4:5 WebP", async () => {
+  const { CARD_DEFINITIONS } = await import("@valenor/shared");
+  const { CARD_ART, CARD_THEMES, CARD_THEME_ART } = await import("./asset-manifest");
+  const assigned = Object.values(CARD_THEMES).flat();
+  assert.equal(assigned.length, 56);
+  assert.equal(new Set(assigned).size, 56, "no card belongs to two themes");
+  assert.deepEqual([...assigned].sort(), CARD_DEFINITIONS.map(card => card.id).sort());
+  for (const card of CARD_DEFINITIONS) assert.ok(CARD_ART[card.id], card.id);
+  for (const art of Object.values(CARD_THEME_ART)) {
+    const file = readFileSync(new URL(`../../../public${art.path}`, import.meta.url));
+    assert.equal(file.subarray(8, 12).toString("ascii"), "WEBP", art.path);
+    assert.equal(art.intendedPixelSize[0] * 5, art.intendedPixelSize[1] * 4, "portrait 4:5");
+  }
+});

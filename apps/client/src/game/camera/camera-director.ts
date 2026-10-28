@@ -16,8 +16,14 @@ export const CAMERA_KIND_COOLDOWN_MS = 30_000;
 export interface CameraShotSpec { zoom: number; holdMs: number; priority: number; always: boolean }
 
 /** Je größer `priority`, desto wichtiger. Drache, Stufe 5, Bankrott und Sieg dürfen immer. */
+/**
+ * Der Sieg ist das Finale: Danach handelt niemand mehr, deshalb bleibt die Kamera über Lichtkegel und Funkenregen auf der
+ * Siegerfigur, bis die Siegerehrung übernimmt (VICTORY_MOMENT_MS, etwa 5 s). Alle anderen Fahrten bleiben unter 2 s.
+ */
+export const FINALE_SHOTS: readonly CameraShotKind[] = ["victory"];
+
 export const CAMERA_SHOTS: Readonly<Record<CameraShotKind, CameraShotSpec>> = {
-  victory: { zoom: 1.2, holdMs: 900, priority: 7, always: true },
+  victory: { zoom: 1.3, holdMs: 3_900, priority: 7, always: true },
   bankrupt: { zoom: 1.2, holdMs: 900, priority: 6, always: true },
   dragon: { zoom: 1.3, holdMs: 700, priority: 5, always: true },
   build5: { zoom: 1.3, holdMs: 700, priority: 4, always: true },

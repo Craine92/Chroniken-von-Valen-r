@@ -46,3 +46,75 @@
 /* Auf dem Handy etwas größer, damit das Bild zur Geltung kommt. */
 .controller-page .controller-card-event .card-reveal.card-reveal--illustrated { width: min(80vw, 300px); }
 .controller-page .controller-card-event .card-reveal--illustrated .card-reveal__text h2 { font-size: var(--fs-md); }
+
+/* --- Charakterkarten links auf dem TV ------------------------------------------------------------------ */
+.character-card--violet { --player-color: var(--c-player-violet); --player-rgb: var(--c-player-violet-rgb); }
+.character-card--green { --player-color: var(--c-player-green); --player-rgb: var(--c-player-green-rgb); }
+.character-card--red { --player-color: var(--c-player-red); --player-rgb: var(--c-player-red-rgb); }
+.character-card--blue { --player-color: var(--c-player-blue); --player-rgb: var(--c-player-blue-rgb); }
+.character-card--orange { --player-color: var(--c-player-orange); --player-rgb: var(--c-player-orange-rgb); }
+.character-card--cyan { --player-color: var(--c-player-cyan); --player-rgb: var(--c-player-cyan-rgb); }
+.character-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2-5, .65rem);
+  padding: var(--space-2) var(--space-2-5, .65rem) var(--space-2) var(--space-2);
+  color: var(--player-color);
+  border: 1px solid rgb(var(--c-gold-400-rgb) / .32);
+  border-left: 3px solid var(--player-color);
+  border-radius: 10px;
+  background:
+    radial-gradient(ellipse 60% 90% at 0% 50%, rgb(var(--player-rgb) / .28), transparent 70%),
+    linear-gradient(160deg, rgb(38 28 20 / .96), rgb(14 10 9 / .96));
+  box-shadow: 0 6px 16px rgb(var(--c-black-rgb) / .45), inset 0 0 0 1px rgb(var(--c-white-rgb) / .03);
+  transition: transform .35s ease, box-shadow .35s ease, border-color .35s ease;
+}
+.character-card__portrait { position: relative; width: 4rem; height: 4rem; }
+.game-sidebar .character-card .hud-player__portrait {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 2px solid var(--player-color);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, rgb(var(--player-rgb) / .35), rgb(var(--c-black-rgb) / .6));
+  box-shadow: 0 0 0 2px rgb(var(--c-gold-500-rgb) / .75), 0 0 16px rgb(var(--player-rgb) / .45);
+}
+.character-card__body { display: grid; gap: 2px; min-width: 0; }
+.character-card__body header { display: flex; align-items: baseline; gap: var(--space-1); min-width: 0; }
+.character-card__body header em { color: var(--c-parchment-600); font: 700 var(--fs-2xs) var(--font-text); font-style: normal; }
+.character-card__body strong { overflow: hidden; color: var(--c-parchment-50); font: 700 var(--fs-md)/1.1 var(--font-display); text-overflow: ellipsis; white-space: nowrap; }
+.character-card__gold { position: relative; display: inline-flex; align-items: center; gap: var(--space-1); color: var(--c-gold-300); font: 800 var(--fs-md) var(--font-text); white-space: nowrap; transition: color .2s ease, text-shadow .2s ease; }
+.character-card__gold.is-rising { color: #9fe7a8; text-shadow: 0 0 10px rgb(120 220 140 / .55); }
+.character-card__gold.is-falling { color: #f0a59a; text-shadow: 0 0 10px rgb(220 95 103 / .55); }
+.character-card__status { color: var(--c-parchment-500); font: 700 var(--fs-2xs) var(--font-text); letter-spacing: .08em; text-transform: uppercase; }
+.character-card__groups { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0 0; padding: 0; list-style: none; }
+/* Ring = Feld(er) der Gruppe, gefüllt = ganze Gruppe. */
+.character-card__groups li { width: .62rem; height: .62rem; box-sizing: border-box; border: 2px solid var(--group-color); border-radius: 50%; background: color-mix(in srgb, var(--group-color) 25%, transparent); }
+.character-card__groups li.is-complete { background: var(--group-color); box-shadow: 0 0 6px var(--group-color); }
+.character-card__turn { position: absolute; top: -.55rem; right: .6rem; padding: 1px 7px; color: #1b130b; background: linear-gradient(180deg, var(--c-gold-200), var(--c-gold-500)); border-radius: 999px; font: 900 .58rem/1.4 var(--font-text); font-style: normal; letter-spacing: .14em; box-shadow: 0 2px 8px rgb(var(--c-black-rgb) / .5); }
+/* Die Karte am Zug: Goldrahmen, Licht in Spielerfarbe, ein langsamer Schimmer. */
+.character-card.is-active {
+  z-index: 1;
+  border-color: var(--c-gold-400);
+  border-left-color: var(--player-color);
+  transform: translateX(4px) scale(1.03);
+  box-shadow: 0 0 0 1px rgb(var(--c-gold-300-rgb) / .6), 0 0 26px rgb(var(--player-rgb) / .45), 0 10px 22px rgb(var(--c-black-rgb) / .55);
+  background:
+    linear-gradient(105deg, transparent 35%, rgb(255 236 180 / .1) 50%, transparent 65%) 0 0 / 250% 100%,
+    radial-gradient(ellipse 70% 100% at 0% 50%, rgb(var(--player-rgb) / .42), transparent 72%),
+    linear-gradient(160deg, rgb(54 40 26 / .97), rgb(18 13 10 / .97));
+  animation: characterCardShine 4.5s ease-in-out infinite;
+}
+@keyframes characterCardShine { 0%, 55% { background-position: 120% 0, 0 0, 0 0; } 100% { background-position: -120% 0, 0 0, 0 0; } }
+.character-card.is-bankrupt { opacity: .5; filter: grayscale(.75); }
+.character-card.is-in-danger { border-color: rgb(var(--c-oxblood-400-rgb, 200 80 80) / .9); animation: characterCardDanger 1.4s ease-in-out infinite; }
+.character-card.is-in-danger .character-card__status { color: var(--danger-text, #f0a59a); }
+@keyframes characterCardDanger { 50% { box-shadow: 0 0 22px rgb(220 70 70 / .55); } }
+.game-hud--compact .character-card { grid-template-columns: 3rem minmax(0, 1fr); padding-block: var(--space-1-5); }
+.game-hud--compact .character-card__portrait { width: 3rem; height: 3rem; }
+.game-hud--compact .character-card__body strong, .game-hud--compact .character-card__gold { font-size: var(--fs-sm); }
+@media (prefers-reduced-motion: reduce) { .character-card, .character-card.is-active, .character-card.is-in-danger { animation: none; transition: none; } }
+.board-page[data-quality="low"] .character-card.is-active, .board-page[data-quality="low"] .character-card.is-in-danger { animation: none; }

@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CHRONICLE_EVENTS } from "@valenor/shared";
-import { CHRONICLE_MOODS, DAYTIME_MOODS, MAX_TINT_ALPHA, MOOD_TRANSITION_MS, getAtmosphere, getTimeOfDay, mixColor } from "./atmosphere";
+import { CHRONICLE_MOODS, DAYTIME_MOODS, FIELD_RING_FACTOR, MAX_FIELD_TINT_ALPHA, MAX_TINT_ALPHA, MOOD_TRANSITION_MS, getAtmosphere, getTimeOfDay, mixColor } from "./atmosphere";
 
 test("each of the eight chronicle events has its own mood, and no mood hides the fields", () => {
   assert.deepEqual(Object.keys(CHRONICLE_MOODS).sort(), CHRONICLE_EVENTS.map(event => event.id).sort());
   const signatures = Object.values(CHRONICLE_MOODS).map(mood => `${mood.tint}:${mood.blend}:${mood.saturation}`);
   assert.equal(new Set(signatures).size, 8, "every event looks different");
   for (const mood of [...Object.values(CHRONICLE_MOODS), ...Object.values(DAYTIME_MOODS)]) {
-    assert.ok(mood.tintAlpha <= MAX_TINT_ALPHA && mood.brightness >= .9 && mood.brightness <= 1.06, "fields stay readable");
+    assert.ok(mood.tintAlpha <= MAX_TINT_ALPHA && mood.brightness >= .88 && mood.brightness <= 1.08, "fields stay readable");
+    assert.ok(mood.tintAlpha * FIELD_RING_FACTOR <= MAX_FIELD_TINT_ALPHA, "over the fields the veil stays as light as before");
   }
+  // Etwa doppelt so deutlich: Jedes Ereignis färbt das Innere der Reiche mindestens mit 20 %.
+  assert.ok(Object.values(CHRONICLE_MOODS).every(mood => mood.tintAlpha >= .2));
   assert.equal(CHRONICLE_MOODS["blood-moon"]!.moon, 0xd8352c, "blood moon brings a red moon");
   assert.ok(CHRONICLE_MOODS["resource-shortage"]!.saturation < -.2, "scarcity is cool and sparse");
   assert.equal(CHRONICLE_MOODS["four-realms-peace"]!.blend, "screen", "peace is warm golden light");

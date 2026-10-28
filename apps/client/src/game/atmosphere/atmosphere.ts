@@ -28,8 +28,12 @@ export interface Mood {
   buildingGlow?: number | undefined;
 }
 
-/** Felder bleiben lesbar: Kein Schleier deckt stärker als das. */
-export const MAX_TINT_ALPHA = .18;
+/** Kräftigster Schleier im Inneren der Reiche. */
+export const MAX_TINT_ALPHA = .34;
+/** Über dem Feldring wirkt der Schleier nur halb so stark: Namen und Preise bleiben so lesbar wie ohne Ereignis-Stimmung. */
+export const FIELD_RING_FACTOR = .5;
+/** Höchstens so viel Schleier liegt über den Feldern. */
+export const MAX_FIELD_TINT_ALPHA = .18;
 /** Weicher Übergang zwischen Stimmungen; auf „low“ und bei reduzierter Bewegung kurz und ruhig. */
 export const MOOD_TRANSITION_MS = { full: 1_500, calm: 200 } as const;
 /** Zwei Runden je Tageszeit: Morgen, Tag, Abend, Nacht – ein Umlauf dauert acht Runden. */
@@ -38,14 +42,15 @@ export const ROUNDS_PER_DAYTIME = 2;
 const NEUTRAL: Mood = { tint: 0xffffff, tintAlpha: 0, blend: "multiply", saturation: 0, brightness: 1, vignette: .25 };
 
 export const CHRONICLE_MOODS: Readonly<Record<string, Mood>> = {
-  "blood-moon": { tint: 0xc0242c, tintAlpha: .16, blend: "multiply", saturation: -.05, brightness: .94, vignette: .5, moon: 0xd8352c },
-  "four-realms-peace": { tint: 0xffcf6e, tintAlpha: .12, blend: "screen", saturation: .08, brightness: 1.04, vignette: .2 },
-  "traders-festival": { tint: 0xffb347, tintAlpha: .1, blend: "screen", saturation: .12, brightness: 1.03, vignette: .22, sparkles: 0xffd77a },
-  "runegate-blessing": { tint: 0x5aa8ff, tintAlpha: .1, blend: "screen", saturation: .04, brightness: 1.02, vignette: .25, sparkles: 0x9fd2ff },
-  "builders-blessing": { tint: 0xffe08a, tintAlpha: .1, blend: "screen", saturation: .06, brightness: 1.03, vignette: .22, buildingGlow: 0xffd27a },
-  "resource-shortage": { tint: 0x7d8b96, tintAlpha: .14, blend: "multiply", saturation: -.38, brightness: .95, vignette: .42 },
-  "crown-decree": { tint: 0x8c8466, tintAlpha: .13, blend: "multiply", saturation: -.12, brightness: .96, vignette: .38 },
-  "golden-building-boom": { tint: 0xffc23a, tintAlpha: .12, blend: "screen", saturation: .16, brightness: 1.04, vignette: .2, sparkles: 0xffe08a, buildingGlow: 0xffc85a }
+  // Etwa doppelt so deutlich wie die erste Fassung; über den Feldern wirkt der Schleier nur halb (FIELD_RING_FACTOR).
+  "blood-moon": { tint: 0xc0242c, tintAlpha: .32, blend: "multiply", saturation: -.1, brightness: .9, vignette: .66, moon: 0xd8352c },
+  "four-realms-peace": { tint: 0xffcf6e, tintAlpha: .24, blend: "screen", saturation: .16, brightness: 1.07, vignette: .26 },
+  "traders-festival": { tint: 0xffb347, tintAlpha: .22, blend: "screen", saturation: .24, brightness: 1.05, vignette: .3, sparkles: 0xffd77a },
+  "runegate-blessing": { tint: 0x5aa8ff, tintAlpha: .22, blend: "screen", saturation: .08, brightness: 1.04, vignette: .34, sparkles: 0x9fd2ff },
+  "builders-blessing": { tint: 0xffe08a, tintAlpha: .2, blend: "screen", saturation: .12, brightness: 1.05, vignette: .3, buildingGlow: 0xffd27a },
+  "resource-shortage": { tint: 0x7d8b96, tintAlpha: .28, blend: "multiply", saturation: -.6, brightness: .9, vignette: .58 },
+  "crown-decree": { tint: 0x8c8466, tintAlpha: .26, blend: "multiply", saturation: -.24, brightness: .92, vignette: .52 },
+  "golden-building-boom": { tint: 0xffc23a, tintAlpha: .24, blend: "screen", saturation: .3, brightness: 1.07, vignette: .26, sparkles: 0xffe08a, buildingGlow: 0xffc85a }
 };
 
 export const DAYTIME_MOODS: Readonly<Record<TimeOfDay, Mood>> = {

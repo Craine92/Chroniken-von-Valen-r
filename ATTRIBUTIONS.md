@@ -21,7 +21,7 @@ For every future imported asset, record:
 Only locally present, reviewed files may be marked as `ready` in the asset manifest. Runtime hotlinks and paid assets are not allowed for the current project phase.
 <!-- credits:skip-end -->
 
-## Feld-, Gebäude- und Titelbilder
+## Feld-, Gebäude-, Karten- und Titelbilder
 
 Vom Projektinhaber mit ChatGPT erstellt und für dieses Projekt bereitgestellt. Für die Anzeige verkleinert und nach WebP umgewandelt; Motive unverändert.
 
@@ -30,6 +30,7 @@ Vom Projektinhaber mit ChatGPT erstellt und für dieses Projekt bereitgestellt. 
 | Feldbilder (34 Felder sowie je ein gemeinsames Bild für Schicksal und Abenteuer) | `apps/client/public/assets/board/fields/*.webp` (Manifest: `VALENOR_ASSETS.fields`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | auf 512 × 512 px verkleinert, WebP | 2026-10-27 |
 | Gebäude (12 Baustufen: Wurzelhütte, Baumhalle, Sternenzitadelle, Gehöft, Herrenhaus, Königsburg, Raiderlager, Kriegslager, Eisenfestung, Wanderzelt, Große Halle, Himmelsfeste) | `apps/client/public/assets/buildings/{elven,human,orc,steppe}/*.webp` (Manifest: `VALENOR_ASSETS.buildings`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | auf den Umriss zugeschnitten, auf 256 px Breite verkleinert, WebP mit Transparenz | 2026-10-27 |
 | Titelbild der TV-Lobby | `apps/client/public/assets/ui/title/titelbild-valenor.webp` (Manifest: `LOBBY_ASSETS.title`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | WebP in Originalgröße (1536 × 1024 px) | 2026-10-27 |
+| Kartenbilder (14 Themenbilder für die 56 Abenteuer- und Schicksalskarten: Schatz, Belohnung, Überfall, Drachenhort, Runentor, Schiff, Nebelpfad, Gefährten, Unwetter, Kerker, Befreiung, Sternensegen, Schatulle, Dunkles Omen) | `apps/client/public/assets/cards/art/*.webp` (Manifest: `CARD_THEME_ART`, Zuordnung `CARD_THEMES` in `apps/client/src/game/assets/asset-manifest.ts`) | vom Projektinhaber mit ChatGPT erstellt | Projektinhaber | wie dieses Projekt | Pergamentrand entfernt, auf das Hochformat 4:5 zugeschnitten (Motiv mittig), 860 × 1075 px, WebP | 2026-10-28 |
 
 ## Stimme des Chronisten
 

@@ -31,3 +31,13 @@ test("movement, dungeon and keepable effects are readable without hidden rules",
   assert.match(dungeon, /Dunklen Kerker/);
   assert.match(keepable, /Behalte diese Karte/);
 });
+
+test("the card shows its theme picture with title and text, on the TV and compact on the phone", () => {
+  for (const compact of [false, true]) {
+    const markup = renderToStaticMarkup(<CardReveal activeCard={{ cardId: "fate_010", deck: "fate", playerId: "p1", status: "readyToAcknowledge" }} compact={compact} />);
+    assert.match(markup, /card-reveal--illustrated/);
+    assert.match(markup, /<img src="\/assets\/cards\/art\/14-dunkles-omen.webp"/);
+    assert.match(markup, /Zerbrochener Weissagungsspiegel/);
+    assert.match(markup, /card-reveal__text/);
+  }
+});

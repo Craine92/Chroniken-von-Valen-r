@@ -232,10 +232,40 @@ export function getFieldArtAsset(tile: BoardTile): ImageAssetDefinition | undefi
 }
 
 /**
- * Kartenbilder je Karten-ID. Noch leer: Die Bilder kommen später; bis dahin zeigt die Karte ihr Deck-Siegel
- * im vorgesehenen Bildfeld.
+ * 14 Themenbilder für die 56 Abenteuer- und Schicksalskarten (vom Projektinhaber mit ChatGPT erstellt, siehe
+ * ATTRIBUTIONS.md). Zugeschnitten auf das Hochformat 4:5 des Kartenfensters, 860 × 1075 Pixel (etwa 2× Anzeigegröße).
  */
-export const CARD_ART: Readonly<Partial<Record<string, ImageAssetDefinition>>> = {};
+export const CARD_THEMES = {
+  schatz: ["adv_002", "adv_004", "adv_025"],
+  belohnung: ["adv_001", "adv_003", "adv_017", "fate_004"],
+  ueberfall: ["adv_005", "adv_006", "adv_026"],
+  drachenhort: ["adv_007", "adv_008"],
+  runentor: ["adv_009", "adv_015", "fate_014", "fate_027"],
+  schiff: ["adv_010", "adv_013", "adv_027", "fate_015"],
+  nebelpfad: ["adv_011", "adv_012", "adv_014", "fate_012", "fate_016"],
+  gefaehrten: ["adv_016", "adv_019", "adv_028", "fate_017", "fate_018", "fate_019", "fate_028"],
+  unwetter: ["adv_020", "adv_021", "fate_021", "fate_022"],
+  kerker: ["adv_022", "adv_023", "fate_023"],
+  befreiung: ["adv_024", "fate_024"],
+  sternensegen: ["fate_001", "fate_003", "fate_005", "fate_007", "fate_020", "fate_025"],
+  schatulle: ["adv_018", "fate_002", "fate_006", "fate_009", "fate_013"],
+  "dunkles-omen": ["fate_008", "fate_010", "fate_011", "fate_026"]
+} as const satisfies Readonly<Record<string, readonly string[]>>;
+export type CardTheme = keyof typeof CARD_THEMES;
+
+const THEME_NUMBER: Readonly<Record<CardTheme, string>> = {
+  schatz: "01", belohnung: "02", ueberfall: "03", drachenhort: "04", runentor: "05", schiff: "06", nebelpfad: "07",
+  gefaehrten: "08", unwetter: "09", kerker: "10", befreiung: "11", sternensegen: "12", schatulle: "13", "dunkles-omen": "14"
+};
+
+export const CARD_THEME_ART: Readonly<Record<CardTheme, ImageAssetDefinition>> = Object.fromEntries(
+  (Object.keys(CARD_THEMES) as CardTheme[]).map(theme => [theme, imageSlot(`card-art-${theme}`, `/assets/cards/art/${THEME_NUMBER[theme]}-${theme}.webp`, 860, 1075, "ready")])
+) as Record<CardTheme, ImageAssetDefinition>;
+
+/** Kartenbild je Karten-ID. */
+export const CARD_ART: Readonly<Partial<Record<string, ImageAssetDefinition>>> = Object.fromEntries(
+  (Object.entries(CARD_THEMES) as [CardTheme, readonly string[]][]).flatMap(([theme, cards]) => cards.map(cardId => [cardId, CARD_THEME_ART[theme]]))
+);
 
 export function getCardArt(cardId: string): ImageAssetDefinition | undefined {
   return CARD_ART[cardId];

@@ -1,0 +1,48 @@
+/* ==========================================================================
+   Kartenbilder, Charakterkarten, Handy-Hintergrund je Reich und Siegerehrung.
+   Unter reduzierter Bewegung und Qualitätsstufe „low“ ruhig.
+   ========================================================================== */
+
+/* --- Karte mit Themenbild: Das Bild füllt das Pergamentfenster des Rahmens (Hochformat) ------------------- */
+.card-reveal--illustrated .card-reveal__content {
+  inset: 20.6% 12.5% 16.4%;
+  justify-content: flex-end;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 14px 14px 8px 8px;
+}
+.card-reveal--illustrated .card-reveal__art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: auto;
+  margin: 0;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: inherit;
+}
+.card-reveal--illustrated .card-reveal__art img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+/* Weicher, dunkler Innenrand: Das Bild sitzt im Rahmen statt darauf zu kleben. */
+.card-reveal--illustrated .card-reveal__art::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 22px rgb(48 28 8 / .75), inset 0 0 2px rgb(216 185 104 / .9); }
+.card-reveal--illustrated .card-reveal__text {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: .35em;
+  padding: 24% 8% 7%;
+  text-align: center;
+  background: linear-gradient(180deg, rgb(239 225 191 / 0), rgb(239 225 191 / .88) 26%, rgb(236 222 186 / .97) 48%);
+}
+.card-reveal--illustrated .card-reveal__text small { color: var(--c-gold-700); font-size: var(--fs-2xs); font-weight: 800; letter-spacing: .18em; }
+.card-reveal--illustrated .card-reveal__text h2 { margin: 0; color: var(--c-leather-700); font: 700 clamp(1.05rem, 1.8vw, 1.6rem)/1.1 var(--font-display); }
+.card-reveal--illustrated .card-reveal__text p { margin: 0; color: var(--c-leather-600); font: italic clamp(.8rem, .95vw, 1rem)/1.35 var(--font-text); }
+.card-reveal--illustrated .card-reveal__text strong { padding-top: .45em; color: var(--c-leather-800); border-top: 1px solid var(--c-gold-700); font-size: clamp(.8rem, .95vw, 1rem); line-height: 1.35; }
+/* Kompakt auf dem Handy: weniger Text, das Bild bleibt. */
+.card-reveal--illustrated.card-reveal--compact .card-reveal__text { padding: 30% 7% 6%; gap: .2em; }
+.card-reveal--illustrated.card-reveal--compact .card-reveal__text p { display: none; }
+.card-reveal--compact:not(.card-reveal--illustrated) .card-reveal__art { display: none; }
+/* Titel nur an Silbengrenzen umbrechen („Mondfinster-nis“ statt mitten im Buchstaben). */
+.card-reveal--illustrated .card-reveal__text h2 { overflow-wrap: normal; hyphens: auto; }
+/* Auf dem Handy etwas größer, damit das Bild zur Geltung kommt. */
+.controller-page .controller-card-event .card-reveal.card-reveal--illustrated { width: min(80vw, 300px); }
+.controller-page .controller-card-event .card-reveal--illustrated .card-reveal__text h2 { font-size: var(--fs-md); }

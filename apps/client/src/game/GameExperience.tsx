@@ -14,7 +14,7 @@ import { useChroniclerVoice } from "../audio/useChroniclerVoice";
 import { MomentumCelebrationBanner, WorldImpulseBanner } from "../components/WorldImpulseUi";
 import { TvQuickTradeBanner, isQuickTradeAction } from "./TvQuickTrade";
 import { Icon, dieIcon, GROUP_ICONS } from "../components/icons/Icon";
-import { VALENOR_ASSETS } from "./assets/asset-manifest";
+import { CARD_THEME_ART, VALENOR_ASSETS } from "./assets/asset-manifest";
 
 const GameCanvas = lazy(() =>
   import("./GameCanvas").then((module) => ({ default: module.GameCanvas }))
@@ -42,6 +42,11 @@ export function GameExperience({ gameState, onNewChronicle, onReturnToLobby, foc
   useChroniclerVoice(gameState);
   const audioTimers = useRef(new Set<number>());
 
+  // Kartenbilder im Hintergrund vorladen, damit die erste gezogene Karte sofort ihr Bild zeigt.
+  useEffect(() => {
+    const timer = window.setTimeout(() => Object.values(CARD_THEME_ART).forEach(art => { const image = new Image(); image.decoding = "async"; image.src = art.path; }), 3_000);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => {
     audioManager.setGameActive(true);
     return () => {

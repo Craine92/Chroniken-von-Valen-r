@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "../board-layout";
-import { CAMERA_EASE, CAMERA_MAX_ZOOM, CAMERA_SHOTS, CAMERA_TIMING, CameraDirector, FOLLOW, GRAND_START, clampToBoard, followTarget, type CameraShotKind } from "./camera-director";
+import { CAMERA_EASE, CAMERA_MAX_ZOOM, CAMERA_SHOTS, CAMERA_TIMING, CameraDirector, FOLLOW, GRAND_START, clampToBoard, followTarget, getFocusZone, type CameraShotKind } from "./camera-director";
 
 /**
  * Führt die Kamera des Bretts: kurze Fahrten auf große Momente, leichtes Mitgehen beim Ziehen und der Flug über die
@@ -38,6 +38,8 @@ export class CameraRig {
     const camera = this.scene.cameras.main;
     const target = clampToBoard({ x, y }, zoom, { width: camera.width, height: camera.height }, { width: BOARD_WIDTH, height: BOARD_HEIGHT });
     this.moveTo(target.x, target.y, zoom, CAMERA_TIMING.inMs);
+    // Am Ziel der Fahrt: Liegt es unten im Bild, rücken Meldungen nach oben.
+    this.scene.game.canvas.dataset.focusZone = getFocusZone(y, target.y, zoom, camera.height);
     this.mark(kind);
     this.after(CAMERA_TIMING.inMs + CAMERA_SHOTS[kind].holdMs, () => this.returnToOverview(CAMERA_TIMING.outMs));
     return true;

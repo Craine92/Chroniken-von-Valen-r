@@ -4,6 +4,93 @@
    Ereignisse auf dem Handy und das Abheben der obersten Karte.
    ========================================================================== */
 
+/* --- Meldungen auf dem TV: Schriftrolle im unteren Drittel ----------------- */
+/* Wie ein Film-Untertitel: Das Geschehen auf dem Brett bleibt sichtbar. Liegt das Geschehen (Landefeld, Kameraziel)
+   in der unteren Bildhälfte, meldet das Brett data-focus-zone="lower", und das Banner rückt nach oben. */
+.board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice),
+.board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .last-round-banner, .world-impulse-banner) {
+  --banner-gold: var(--c-gold-400);
+  position: absolute;
+  inset: auto auto 5.5% 50%;
+  translate: -50% 0;
+  width: min(820px, calc(100% - 7rem));
+  min-width: 0;
+  box-sizing: border-box;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4) calc(var(--space-8) + 18px) var(--space-5);
+  overflow: visible;
+  text-align: center;
+  color: var(--c-parchment-100);
+  border: 2px solid var(--banner-gold);
+  border-radius: 6px;
+  outline: 1px solid rgb(var(--c-gold-300-rgb) / .45);
+  outline-offset: -8px;
+  /* Rollstäbe aus Gold an beiden Enden, darunter dunkles Pergament mit warmem Licht von oben. */
+  background:
+    linear-gradient(90deg, #4a3112, #e9c877 5px, #8f6826 11px, #3b270e 14px, transparent 15px, transparent calc(100% - 15px), #3b270e calc(100% - 14px), #8f6826 calc(100% - 11px), #e9c877 calc(100% - 5px), #4a3112),
+    radial-gradient(ellipse 70% 120% at 50% 0%, rgb(var(--c-gold-400-rgb) / .2), transparent 62%),
+    linear-gradient(180deg, rgb(42 30 19 / .97), rgb(16 11 9 / .97));
+  box-shadow: 0 18px 50px rgb(var(--c-black-rgb) / .7), 0 0 40px rgb(var(--c-gold-400-rgb) / .16), inset 0 0 30px rgb(var(--c-black-rgb) / .45);
+  animation: bannerUnroll .55s cubic-bezier(.2, .72, .2, 1) both;
+  transition: top .35s ease, bottom .35s ease, opacity .25s ease;
+}
+/* Ornament oben in der Mitte und unten: geschwungene Goldlinie mit Raute. */
+.board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice)::before,
+.board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .last-round-banner, .world-impulse-banner)::before,
+.board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice)::after,
+.board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .last-round-banner, .world-impulse-banner)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 150px;
+  height: 26px;
+  translate: -50% 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 150 26'%3E%3Cg fill='none' stroke='%23d8b968' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M4 13H52'/%3E%3Cpath d='M98 13H146'/%3E%3Cpath d='M52 13c6-10 14-10 18 0 4-10 12-10 18 0'/%3E%3Cpath d='M52 13c6 10 14 10 18 0 4 10 12 10 18 0' opacity='.6'/%3E%3Ccircle cx='4' cy='13' r='2' fill='%23d8b968'/%3E%3Ccircle cx='146' cy='13' r='2' fill='%23d8b968'/%3E%3C/g%3E%3Cpath d='M75 4l6 9-6 9-6-9z' fill='%23f2d58c' stroke='%237a5418' stroke-width='1'/%3E%3C/svg%3E") center / contain no-repeat;
+  filter: drop-shadow(0 0 6px rgb(var(--c-gold-400-rgb) / .45));
+  pointer-events: none;
+}
+.board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice)::before,
+.board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .last-round-banner, .world-impulse-banner)::before { top: -14px; bottom: auto; right: auto; }
+.board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice)::after,
+.board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .last-round-banner, .world-impulse-banner)::after { top: auto; bottom: -14px; right: auto; transform: scaleY(-1); }
+
+.board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice) small,
+.board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .world-impulse-banner) small { color: var(--c-gold-400); font: 800 var(--fs-2xs) var(--font-text); letter-spacing: .22em; }
+.board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice) strong,
+.board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .world-impulse-banner) strong {
+  color: var(--c-gold-200);
+  font: 700 clamp(1.5rem, 2vw, 2.1rem)/1.08 var(--font-display);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgb(var(--c-black-rgb) / .6), 0 0 18px rgb(var(--c-gold-500-rgb) / .35);
+}
+.board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice) span,
+.board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .world-impulse-banner) span { margin: 0; color: var(--c-parchment-200); font: 600 var(--fs-md)/1.4 var(--font-text); }
+.board-page .board-event-layer > .last-round-banner { padding-block: var(--space-3); color: var(--c-gold-200); font: 900 var(--fs-sm) var(--font-text); letter-spacing: .2em; }
+
+/* Das Geschehen liegt unten: Banner ins obere Drittel, unter die Anzeige „Am Zug“. */
+body:has(canvas[data-focus-zone="lower"]) .board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice),
+body:has(canvas[data-focus-zone="lower"]) .board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .last-round-banner, .world-impulse-banner) { inset: 9.5% auto auto 50%; }
+
+/* Eine Ereignismeldung hat Vorrang vor der Landekarte; beide teilen sich sonst denselben Platz. */
+.board-event-layer:has(> :is(.dragon-notice, .chronicle-notice, .tavern-notice, .world-impulse-banner, .building-notice)) .landed-card { opacity: 0; }
+
+/* Die Rolle entrollt sich von der Mitte aus. Nur transform und opacity: Das übernimmt die Grafikkarte, ohne das Banner
+   in jedem Bild neu zu zeichnen. */
+@keyframes bannerUnroll {
+  from { opacity: 0; transform: scaleX(.08); }
+  30% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-page .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice),
+  .board-page .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .last-round-banner, .world-impulse-banner) { animation: none; transition: none; }
+}
+.board-page[data-quality="low"] .board-event-layer :is(.landed-card, .dungeon-status, .double-notice, .dungeon-notice),
+.board-page[data-quality="low"] .board-event-layer > :is(.chronicle-notice, .tavern-notice, .dragon-notice, .building-notice, .last-round-banner, .world-impulse-banner) { animation-duration: .15s; transition: none; }
+
 /* Landekarte: groß der Kaufpreis oder die Miete. */
 .landed-card__price { display: grid; justify-items: center; gap: 2px; margin: var(--space-1) 0 0; }
 .board-page .board-event-layer .landed-card .landed-card__price .price-tag { font: 800 clamp(1.7rem, 2.3vw, 2.4rem)/1.1 var(--font-text); color: var(--c-gold-300); }
@@ -59,6 +146,22 @@
 .mobile-world-status dl > div { display: grid; grid-template-columns: 5.5rem 1fr; gap: var(--space-2); font-size: var(--fs-xs); }
 .mobile-world-status dt { color: var(--c-parchment-500); }
 .mobile-world-status dd { margin: 0; color: var(--c-parchment-100); font-weight: 700; }
+
+/* --- Karte ziehen: Erst hebt sich die oberste Karte vom Stapel (Phaser), dann fliegt sie zur Mitte -------- */
+.board-card-event .card-flip { animation: deckCardLift .76s cubic-bezier(.2, .72, .2, 1) .3s both; }
+/* Erst nach dem Abheben (DECK_LIFT_MS im Brett) übernimmt die große Karte. */
+.board-card-event .card-flip__front { animation-delay: .3s; }
+.board-card-event .card-flip__back { animation-delay: .3s; }
+@keyframes deckCardLift {
+  0% { opacity: 0; transform: translate(var(--draw-x), calc(var(--card-source-y, 78px) - 42px)) scale(calc(var(--card-start-scale, .21) * 1.12)) rotate(-3deg); }
+  10% { opacity: 1; }
+  100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-card-event .card-flip, .board-card-event .card-flip__front { animation: none; }
+}
+.board-page[data-quality="low"] .board-card-event .card-flip,
+.board-page[data-quality="low"] .board-card-event .card-flip__front { animation: none; }
 
 /* Lange Gebäudenamen in schmalen Zellen mit Silbentrennung statt mitten im Wort. */
 .controller-page .controller-detail-card dd { overflow-wrap: break-word; hyphens: auto; }

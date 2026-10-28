@@ -582,6 +582,16 @@ function MovementShowcase({ kind }: { kind: "corner" | "multi" | "wrap" }) {
 }
 
 /** TV-Lobby mit Titelbild und Beispielgefährten, ohne Verbindung zum Spielserver. */
+/** Kartengalerie: mehrere Karten groß (TV) und kompakt (Handy), darunter lange Titel und lange Texte. */
+const GALLERY_CARDS = ["adv_002", "fate_010", "adv_025", "adv_024", "fate_020", "fate_024"] as const;
+function CardGalleryQa() {
+  const active = (cardId: string) => ({ cardId, deck: cardId.startsWith("adv") ? "adventure" as const : "fate" as const, playerId: "p1", status: "readyToAcknowledge" as const });
+  return <main className="card-gallery-qa">
+    <div className="card-gallery-qa__tv">{GALLERY_CARDS.map(cardId => <div key={cardId} className="board-card-event-qa"><CardReveal activeCard={active(cardId)} /></div>)}</div>
+    <div className="card-gallery-qa__phone controller-page">{GALLERY_CARDS.map(cardId => <section key={cardId} className="controller-card-event"><CardReveal activeCard={active(cardId)} compact /></section>)}</div>
+  </main>;
+}
+
 function LobbyQa({ empty = false }: { empty?: boolean }) {
   const players: Player[] = empty ? [] : [
     { id: "p1", name: "Philipp", type: "human", color: "violet", characterId: "elvenSpellweaver", ready: true, connectionState: "connected", joinedAt: 1 },
@@ -650,6 +660,7 @@ export function VisualQaPage() {
   if (scenario === "controller-emotes-cooldown") return <MobileEmotesQa cooldown />;
   if (isBoardFieldScene(scenario)) return <BoardFieldsQa scene={scenario} />;
   if (isStagingScene(scenario)) return <StagingQa scene={scenario} createBase={() => createShowcaseState("buildings")} />;
+  if (scenario === "card-gallery") return <CardGalleryQa />;
   if (scenario === "lobby") return <LobbyQa />;
   if (scenario === "controller-target") return <MobileTargetQa />;
   if (scenario === "controller-target-rent") return <MobileTargetQa owned />;

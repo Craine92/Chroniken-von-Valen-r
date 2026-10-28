@@ -251,3 +251,9 @@ article.card-reveal.card-reveal--compact:not(.card-reveal--illustrated) .card-re
 .mobile-victory__facts div { display: grid; }
 .mobile-victory__facts dt { color: var(--c-parchment-500); font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: .08em; }
 .mobile-victory__facts dd { margin: 0; color: var(--c-parchment-100); font: 700 var(--fs-md) var(--font-text); }
+
+/* --- Visual-QA: Kartengalerie ---------------------------------------------------------------------------------- */
+.card-gallery-qa { display: grid; gap: 28px; min-height: 100vh; padding: 24px; box-sizing: border-box; background: #120d0c; }
+.card-gallery-qa__tv { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.card-gallery-qa__phone { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 18px; align-items: start; min-height: 0; }
+.card-gallery-qa__phone::before, .card-gallery-qa__phone::after { display: none; }

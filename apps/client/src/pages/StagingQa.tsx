@@ -13,7 +13,7 @@ export const STAGING_SCENES = [
   // Feinschliff: Landekarte mit Kaufpreis bzw. Miete, Banner weicht dem Geschehen aus.
   "landing-free-discount", "landing-rent-low", "landing-own",
   // Siegerehrung: live mit Siegmoment, oder gleich die Ehrung.
-  "victory", "victory-ceremony"
+  "victory", "victory-ceremony", "victory-ceremony-duo"
 ] as const;
 export type StagingScene = string;
 
@@ -132,6 +132,17 @@ const SCENES: Record<string, { prepare?: (draft: GameState) => void; trigger?: (
   },
   "victory-ceremony": {
     prepare: draft => { draft.currentRound = 12; finish(draft, Date.now() - 60_000); draft.matchStats = showcaseMatchStats(draft); }
+  },
+  // Zwei Spieler wie in der kürzesten echten Partie: Der Sieger sammelt viele Auszeichnungen.
+  "victory-ceremony-duo": {
+    prepare: draft => {
+      draft.players = draft.players.filter(player => player.id === "p1" || player.id === "p4");
+      draft.turnOrder = draft.turnOrder.filter(id => id === "p1" || id === "p4");
+      draft.propertyOwnerships = draft.propertyOwnerships.filter(entry => entry.ownerId === "p1" || entry.ownerId === "p4");
+      draft.currentRound = 27; draft.status = "finished"; draft.players[0]!.isBankrupt = true; draft.winnerId = "p4"; draft.winnerIds = ["p4"];
+      draft.gameResult = { finishReason: "lastPlayerStanding", winnerIds: ["p4"], finishedAt: Date.now() - 60_000, roundsPlayed: 27 };
+      draft.matchStats = showcaseMatchStats(draft, 27);
+    }
   },
   "card-flip": {
     trigger: draft => {

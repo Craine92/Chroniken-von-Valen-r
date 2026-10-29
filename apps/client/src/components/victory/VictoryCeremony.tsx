@@ -8,6 +8,8 @@ import { getGraphicsQuality, prefersReducedMotion } from "../../game/visual-conf
 /** So lange gehört die Bühne dem Brett: Kamerafahrt, Lichtkegel, Funkenregen und der Chronist. */
 export const VICTORY_MOMENT_MS = 5_200;
 export const VICTORY_MOMENT_CALM_MS = 1_200;
+/** So viele Auszeichnungen stehen je Spieler auf der Karte; weitere werden gezählt („+2 weitere“). */
+export const SHOWN_AWARDS = 3;
 
 /** Podestplätze in der Anzeige: Zweiter links, Erster in der Mitte, Dritter rechts. */
 export function podiumOrder(ranking: readonly string[]): { id: string; place: number }[] {
@@ -55,7 +57,7 @@ export function VictoryCeremony({ gameState, onNewChronicle }: { gameState: Game
       <p>{winners.length > 1 ? winners.map(winner => winner.name).join(" · ") : "Herrscher von Valenør"} · {gameState.currentRound} Runden</p>
     </header>
     <div className="victory-ceremony__stage">
-      <div className="victory-podium" aria-label="Siegerpodest">
+      <div className="victory-podium" aria-label="Siegerpodest" style={{ "--podium-places": Math.min(3, ranking.length) } as CSSProperties}>
         {podiumOrder(ranking).map(({ id, place }, index) => {
           const player = players.get(id)!;
           return <div key={id} className={`victory-podium__step victory-podium__step--${place} player-theme--${player.color}`} style={{ "--step-delay": `${[600, 1_000, 200][index] ?? 0}ms` } as CSSProperties}>
@@ -83,7 +85,8 @@ export function VictoryCeremony({ gameState, onNewChronicle }: { gameState: Game
         const player = players.get(id)!;
         return <li key={id} className={`victory-award player-theme--${player.color}`} style={{ "--item-delay": `${1_800 + index * 160}ms` } as CSSProperties}>
           <PlayerPortrait characterId={player.characterId} />
-          <div><strong>{player.name}</strong>{awards[id]!.map(award => <p key={award.id}><b>{award.title}</b><span>{award.reason}</span></p>)}</div>
+          <div><strong>{player.name}</strong>{awards[id]!.slice(0, SHOWN_AWARDS).map(award => <p key={award.id}><b>{award.title}</b><span>{award.reason}</span></p>)}
+            {awards[id]!.length > SHOWN_AWARDS && <small className="victory-award__more" title={awards[id]!.slice(SHOWN_AWARDS).map(award => award.title).join(", ")}>+{awards[id]!.length - SHOWN_AWARDS} weitere: {awards[id]!.slice(SHOWN_AWARDS).map(award => award.title).join(", ")}</small>}</div>
         </li>;
       })}
     </ul>

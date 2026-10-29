@@ -179,7 +179,7 @@ test("TV presents an active fate card over the board without a permanent chronic
   state.turnPhase = "paymentRequired";
   state.pendingPayment = { payerId: "p1", amount: 100, reason: "Fluch der Mondfinsternis", creditorType: "bank", reasonType: "card" };
   const markup = renderToStaticMarkup(<GameExperience gameState={state} />);
-  assert.match(markup, /Fluch der Mondfinsternis/);
+  assert.match(markup.replaceAll("­", ""), /Fluch der Mondfinsternis/, "title with soft hyphens at word joints");
   assert.match(markup, /class="board-card-event"/);
   assert.doesNotMatch(markup, /game-context-sidebar/);
   assert.equal((markup.match(/data-testid="card-reveal"/g) ?? []).length, 1);

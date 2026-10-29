@@ -91,10 +91,11 @@ export function WealthChart({ snapshots, series, animate = true }: { snapshots: 
           <span key={entry.id}><i className={`wealth-key player-theme--${entry.color}`} /><b>{(hoverSnapshot.values[entry.id] ?? 0).toLocaleString("de-DE")}</b> {entry.name}</span>)}
       </div>}
     </div>
-    <table className="visually-hidden">
+    {/* Tabellen ignorieren Höhenangaben; deshalb versteckt ein Behälter die Tabelle, nicht die Tabelle sich selbst. */}
+    <div className="visually-hidden"><table>
       <caption>Vermögen in Gold je Runde</caption>
       <thead><tr><th scope="col">Runde</th>{series.map(entry => <th key={entry.id} scope="col">{entry.name}</th>)}</tr></thead>
       <tbody>{snapshots.map(snapshot => <tr key={snapshot.round}><th scope="row">{snapshot.round === 0 ? "Start" : snapshot.round}</th>{series.map(entry => <td key={entry.id}>{snapshot.values[entry.id] ?? 0}</td>)}</tr>)}</tbody>
-    </table>
+    </table></div>
   </figure>;
 }

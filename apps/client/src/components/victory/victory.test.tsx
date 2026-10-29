@@ -38,7 +38,7 @@ test("the ceremony shows podium, a line per player with legend and table, record
   assert.match(html, /Siegerpodest/);
   assert.equal((html.match(/class="wealth-chart__line/g) ?? []).length, 4);
   assert.equal((html.match(/<li><i class="wealth-key/g) ?? []).length, 4, "legend for every player");
-  assert.match(html, /<table class="visually-hidden">/);
+  assert.match(html, /<div class="visually-hidden"><table>/);
   assert.match(html, /Höchste Miete/);
   assert.equal((html.match(/class="victory-award /g) ?? []).length, 4);
   for (const name of ["Philipp", "Justine", "Ragna", "Eldric"]) assert.match(html, new RegExp(`<strong>${name}</strong><p>`), `${name} has at least one award`);

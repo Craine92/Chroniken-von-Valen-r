@@ -1,4 +1,4 @@
-import { lazy, Suspense, type CSSProperties } from "react";
+import { lazy, Suspense, useState, type CSSProperties } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { MIN_PLAYERS, MAX_PLAYERS, type GameConfig, type GameRoom, type MagicSignal } from "@valenor/shared";
 import { Ambience } from "../components/Ambience";
@@ -9,6 +9,7 @@ import { PlayerSlot } from "../components/PlayerSlot";
 import { CODEX_COLORS } from "../game/design-tokens";
 import { LOBBY_ASSETS } from "../game/assets/asset-manifest";
 import { Icon } from "../components/icons/Icon";
+import { FriendGuideDialog } from "../components/guide/FriendGuide";
 
 const CreditsOverlay = lazy(() => import("../components/credits/CreditsOverlay"));
 
@@ -31,6 +32,7 @@ export interface HostLobbyProps {
 /** Die TV-Lobby ohne Verbindungslogik: Titelbild, Beitritt per QR-Code, Gefährten und Spielmodus. */
 export function HostLobby({ room, controllerUrl, connected, busy, signal, error, creditsOpen, onAddComputer, onRemovePlayer, onConfigChange, onStart, onOpenCredits, onCloseCredits }: HostLobbyProps) {
   const players = room?.players ?? [];
+  const [guideOpen, setGuideOpen] = useState(false);
   const connectedHumans = players.filter(
     (player) => player.type === "human" && player.connectionState === "connected"
   ).length;
@@ -130,7 +132,8 @@ export function HostLobby({ room, controllerUrl, connected, busy, signal, error,
         </div>
       )}
       {error && <div className="error-toast" role="alert">{error}</div>}
-      <footer className="host-footer"><span>CHRONIKEN VON VALENØR · SPIELVORBEREITUNG</span><button type="button" className="host-footer__credits" onClick={onOpenCredits}>Mitwirkende</button></footer>
+      <footer className="host-footer"><span>CHRONIKEN VON VALENØR · SPIELVORBEREITUNG</span><button type="button" className="host-footer__credits" onClick={() => setGuideOpen(true)}>Anleitung</button><button type="button" className="host-footer__credits" onClick={onOpenCredits}>Mitwirkende</button></footer>
+      {guideOpen && <FriendGuideDialog onClose={() => setGuideOpen(false)} />}
       {creditsOpen && <Suspense fallback={null}><CreditsOverlay onClose={onCloseCredits} /></Suspense>}
     </main>
   );

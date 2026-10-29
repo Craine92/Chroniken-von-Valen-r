@@ -1,0 +1,53 @@
+/* ==========================================================================
+   Anleitung für Freunde: als Fenster über der Lobby, als eigene Seite und
+   als Vorlage der Anleitung.pdf (Druckansicht A4, hell).
+   ========================================================================== */
+.friend-guide { color: var(--c-parchment-100); font: 400 var(--fs-md)/1.5 var(--font-text); }
+.friend-guide header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
+.friend-guide header h1 { margin: 0; color: var(--c-gold-200); font: 700 var(--fs-2xl)/1.1 var(--font-display); }
+.friend-guide header p { margin: var(--space-1) 0 0; color: var(--c-parchment-300); }
+.friend-guide__steps { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.friend-guide__steps li { display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid rgb(var(--c-gold-400-rgb) / .3); border-radius: 10px; background: rgb(255 255 255 / .03); break-inside: avoid; }
+.friend-guide__number { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; color: #1b130b; background: linear-gradient(180deg, var(--c-gold-200), var(--c-gold-500)); border-radius: 50%; font: 800 var(--fs-lg) var(--font-display); }
+.friend-guide__steps h2, .friend-guide__tips h2 { margin: 0 0 var(--space-1); color: var(--c-gold-300); font: 700 var(--fs-lg) var(--font-display); }
+.friend-guide__steps p { margin: 0 0 var(--space-1); }
+.friend-guide__tips { margin-top: var(--space-5); break-inside: avoid; }
+.friend-guide__tips dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); margin: 0; }
+.friend-guide__tips dt { color: var(--c-gold-200); font-weight: 800; }
+.friend-guide__tips dd { margin: 0; color: var(--c-parchment-300); }
+
+.friend-guide-overlay { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: var(--space-4); background: rgb(6 4 8 / .78); }
+.friend-guide--dialog { width: min(1100px, 100%); max-height: calc(100dvh - 2rem); box-sizing: border-box; overflow: auto; padding: var(--space-5) var(--space-6); border: 1px solid var(--c-gold-400); border-radius: 12px; background: linear-gradient(170deg, rgb(32 24 18 / .98), rgb(12 9 8 / .98)); box-shadow: 0 30px 80px rgb(0 0 0 / .7); }
+.friend-guide--dialog .friend-guide__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.friend-guide__close { min-height: var(--touch-target); padding: 0 var(--space-4); color: var(--c-gold-200); background: transparent; border: 1px solid var(--c-gold-500); border-radius: 8px; font: 700 var(--fs-sm) var(--font-text); }
+
+.friend-guide--page { max-width: 900px; margin: 0 auto; padding: var(--space-6) var(--space-5); min-height: 100vh; box-sizing: border-box; background: #120d0c; }
+.friend-guide--page header { justify-content: flex-start; }
+
+/* Anleitung.pdf: hell, gut druckbar, eine A4-Seite. */
+@page { size: A4; margin: 14mm; }
+@media print {
+  html, body, #root { background: #fff !important; }
+  body::before, body::after { display: none !important; }
+  .friend-guide--page { max-width: none; min-height: 0; padding: 0; color: #2a1d12; background: #fff; font-size: 10.5pt; }
+  .friend-guide--page header h1 { color: #5b3a10; font-size: 22pt; }
+  .friend-guide--page header p, .friend-guide--page .eyebrow { color: #6b5a44; }
+  .friend-guide--page .brand-mark { filter: brightness(.35) sepia(1) saturate(2); }
+  .friend-guide--page .friend-guide__steps li { padding: 6pt 9pt; border-color: #d8c08a; background: #fbf6ea; }
+  .friend-guide--page .friend-guide__steps h2, .friend-guide--page .friend-guide__tips h2 { color: #7a4f12; font-size: 13pt; }
+  .friend-guide--page .friend-guide__tips dt { color: #5b3a10; }
+  .friend-guide--page .friend-guide__tips dd { color: #3a2b1c; }
+  .friend-guide--page .friend-guide__number { color: #fff; background: #a5761f; }
+}
+
+/* Im Fenster auf dem TV: auf flachen Bildschirmen dichter, damit alles ohne Scrollen zu sehen ist; der Tipp-Bereich wird vierspaltig. */
+@media (max-height: 900px) {
+  .friend-guide--dialog { padding: var(--space-4) var(--space-5); font-size: var(--fs-sm); line-height: 1.4; }
+  .friend-guide--dialog header { margin-bottom: var(--space-3); }
+  .friend-guide--dialog .friend-guide__steps { gap: var(--space-2); }
+  .friend-guide--dialog .friend-guide__steps li { padding: var(--space-2) var(--space-3); }
+  .friend-guide--dialog .friend-guide__steps h2, .friend-guide--dialog .friend-guide__tips h2 { font-size: var(--fs-md); }
+  .friend-guide--dialog .friend-guide__steps p { margin-bottom: 2px; }
+  .friend-guide--dialog .friend-guide__tips { margin-top: var(--space-3); }
+  .friend-guide--dialog .friend-guide__tips dl { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { ControllerPage } from "./pages/ControllerPage";
 import { HostPage } from "./pages/HostPage";
 import { AudioRuntime } from "./audio/AudioSettings";
+import { FriendGuidePage } from "./components/guide/FriendGuide";
 
 const VisualQaPage = import.meta.env.DEV
   ? lazy(() => import("./pages/VisualQaPage").then((module) => ({ default: module.VisualQaPage })))
@@ -13,6 +14,7 @@ export function App() {
   if (path === "/controller") return <><AudioRuntime role="controller" /><ControllerPage /></>;
   if (path === "/visual-qa" && VisualQaPage) return <Suspense fallback={null}><VisualQaPage /></Suspense>;
   if (path === "/host" || path === "/") return <><AudioRuntime role="board" /><HostPage /></>;
+  if (path === "/anleitung") return <FriendGuidePage />;
 
   return (
     <main className="not-found">

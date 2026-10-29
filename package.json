@@ -12,7 +12,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "start": "npm run start --workspace @valenor/server",
-    "dist:win": "electron-builder --win nsis portable --x64 --publish never"
+    "dist:win": "npm run anleitung:pdf && electron-builder --win portable nsis --x64 --publish never",
+    "anleitung:pdf": "electron scripts/anleitung-pdf.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
@@ -26,27 +27,65 @@
   "build": {
     "appId": "de.valenor.chroniken",
     "productName": "Chroniken von Valenør",
-    "asar": false,
+    "copyright": "© 2026 Chroniken von Valenør",
+    "asar": true,
+    "electronLanguages": [
+      "de",
+      "en-US"
+    ],
+    "compression": "maximum",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "desktop/build"
     },
     "files": [
-      "desktop/**/*",
+      "desktop/main.cjs",
+      "desktop/build/icon.png",
       "apps/client/dist/**/*",
+      "!apps/client/dist/assets/buildings/building-test-sheet.png",
+      "!apps/client/dist/assets/characters/characters-sheet.png",
       "apps/server/dist/**/*",
-      "node_modules/**/*",
+      "apps/server/package.json",
       "package.json"
+    ],
+    "extraFiles": [
+      {
+        "from": "desktop/Anleitung.pdf",
+        "to": "Anleitung.pdf"
+      }
     ],
     "win": {
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "icon": "desktop/build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Chroniken von Valenør",
+      "uninstallDisplayName": "Chroniken von Valenør",
+      "installerIcon": "desktop/build/icon.ico",
+      "uninstallerIcon": "desktop/build/icon.ico",
+      "installerHeaderIcon": "desktop/build/icon.ico",
+      "include": "desktop/build/installer.nsh",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "Chroniken-von-Valenor-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Chroniken-von-Valenor-Portable-${version}.${ext}"
     }
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "socket.io": "^4.8.1"
-  }
+  },
+  "description": "Fantasy-Brettspiel für TV und Handys im selben WLAN.",
+  "author": "Chroniken von Valenør"
 }

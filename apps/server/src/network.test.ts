@@ -102,3 +102,10 @@ test("PUBLIC_HOST still overrides the automatic choice", () => {
   assert.deepEqual(describeAddressChoice({ PUBLIC_HOST: "spiel.local" }, interfaces), ["QR-Code-Adresse: spiel.local (PUBLIC_HOST gesetzt, automatische Auswahl übersprungen)"]);
   assert.equal(resolvePublicHost({ PUBLIC_HOST: "  " }, interfaces), "192.168.178.29", "an empty override is ignored");
 });
+
+test("listen errors become friendly German hints instead of a crash", async () => {
+  const { describeListenError } = await import("./network");
+  assert.match(describeListenError(Object.assign(new Error("x"), { code: "EADDRINUSE" }), 3001), /Port 3001 ist schon belegt/);
+  assert.match(describeListenError(Object.assign(new Error("x"), { code: "EACCES" }), 3001), /neu starten/);
+  assert.match(describeListenError(new Error("kaputt"), 3001), /kaputt/);
+});

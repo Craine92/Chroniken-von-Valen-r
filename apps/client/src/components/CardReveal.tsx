@@ -3,6 +3,7 @@ import { describeCardEffects, getCardDefinition, type ActiveCardState } from "@v
 import { getCardArt, VALENOR_ASSETS } from "../game/assets/asset-manifest";
 import { CARD_FRAME_OPENINGS } from "../game/assets/card-frame-openings";
 import { Icon } from "./icons/Icon";
+import { hyphenateTitle } from "./card-title";
 
 const percent = (value: number) => `${(value * 100).toFixed(2)}%`;
 
@@ -34,7 +35,7 @@ export function CardReveal({ activeCard, compact = false }: { activeCard: Active
         </div>
         <div className="card-reveal__text">
           <small>{card.deck === "adventure" ? "ABENTEUER" : "SCHICKSAL"}</small>
-          <h2>{card.title}</h2>
+          <h2>{hyphenateTitle(card.title)}</h2>
           <p>{card.flavorText}</p>
           <strong>{describeCardEffects(card)}</strong>
         </div>

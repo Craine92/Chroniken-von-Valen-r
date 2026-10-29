@@ -99,3 +99,10 @@ export function createControllerUrl(roomCode: string, env: Env = process.env, in
   const port = env.PUBLIC_CLIENT_PORT ?? (env.NODE_ENV === "production" ? env.PORT ?? "3001" : "5173");
   return `${protocol}://${host}:${port}/controller?room=${encodeURIComponent(roomCode)}`;
 }
+
+/** Verständliche Erklärung, wenn der Server nicht starten kann, mit einem Tipp, was man tun kann. */
+export function describeListenError(error: NodeJS.ErrnoException, port: number): string {
+  if (error.code === "EADDRINUSE") return `Port ${port} ist schon belegt. Läuft Valenør bereits in einem anderen Fenster? Sonst das Programm schließen, das Port ${port} nutzt, oder den PC neu starten.`;
+  if (error.code === "EACCES") return `Windows erlaubt Port ${port} nicht. Bitte den PC neu starten; hilft das nicht, Valenør einmal als Administrator starten.`;
+  return `Der Spielserver konnte nicht starten (${error.code ?? error.message}). Bitte Valenør neu starten.`;
+}

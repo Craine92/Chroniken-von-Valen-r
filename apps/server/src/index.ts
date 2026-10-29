@@ -17,7 +17,7 @@ import {
   type ServerToClientEvents,
   type SocketData
 } from "@valenor/shared";
-import { createControllerUrl, describeAddressChoice, resolvePublicHost } from "./network";
+import { createControllerUrl, describeAddressChoice, describeListenError, resolvePublicHost } from "./network";
 import { RoomManager } from "./room-manager";
 import { EconomicAi, getAiEconomyProfile } from "./ai/economic-ai";
 import { chooseNpcTavernAction } from "./game/economy-service";
@@ -1149,6 +1149,22 @@ if (process.env.NODE_ENV === "production") {
   const clientDirectory = path.resolve(currentDirectory, "../../client/dist");
   app.use(express.static(clientDirectory));
   app.get("/{*path}", (_request, response) => response.sendFile(path.join(clientDirectory, "index.html")));
+}
+
+/**
+ * Meldet, ob der Server lauscht. Die Desktop-Version wartet darauf und zeigt bei einem Fehler (z. B. Port belegt) eine
+ * verständliche Meldung statt abzustürzen. Ohne Abnehmer gibt der Server die Meldung selbst aus.
+ */
+export const serverReady = new Promise<{ port: number }>((resolve, reject) => {
+  httpServer.once("listening", () => resolve({ port: PORT }));
+  httpServer.once("error", reject);
+});
+serverReady.catch((error: NodeJS.ErrnoException) => console.error(describeListenError(error, PORT)));
+
+/** Netzwerkzustand für die Desktop-Version: Ohne WLAN/LAN können Handys nicht beitreten. */
+export function getNetworkStatus(): { address: string; reachableByPhones: boolean } {
+  const address = resolvePublicHost();
+  return { address, reachableByPhones: address !== "localhost" && !address.startsWith("127.") };
 }
 
 httpServer.listen(PORT, "0.0.0.0", () => {

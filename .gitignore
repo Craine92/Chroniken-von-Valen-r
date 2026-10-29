@@ -21,3 +21,8 @@ Thumbs.db
 
 .sites-runtime/
 assets-neu/
+
+# Symbol und Installer-Zusätze der Desktop-Version gehören ins Repository.
+!desktop/build/
+# Fertige Windows-Pakete (npm run dist:win) – zu groß fürs Repository.
+release/

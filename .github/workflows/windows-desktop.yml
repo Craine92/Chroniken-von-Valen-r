@@ -19,22 +19,29 @@ jobs:
           node-version: "22"
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Typecheck and tests
+        run: |
+          npm run typecheck
+          npm test
       - name: Build game and server
         run: npm run build
-      - name: Package Windows installers
+      - name: Package Windows installers (creates Anleitung.pdf first)
         run: npm run dist:win
-      - name: Verify packaged server dependencies
+      - name: Verify packaged app
         shell: pwsh
         run: |
-          $root = "release/win-unpacked/resources/app/node_modules"
-          foreach ($module in @("cors", "express", "socket.io")) {
-            if (-not (Test-Path (Join-Path $root $module))) {
-              throw "Missing server module in Windows package: $module"
-            }
+          # Der Spielinhalt liegt im Archiv app.asar; die Server-Module, das Spiel und der Server müssen darin sein.
+          $files = node -e "console.log(require('@electron/asar').listPackage('release/win-unpacked/resources/app.asar').join('\n'))"
+          foreach ($entry in @("\node_modules\cors", "\node_modules\express", "\node_modules\socket.io", "\apps\server\dist\index.js", "\apps\client\dist\index.html")) {
+            if (-not ($files -contains $entry)) { throw "Missing in Windows package: $entry" }
           }
+          if (-not (Test-Path "release/win-unpacked/Anleitung.pdf")) { throw "Anleitung.pdf missing next to the program" }
+          Get-ChildItem release/*.exe | ForEach-Object { "{0}  {1:N0} MB" -f $_.Name, ($_.Length / 1MB) }
       - name: Upload Windows builds
         uses: actions/upload-artifact@v4
         with:
           name: Valenor-Windows
-          path: release/*.exe
+          path: |
+            release/*.exe
+            desktop/Anleitung.pdf
           if-no-files-found: error
